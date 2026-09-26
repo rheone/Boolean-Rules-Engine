@@ -1,0 +1,10 @@
+<Solution FileFormatVersion="12.00" VisualStudioVersion="17.0" MinimumVisualStudioVersion="10.0">
+  <Solution>
+    <Project Name="BooleanRulesEngine" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="BooleanRulesEngine" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="BooleanRulesEngine.Tests" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="BooleanRulesEngine.Tests" Configuration="Release|AnyCPU" Build="true" />
+  </Solution>
+  <Project Path="src\BooleanRulesEngine\BooleanRulesEngine.csproj" />
+  <Project Path="tests\BooleanRulesEngine.Tests\BooleanRulesEngine.Tests.csproj" />
+</Solution>

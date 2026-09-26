@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore __SOLUTION__ --locked-mode
+
+      - name: Build
+        run: dotnet build __SOLUTION__ --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test __SOLUTION__ --configuration Release --no-build
+
+      - name: CSharpier
+        run: dotnet csharpier check .
+
+      - name: dotnet format
+        run: dotnet format __SOLUTION__ --no-restore --verify-no-changes --severity info
+
+      - name: Roslynator
+        run: dotnet roslynator analyze __SOLUTION__

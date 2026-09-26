@@ -1,0 +1,83 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- <TreatWarningsAsErrors>true</TreatWarningsAsErrors> -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>true</IsPackable>
+    <Version>1.0.0-dev</Version>
+    <Authors>Robert H. Engelhardt</Authors>
+    <!-- No Company: this is an individual-authored project, not published under a company entity - Authors
+         above already carries attribution. Deliberately omitted rather than a placeholder value. -->
+    <Copyright>Copyright 2024-2025 Robert H. Engelhardt</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <RepositoryUrl>https://github.com/rheone/interlocutor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/rheone/interlocutor</PackageProjectUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PackageTags>rules engine</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- No PackageIcon yet: no icon asset exists in the repo, and a placeholder image is worse than none -
+         add one and set PackageIcon when real branding exists, rather than shipping a fabricated stand-in. -->
+  </PropertyGroup>
+
+  <!-- Source Link -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <!-- Package README - every packable project ships the repo root README as its NuGet readme. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- AD0001: Roslyn analyzer failure (an analyzer threw an exception) -->
+    <!-- SA1633: File should have a header -->
+    <NoWarn>$(NoWarn)AD0001;SA1633</NoWarn>
+  </PropertyGroup>
+
+  <!-- Shared BCL usings -->
+  <ItemGroup>
+    <Using Include="System.Collections.Concurrent" />
+  </ItemGroup>
+
+  <!-- Roslynator analyzers -->
+  <ItemGroup>
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Formatting.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- StyleCop -->
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- SonarAnalyzer -->
+  <ItemGroup>
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Async/await usage analyzers -->
+  <ItemGroup>
+    <PackageReference Include="AsyncFixer" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- IDisposable usage analyzer -->
+  <ItemGroup>
+    <PackageReference Include="IDisposableAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Shared AdditionalFiles -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory).editorconfig" Link=".editorconfig" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)dictionary.dic" Link="dictionary.dic" />
+  </ItemGroup>
+</Project>
