@@ -1,0 +1,47 @@
+namespace BooleanRulesEngine.Diagnostics;
+
+/// <summary>Well-known <see cref="Diagnostic.Code"/> values produced by the compiler pipeline.</summary>
+public static class DiagnosticCodes
+{
+    /// <summary>A syntax error while parsing rule text.</summary>
+    public const string SyntaxError = "BRE0001";
+
+    /// <summary>A term references a predicate name with no matching registration.</summary>
+    public const string UnknownPredicate = "BRE0002";
+
+    /// <summary>A term omits a required argument declared by the predicate's schema.</summary>
+    public const string MissingArgument = "BRE0003";
+
+    /// <summary>A term supplies an argument whose value's kind does not match the predicate's schema.</summary>
+    public const string ArgumentTypeMismatch = "BRE0004";
+
+    /// <summary>A term supplies an argument name the predicate's schema does not declare.</summary>
+    public const string UnknownArgument = "BRE0005";
+
+    /// <summary><c>XOR</c> was given more than two operands.</summary>
+    public const string XorArityViolation = "BRE0006";
+
+    /// <summary><c>XOR</c> was combined with <c>AND</c>/<c>OR</c> at the same syntactic level without parentheses.</summary>
+    public const string AmbiguousOperatorMixing = "BRE0007";
+
+    /// <summary><c>AtLeast(k, ...)</c> was given a <c>k</c> outside <c>1..operandCount</c>.</summary>
+    public const string InvalidAtLeastThreshold = "BRE0008";
+
+    /// <summary>The expression tree exceeds <c>CompilerOptions.MaxDepth</c>.</summary>
+    public const string MaxDepthExceeded = "BRE0009";
+
+    /// <summary>The expression tree exceeds <c>CompilerOptions.MaxNodeCount</c>.</summary>
+    public const string MaxNodeCountExceeded = "BRE0010";
+
+    /// <summary>Constant/contradiction analysis was skipped because the term count exceeds <c>CompilerOptions.MaxAnalysisTerms</c>.</summary>
+    public const string AnalysisSkippedTooManyTerms = "BRE0011";
+
+    /// <summary>The analyzer determined a sub-expression is a structural tautology (always <see langword="true"/>).</summary>
+    public const string StructuralTautology = "BRE0012";
+
+    /// <summary>The analyzer determined a sub-expression is a structural contradiction (always <see langword="false"/>).</summary>
+    public const string StructuralContradiction = "BRE0013";
+
+    /// <summary>The tree/JSON/YAML source is malformed independently of DSL syntax (e.g. unknown <c>op</c>, missing discriminator key).</summary>
+    public const string MalformedTree = "BRE0014";
+}

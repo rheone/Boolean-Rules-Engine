@@ -1,0 +1,300 @@
+namespace BooleanRulesEngine.Yaml;
+
+using System.Diagnostics.CodeAnalysis;
+using BooleanRulesEngine.Diagnostics;
+using BooleanRulesEngine.Parsing;
+using YamlDotNet.Core;
+using YamlDotNet.RepresentationModel;
+
+/// <summary>
+/// Parses the identical flat, key-discriminated tree shape JSON uses (ADR-0003), expressed in YAML,
+/// into the same raw <see cref="RuleNode"/> tree the DSL and JSON front ends produce (ticket 08).
+/// Never throws for malformed YAML — it reports a <see cref="DiagnosticCodes.MalformedTree"/>
+/// diagnostic instead.
+/// </summary>
+internal static class YamlTreeParser
+{
+    /// <summary>Parses YAML tree text into a raw <see cref="RuleNode"/> tree plus any diagnostics.</summary>
+    /// <param name="yaml">The YAML tree text.</param>
+    /// <returns>
+    /// The parsed root node (or <see langword="null"/> if the YAML itself was malformed) and the
+    /// diagnostics raised while parsing.
+    /// </returns>
+    public static (RuleNode? Root, IReadOnlyList<Diagnostic> Diagnostics) Parse(string yaml)
+    {
+        List<Diagnostic> diagnostics = [];
+        YamlStream stream = [];
+        try
+        {
+            using StringReader reader = new(yaml);
+            stream.Load(reader);
+        }
+        catch (YamlException ex)
+        {
+            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Malformed YAML: {ex.Message}", SourceSpan.None));
+            return (null, diagnostics);
+        }
+
+        if (stream.Documents.Count == 0)
+        {
+            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, "The YAML document is empty.", SourceSpan.None));
+            return (null, diagnostics);
+        }
+
+        RuleNode? root = ParseNode(stream.Documents[0].RootNode, diagnostics);
+        return (root, diagnostics);
+    }
+
+    private static RuleNode? ParseNode(YamlNode node, List<Diagnostic> diagnostics)
+    {
+        if (node is not YamlMappingNode mapping)
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"Expected a YAML mapping node but found {node.NodeType}.",
+                    SourceSpan.None
+                )
+            );
+            return null;
+        }
+
+        if (TryGetChild(mapping, "const", out YamlNode? constNode))
+        {
+            if (constNode is not YamlScalarNode { Value: { } constText } || !TryParseBoolean(constText, out bool constValue))
+            {
+                diagnostics.Add(
+                    Diagnostic.Error(DiagnosticCodes.MalformedTree, "'const' must be a YAML boolean.", SourceSpan.None)
+                );
+                return null;
+            }
+
+            return new ConstantNode(constValue, SourceSpan.None);
+        }
+
+        if (TryGetChild(mapping, "predicate", out YamlNode? predicateNode))
+        {
+            return ParseTerm(mapping, predicateNode, diagnostics);
+        }
+
+        if (TryGetChild(mapping, "op", out YamlNode? opNode) && opNode is YamlScalarNode { Value: { } opText })
+        {
+            return ParseOperator(mapping, opText, diagnostics);
+        }
+
+        diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.MalformedTree,
+                "A tree node must have a 'const', 'predicate', or 'op' key.",
+                SourceSpan.None
+            )
+        );
+        return null;
+    }
+
+    private static RuleNode? ParseTerm(YamlMappingNode mapping, YamlNode predicateNode, List<Diagnostic> diagnostics)
+    {
+        if (predicateNode is not YamlScalarNode { Value: { } predicateName })
+        {
+            diagnostics.Add(
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, "'predicate' must be a YAML string.", SourceSpan.None)
+            );
+            return null;
+        }
+
+        List<ArgumentNode> arguments = [];
+        if (TryGetChild(mapping, "args", out YamlNode? argsNode))
+        {
+            if (argsNode is not YamlMappingNode argsMapping)
+            {
+                diagnostics.Add(
+                    Diagnostic.Error(DiagnosticCodes.MalformedTree, "'args' must be a YAML mapping.", SourceSpan.None)
+                );
+                return null;
+            }
+
+            foreach (KeyValuePair<YamlNode, YamlNode> entry in argsMapping.Children)
+            {
+                if (entry.Key is not YamlScalarNode { Value: { } argName })
+                {
+                    diagnostics.Add(
+                        Diagnostic.Error(
+                            DiagnosticCodes.MalformedTree,
+                            "An argument name must be a YAML string.",
+                            SourceSpan.None
+                        )
+                    );
+                    return null;
+                }
+
+                RawLiteral? literal = ParseLiteral(entry.Value, diagnostics);
+                if (literal is null)
+                {
+                    return null;
+                }
+
+                arguments.Add(new ArgumentNode(argName, literal, SourceSpan.None));
+            }
+        }
+
+        return new TermNode(predicateName, arguments, SourceSpan.None);
+    }
+
+    private static RuleNode? ParseOperator(YamlMappingNode mapping, string op, List<Diagnostic> diagnostics)
+    {
+        if (
+            !TryGetChild(mapping, "operands", out YamlNode? operandsNode)
+            || operandsNode is not YamlSequenceNode operandsSequence
+        )
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"Operator node '{op}' requires an 'operands' sequence.",
+                    SourceSpan.None
+                )
+            );
+            return null;
+        }
+
+        List<RuleNode> operands = [];
+        foreach (YamlNode operandNode in operandsSequence.Children)
+        {
+            RuleNode? operand = ParseNode(operandNode, diagnostics);
+            if (operand is null)
+            {
+                return null;
+            }
+
+            operands.Add(operand);
+        }
+
+        switch (op.ToUpperInvariant())
+        {
+            case "AND":
+                return new AndNode(operands, SourceSpan.None);
+            case "OR":
+                return new OrNode(operands, SourceSpan.None);
+            case "NOT":
+                if (operands.Count != 1)
+                {
+                    diagnostics.Add(
+                        Diagnostic.Error(DiagnosticCodes.MalformedTree, "'not' requires exactly one operand.", SourceSpan.None)
+                    );
+                    return null;
+                }
+
+                return new NotNode(operands[0], SourceSpan.None);
+            case "XOR":
+                return new XorNode(operands, SourceSpan.None);
+            case "EXACTLYONE":
+                return new ExactlyOneNode(operands, SourceSpan.None);
+            case "ATLEAST":
+                if (
+                    !TryGetChild(mapping, "k", out YamlNode? kNode)
+                    || kNode is not YamlScalarNode { Value: { } kText }
+                    || !int.TryParse(kText, out int k)
+                )
+                {
+                    diagnostics.Add(
+                        Diagnostic.Error(DiagnosticCodes.MalformedTree, "'atLeast' requires a numeric 'k'.", SourceSpan.None)
+                    );
+                    return null;
+                }
+
+                return new AtLeastNode(k, operands, SourceSpan.None);
+            default:
+                diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Unknown operator '{op}'.", SourceSpan.None));
+                return null;
+        }
+    }
+
+    private static RawLiteral? ParseLiteral(YamlNode node, List<Diagnostic> diagnostics)
+    {
+        switch (node)
+        {
+            case YamlScalarNode scalar:
+                return ClassifyScalar(scalar);
+            case YamlSequenceNode sequence:
+                List<RawLiteral> items = [];
+                foreach (YamlNode child in sequence.Children)
+                {
+                    RawLiteral? converted = ParseLiteral(child, diagnostics);
+                    if (converted is null)
+                    {
+                        return null;
+                    }
+
+                    items.Add(converted);
+                }
+
+                return RawLiteral.OfArray(items, SourceSpan.None);
+            default:
+                diagnostics.Add(
+                    Diagnostic.Error(
+                        DiagnosticCodes.MalformedTree,
+                        $"Unsupported YAML node type '{node.NodeType}' for a literal value.",
+                        SourceSpan.None
+                    )
+                );
+                return null;
+        }
+    }
+
+    private static RawLiteral ClassifyScalar(YamlScalarNode scalar)
+    {
+        string text = scalar.Value ?? string.Empty;
+
+        // A quoted scalar is always the author's explicit string, regardless of its content
+        // (e.g. role: "true" must stay the string "true", not become a boolean).
+        if (scalar.Style is ScalarStyle.SingleQuoted or ScalarStyle.DoubleQuoted or ScalarStyle.Literal or ScalarStyle.Folded)
+        {
+            return RawLiteral.OfString(text, SourceSpan.None);
+        }
+
+        if (TryParseBoolean(text, out bool boolValue))
+        {
+            return RawLiteral.OfBoolean(boolValue, SourceSpan.None);
+        }
+
+        return IsNumber(text) ? RawLiteral.OfNumber(text, SourceSpan.None) : RawLiteral.OfString(text, SourceSpan.None);
+    }
+
+    private static bool TryParseBoolean(string text, out bool value)
+    {
+        if (string.Equals(text, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            value = true;
+            return true;
+        }
+
+        if (string.Equals(text, "false", StringComparison.OrdinalIgnoreCase))
+        {
+            value = false;
+            return true;
+        }
+
+        value = false;
+        return false;
+    }
+
+    private static bool IsNumber(string text)
+    {
+        return decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
+    }
+
+    private static bool TryGetChild(YamlMappingNode mapping, string key, [NotNullWhen(true)] out YamlNode? value)
+    {
+        foreach (KeyValuePair<YamlNode, YamlNode> entry in mapping.Children)
+        {
+            if (entry.Key is YamlScalarNode { Value: { } keyText } && string.Equals(keyText, key, StringComparison.Ordinal))
+            {
+                value = entry.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+}

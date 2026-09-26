@@ -130,6 +130,9 @@ A node is discriminated by which key is present (`op` vs. `predicate`)
 rather than by an extra wrapper object, halving the nesting depth for the
 same information. YAML uses the identical shape under YamlDotNet.
 
+The `true`/`false` constant (user story 11) uses the same discrimination
+principle with a third key: `{"const": true}` / `{"const": false}`.
+
 ### Compilation pipeline
 
 ```mermaid

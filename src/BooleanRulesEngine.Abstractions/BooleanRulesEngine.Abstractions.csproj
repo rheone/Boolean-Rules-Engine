@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>c3f1a2b4-5d6e-4f7a-8b9c-0d1e2f3a4b5c</ProjectGuid>
+    <RootNamespace>BooleanRulesEngine.Abstractions</RootNamespace>
+    <Description>
+      Zero-third-party-dependency kernel for BooleanRulesEngine: IPredicate&lt;TContext&gt;,
+      PredicateSchema, PredicateArguments, TruthValue, Decision, and Fault. Reference this
+      package alone from a service that only implements and registers predicates.
+    </Description>
+  </PropertyGroup>
+</Project>

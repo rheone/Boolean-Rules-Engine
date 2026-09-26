@@ -29,73 +29,18 @@
   <ItemGroup>
     <PackageVersion Include="IDisposableAnalyzers" Version="4.0.8" />
   </ItemGroup>
-  <!-- Public API surface tracking - referenced only by the packable src/ libraries, not
-       Interlocutor.Generator (tracked separately via its own AnalyzerReleases.*.md), tests, or
-       TutorialProject. -->
-  <ItemGroup>
-    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.11.0-1.26425.128" />
-  </ItemGroup>
-  <!-- Microsoft extensions (ship with .NET 11) -->
+  <!-- Microsoft extensions (ship with .NET 11). Abstractions packages are what BooleanRulesEngine
+       itself depends on (ADR-0004); the non-Abstractions packages are test-only, wiring a real DI
+       container/logger in the DI-registration-extension tests (ticket 12). -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0-preview.6.26359.118" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0-preview.6.26359.118" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0-preview.7.26381.103" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="11.0.0-preview.7.26381.103" />
-    <!-- IPipelineExplainer's Microsoft-DI-specific "an application's own IOptions/IOptionsMonitor
-         registration wins over the builder-supplied PipelineExplainerOptions" precedence. -->
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="11.0.0-preview.7.26381.103" />
-    <!-- Test-only: in-memory ASP.NET Core test host for AspNetCore.Tests' manual sanity-check host. -->
-    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="11.0.0-preview.7.26381.103" />
   </ItemGroup>
-  <!-- Entity Framework Core -->
+  <!-- YamlDotNet - BooleanRulesEngine.Yaml's sole dependency beyond BooleanRulesEngine itself. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="11.0.0-preview.7.26381.103" />
-    <!-- An in-memory Sqlite database gives both UnitOfWorkBehavior tests (Interlocutor.Persistence.EntityFrameworkCore.Tests)
-         and the sample application (Interlocutor.Sample.Handlers) a real ADO.NET transaction to commit/roll
-         back against, which the relational-agnostic base package alone cannot provide. -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="11.0.0-preview.7.26381.103" />
-    <!-- Design-time only (PrivateAssets="all" everywhere it's referenced): generates the sample's compiled
-         model (dotnet ef dbcontext optimize). EF Core's own model-validation pass reflectively constructs a
-         value comparer per property type via Activator.CreateInstance, which trimming removes when nothing
-         else statically references it - a compiled model bakes that step in at build time instead. See
-         documentation/trim-and-aot-support.md's "Known limitations". -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0-preview.7.26381.103" />
-  </ItemGroup>
-  <!-- FluentValidation -->
-  <ItemGroup>
-    <PackageVersion Include="FluentValidation" Version="12.1.1" />
-    <!-- MS DI's AddValidatorsFromAssembly, used by TutorialProject/TodoTasks.Api to register its
-         FluentValidation validators - MS DI (unlike Autofac) has no built-in assembly-scanning
-         registration of its own for this to build on. -->
-    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
-  </ItemGroup>
-  <!-- NHibernate -->
-  <ItemGroup>
-    <PackageVersion Include="NHibernate" Version="5.7.0" />
-    <!-- Fluent NHibernate mapping, used by TutorialProject/TodoTasks.Api. -->
-    <PackageVersion Include="FluentNHibernate" Version="3.5.0" />
-    <!-- NHibernate 5.7.0 ships exactly two SQLite drivers - SQLite20Driver (wraps System.Data.SQLite)
-         and CsharpSqliteDriver - and no Microsoft.Data.Sqlite-based one at all (verified against the
-         shipped assembly, not assumed). TutorialProject/TodoTasks.Api's in-memory database needs
-         System.Data.SQLite.Core to pair with NHibernate's own SQLite20Driver. -->
-    <PackageVersion Include="System.Data.SQLite.Core" Version="1.0.119" />
-  </ItemGroup>
-  <!-- Autofac -->
-  <ItemGroup>
-    <PackageVersion Include="Autofac" Version="9.3.2" />
-    <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="11.0.2" />
-  </ItemGroup>
-  <!-- ASP.NET Core integration testing (WebApplicationFactory) - used by TodoTasks.Api.Tests' HTTP layer.
-       Pinned to preview.6, matching the actually-installed Microsoft.AspNetCore.App/Microsoft.NETCore.App
-       shared framework (see global.json's SDK pin) - not preview.7 like the other Microsoft.Extensions.*
-       packages above. WebApplicationFactory<Program> boots the real Program.cs, which (unlike the other
-       preview.7-pinned packages' own test usage elsewhere in this repo) actually loads appsettings.json
-       through the file-watching config provider, and preview.7's Microsoft.Extensions.Configuration.Json
-       calls a Microsoft.Extensions.Primitives.ChangeToken.OnChange overload the installed preview.6
-       shared framework doesn't have - a genuine binary mismatch (MissingMethodException at run time, not
-       a build-time error), not a mistake in this project's own code. -->
-  <ItemGroup>
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="11.0.0-preview.6.26359.118" />
+    <PackageVersion Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
   <!-- xUnit v3 + MTP test packages -->
   <ItemGroup>
@@ -109,15 +54,6 @@
   <ItemGroup>
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
-  </ItemGroup>
-  <!-- Architecture tests -->
-  <ItemGroup>
-    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
-  </ItemGroup>
-  <!-- Roslyn (source generator) -->
-  <ItemGroup>
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
   </ItemGroup>
   <!-- Source Link -->
   <ItemGroup>

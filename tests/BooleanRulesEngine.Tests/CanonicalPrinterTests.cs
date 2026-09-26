@@ -1,0 +1,76 @@
+namespace BooleanRulesEngine.Tests;
+
+using BooleanRulesEngine.Compilation;
+using BooleanRulesEngine.Evaluation;
+using BooleanRulesEngine.Registry;
+using BooleanRulesEngine.Tests.TestSupport;
+
+/// <summary>Ticket 06: canonical DSL printer and round-trip.</summary>
+public sealed class CanonicalPrinterTests
+{
+    [Fact]
+    public void Prints_the_adr_0003_worked_example_verbatim()
+    {
+        const string source =
+            "hasRole(role: \"Y\") AND (hasTraining(training: \"Q\") OR hasTraining(training: \"Z\") OR (isManager XOR isDepartmentHead))";
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile(source).CompiledRule!;
+
+        Assert.Equal(source, rule.CanonicalText);
+    }
+
+    [Fact]
+    public void Xor_operand_is_always_parenthesized_even_when_unnecessary_for_precedence()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile("isManager XOR isDepartmentHead").CompiledRule!;
+
+        Assert.Equal("(isManager XOR isDepartmentHead)", rule.CanonicalText);
+    }
+
+    [Theory]
+    [InlineData("isManager AND isDepartmentHead")]
+    [InlineData("isManager OR isDepartmentHead")]
+    [InlineData("NOT isManager")]
+    [InlineData("(isManager XOR isDepartmentHead)")]
+    [InlineData("ExactlyOne(isManager, isDepartmentHead, isManager)")]
+    [InlineData("AtLeast(2, isManager, isDepartmentHead, isManager)")]
+    [InlineData("hasRole(role: \"Y\")")]
+    [InlineData("true")]
+    [InlineData("false")]
+    [InlineData("isManager AND (isDepartmentHead OR hasRole(role: \"Y\"))")]
+    [InlineData("(isManager AND isDepartmentHead) OR hasRole(role: \"Y\")")]
+    public void Parse_print_round_trips_to_a_structurally_equal_tree(string source)
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> original = compiler.Compile(source).CompiledRule!;
+        CompiledRule<RuleTestContext> reparsed = compiler.Compile(original.CanonicalText).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+    }
+
+    [Fact]
+    public void Printing_the_same_tree_twice_is_byte_identical()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> rule = compiler.Compile("isManager AND hasRole(role: \"Y\")").CompiledRule!;
+
+        Assert.Equal(rule.CanonicalText, rule.CanonicalText);
+    }
+
+    private static RuleCompiler<RuleTestContext> CreateCompiler()
+    {
+        return new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddStringArgPredicate("hasRole", "role", "Y")
+                .AddStringArgPredicate("hasTraining", "training", "Q")
+                .AddConstant("isManager", true)
+                .AddConstant("isDepartmentHead", true)
+                .Build()
+        );
+    }
+}

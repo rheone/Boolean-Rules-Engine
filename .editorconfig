@@ -62,6 +62,19 @@ dotnet_naming_rule.private_fields_should_be_camel_case.severity = warning
 dotnet_diagnostic.SA1600.severity = none
 dotnet_diagnostic.SA1633.severity = none
 
+# SA1009/SA1111 ("closing parenthesis should not be preceded by a space" / "should be on the line of
+# the last parameter") routinely conflict with CSharpier's own multi-line call-wrapping style, which
+# places a closing ')' on its own indented line whenever an argument list must wrap. CSharpier is
+# this repo's authoritative formatter (CLAUDE.md), so both are disabled rather than fought.
+dotnet_diagnostic.SA1009.severity = none
+dotnet_diagnostic.SA1111.severity = none
+
+# SA1500/SA1502 similarly conflict with CSharpier's canonical output for an empty block body
+# ("{ }" collapsed onto one line, e.g. a private-protected base-class constructor) and for
+# do/while's "} while (...)" sharing a line. Same rationale as above.
+dotnet_diagnostic.SA1500.severity = none
+dotnet_diagnostic.SA1502.severity = none
+
 [*.csproj]
 indent_size = 2
 

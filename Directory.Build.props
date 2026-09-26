@@ -41,9 +41,15 @@
     <NoWarn>$(NoWarn)AD0001;SA1633</NoWarn>
   </PropertyGroup>
 
-  <!-- Shared BCL usings -->
+  <!-- Shared BCL usings - promoted to global so SA1200 (using directives must appear within a
+       namespace) never fights csharp_style_namespace_declarations=file_scoped: a file-scoped
+       namespace has no block for a using to live inside, so any BCL namespace beyond
+       ImplicitUsings' defaults belongs here instead of a per-file using directive. -->
   <ItemGroup>
     <Using Include="System.Collections.Concurrent" />
+    <Using Include="System.Collections.Immutable" />
+    <Using Include="System.Globalization" />
+    <Using Include="System.Text" />
   </ItemGroup>
 
   <!-- Roslynator analyzers -->
