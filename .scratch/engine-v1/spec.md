@@ -90,6 +90,34 @@ Everything listed under `CONTEXT.md`'s [Deferred](../../CONTEXT.md#deferred) tab
 
 Also out of scope: rule storage, scheduling, or invalidation (the library owns compilation and evaluation only, per ADR-0002); any concrete logging provider; a UI rule builder itself (only the JSON/YAML tree shape it would consume/produce).
 
+## Post-v1 Amendments
+
+Added after this spec's tickets shipped; see
+[ADR-0003's Amendments section](../../docs/adr/0003-rule-syntax-and-serialization.md#amendments)
+for full rationale on each:
+
+- **Threshold operator family**: `AtLeast(k, ...)` generalized into
+  `AtLeast`/`AtMost`/`GreaterThan`/`LessThan`/`Exactly`, all sharing one AST
+  node (`ThresholdExpression`) and one compile-time out-of-range check.
+- **`XNOR`** (logical biconditional / `IFF`) added alongside `XOR`, with the
+  same binary-only restriction, always-parenthesized printing, and
+  ambiguous-mixing compile error (now also covering `XOR`-vs-`XNOR` mixing).
+- **Required predicate descriptions**: `PredicateSchema` and
+  `PredicateArgumentSchema` both require a read-only `Description` string,
+  so a rule-authoring UI or generated documentation always has something to
+  show for every registered predicate and argument.
+- **Canonical printer clarity parens**: the printer now parenthesizes an
+  operand whenever it's a different operator than the one it's nested under
+  (e.g. `a AND b OR c` prints as `(a AND b) OR c`), even where precedence
+  alone already made the parse unambiguous — readability for a large nested
+  rule, not just correctness.
+- **`RuleBuilder`** (`BooleanRulesEngine.Building`): a fluent API for
+  assembling a rule from application logic without hand-writing DSL/JSON/YAML
+  text. Renders to the existing flat JSON tree shape and compiles through
+  `RuleCompiler.CompileJson`, so it goes through the identical
+  Validate/Analyze pipeline as any other rule source — not a new front end
+  into the AST.
+
 ## Further Notes
 
 - The BDD-based analyzer (constant/contradiction/redundancy detection) is nontrivial and load-bearing for several user stories (7, 8, 38) and for the node-count-based analysis cap (36) — it may warrant its own prefactoring/design pass before ticket-splitting, since it's the one component that isn't a fairly direct ADR-to-code translation.

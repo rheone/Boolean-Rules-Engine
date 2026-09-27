@@ -27,12 +27,12 @@ layer this may grow later.
 | **Expression** | The boolean tree: operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasRole` or `isManager`. The *function*, not any particular call to it. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasRole(role: "Y")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
-| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `ExactlyOne`, `AtLeast(k)`, and the constants `true`/`false`. Never called a "gate." |
+| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `true`/`false`. Never called a "gate." |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
 | **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |
 | **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. |
 | **CompiledRule** | The immutable, thread-safe result of compiling a rule's text. Safe to cache and share; compile once, evaluate many times. |
-| **PredicateRegistry** | Where predicate implementations are registered under a name, with their argument schema. |
+| **PredicateRegistry** | Where predicate implementations are registered under a name, with their argument schema. Every predicate and argument carries a required, read-only `Description` string. |
 
 Avoid these near-synonyms once the term above is established: "term" and
 "predicate" are not interchangeable (a predicate is the function; a term is
@@ -51,8 +51,13 @@ Expression =
     | OR(Expression, Expression, ...)
     | NOT(Expression)
     | XOR(Expression, Expression)          // binary only
+    | XNOR(Expression, Expression)         // binary only; NOT(XOR(...))
     | ExactlyOne(Expression, Expression, ...)
     | AtLeast(k, Expression, Expression, ...)
+    | AtMost(k, Expression, Expression, ...)
+    | GreaterThan(k, Expression, Expression, ...)
+    | LessThan(k, Expression, Expression, ...)
+    | Exactly(k, Expression, Expression, ...)
     | true | false
 ```
 
@@ -123,10 +128,13 @@ locking, in-flight evaluations finish against the old rule. Full reasoning:
 
 ## Syntax and serialization (summary)
 
-The string DSL (word operators, `NOT > AND > OR` precedence, `XOR` never
-mixed with `AND`/`OR` without parentheses) is canonical and is what gets
-persisted. JSON and YAML are interchange/tooling formats that compile to the
-same AST and round-trip losslessly with the DSL. Full grammar and schema:
+The string DSL (word operators, `NOT > AND > OR` precedence, `XOR`/`XNOR`
+never mixed with `AND`/`OR` or with each other without parentheses) is
+canonical and is what gets persisted. JSON and YAML are interchange/tooling
+formats that compile to the same AST and round-trip losslessly with the DSL.
+A rule can also be assembled programmatically via `RuleBuilder`
+(`BooleanRulesEngine.Building`), which renders to the same JSON tree shape
+and compiles through the identical pipeline. Full grammar and schema:
 [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
 
 ## Package boundaries (summary)
