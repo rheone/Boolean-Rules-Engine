@@ -4,9 +4,9 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Diff API accepts two compiled rules and returns added/removed/changed node information
-- [ ] Structurally identical rules produce an empty/no-change diff
-- [ ] A changed operator, changed term arguments, and an added/removed operand each produce a distinguishable diff entry
-- [ ] Covered by tests exercising at least one change per category above
+- [x] Diff API accepts two compiled rules and returns added/removed/changed node information
+- [x] Structurally identical rules produce an empty/no-change diff
+- [x] A changed operator, changed term arguments, and an added/removed operand each produce a distinguishable diff entry
+- [x] Covered by tests exercising at least one change per category above

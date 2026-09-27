@@ -4,8 +4,8 @@
 
 **Blocked by:** 01 (structural diff between two compiled rules)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A rendering function turns a diff result into readable text describing each change (e.g. "added operand: hasRole(role: Y)")
-- [ ] Output uses each node's `Label`/`Description` (from `RuleDescription`) rather than raw AST type names
-- [ ] Example usage documented (README or XML doc) showing a before/after rule and the resulting rendered diff
+- [x] A rendering function turns a diff result into readable text describing each change (e.g. "added operand: hasRole(role: Y)")
+- [x] Output uses each node's `Label`/`Description` (from `RuleDescription`) rather than raw AST type names
+- [x] Example usage documented (README or XML doc) showing a before/after rule and the resulting rendered diff
