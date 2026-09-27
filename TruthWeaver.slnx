@@ -1,0 +1,31 @@
+<Solution FileFormatVersion="12.00" VisualStudioVersion="17.0" MinimumVisualStudioVersion="10.0">
+  <Solution>
+    <Project Name="TruthWeaver.Abstractions" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Abstractions" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Yaml" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Yaml" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Predicates" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Predicates" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Testing" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Testing" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Tests" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Tests" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Predicates.Tests" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Predicates.Tests" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Testing.Tests" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Testing.Tests" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Benchmarks" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Benchmarks" Configuration="Release|AnyCPU" Build="true" />
+  </Solution>
+  <Project Path="src\TruthWeaver.Abstractions\TruthWeaver.Abstractions.csproj" />
+  <Project Path="src\TruthWeaver\TruthWeaver.csproj" />
+  <Project Path="src\TruthWeaver.Yaml\TruthWeaver.Yaml.csproj" />
+  <Project Path="src\TruthWeaver.Predicates\TruthWeaver.Predicates.csproj" />
+  <Project Path="src\TruthWeaver.Testing\TruthWeaver.Testing.csproj" />
+  <Project Path="tests\TruthWeaver.Tests\TruthWeaver.Tests.csproj" />
+  <Project Path="tests\TruthWeaver.Predicates.Tests\TruthWeaver.Predicates.Tests.csproj" />
+  <Project Path="tests\TruthWeaver.Testing.Tests\TruthWeaver.Testing.Tests.csproj" />
+  <Project Path="benchmarks\TruthWeaver.Benchmarks\TruthWeaver.Benchmarks.csproj" />
+</Solution>

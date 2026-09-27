@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>1b835dee-d2e9-4053-b189-ac042e6c60e0</ProjectGuid>
+    <RootNamespace>TruthWeaver.Testing</RootNamespace>
+    <Description>
+      Test-support helpers for TruthWeaver consumers: fluent assertions over a Decision, and
+      fake/scripted predicate factories for registering a stubbed answer or a simulated fault without
+      a hand-written IPredicate&lt;TContext&gt; class. References only TruthWeaver.Abstractions,
+      so a consumer's test project never acquires the parser, compiler, or analyzer transitively just
+      to assert on evaluation results.
+    </Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../TruthWeaver.Abstractions/TruthWeaver.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

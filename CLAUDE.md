@@ -1,8 +1,8 @@
-# BooleanRulesEngine
+# TruthWeaver
 
 ## Project
 
-This repository contains the **BooleanRulesEngine** C# library.
+This repository contains the **TruthWeaver** C# library.
 
 Target framework: `net11.0`
 Pinned SDK: `11.0.100-rc.1.26425.128` (see `global.json`)
@@ -23,8 +23,8 @@ The repository uses:
 
 ## Repository layout
 
-- `src/BooleanRulesEngine` — production library
-- `tests/BooleanRulesEngine.Tests` — unit tests
+- `src/TruthWeaver` — production library
+- `tests/TruthWeaver.Tests` — unit tests
 - `Directory.Build.props` — common MSBuild configuration
 - `Directory.Build.targets` — common MSBuild targets
 - `Directory.Packages.props` — central package versions

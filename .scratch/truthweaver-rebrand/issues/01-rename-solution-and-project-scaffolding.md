@@ -21,13 +21,16 @@ Leave namespace declarations *inside* `.cs` files untouched — that's ticket 02
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `TruthWeaver.slnx` exists at repo root; `BooleanRulesEngine.slnx` no longer does
-- [ ] All four project directories are renamed under `src/`/`tests/` with matching
-      `.csproj` filenames
-- [ ] Every `<ProjectReference>` in every `.csproj` resolves to the new paths
-- [ ] `<RootNamespace>` in each `.csproj` matches the new project name
-- [ ] `dotnet restore --locked-mode` and `dotnet build` succeed against
+- [x] `TruthWeaver.slnx` exists at repo root; `BooleanRulesEngine.slnx` no longer does
+- [x] All four project directories are renamed under `src/`/`tests/` with matching
+      `.csproj` filenames (plus `src/BooleanRulesEngine.Predicates`, `src/BooleanRulesEngine.Testing`,
+      `tests/BooleanRulesEngine.Predicates.Tests`, `tests/BooleanRulesEngine.Testing.Tests`, and
+      `benchmarks/BooleanRulesEngine.Benchmarks`, which were added to the repo after this ticket
+      was written; renamed for consistency using the same convention)
+- [x] Every `<ProjectReference>` in every `.csproj` resolves to the new paths
+- [x] `<RootNamespace>` in each `.csproj` matches the new project name
+- [x] `dotnet restore --locked-mode` and `dotnet build` succeed against
       `TruthWeaver.slnx`
-- [ ] `git status`/`git log --follow` shows renames, not delete+add, for every moved file
+- [x] `git status`/`git log --follow` shows renames, not delete+add, for every moved file

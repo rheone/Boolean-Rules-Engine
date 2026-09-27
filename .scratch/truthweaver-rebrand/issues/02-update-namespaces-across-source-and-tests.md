@@ -24,14 +24,16 @@ per-file judgment call.
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] No `.cs` file under `src/` or `tests/` contains the string `BooleanRulesEngine` in a
-      `namespace` or `using` statement
-- [ ] `BooleanRulesEngineServiceCollectionExtensions` is renamed to
+- [x] No `.cs` file under `src/` or `tests/` contains the string `BooleanRulesEngine` in a
+      `namespace` or `using` statement (including the `.Metrics` and `.Diffing`
+      sub-namespaces, added to the repo after this ticket was written but covered by the
+      blanket namespace/using rule above)
+- [x] `BooleanRulesEngineServiceCollectionExtensions` is renamed to
       `TruthWeaverServiceCollectionExtensions` (type and file name), and every call site
       updated
-- [ ] `dotnet build` succeeds against `TruthWeaver.slnx`
-- [ ] `dotnet test` passes with no failures
-- [ ] `dotnet csharpier check .` and `dotnet format --verify-no-changes --severity info`
+- [x] `dotnet build` succeeds against `TruthWeaver.slnx`
+- [x] `dotnet test` passes with no failures
+- [x] `dotnet csharpier check .` and `dotnet format --verify-no-changes --severity info`
       report no diffs

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>030258ff-378a-4466-8223-8cf49fe95c6f</ProjectGuid>
+    <RootNamespace>TruthWeaver.Predicates</RootNamespace>
+    <Description>
+      A convenience library of ready-made, generic IPredicate&lt;TContext&gt; implementations (string
+      comparison, null/empty, set equality, regex matching) for TruthWeaver, referencing only
+      TruthWeaver.Abstractions so a predicate-only consumer never acquires the parser, compiler,
+      or analyzer transitively.
+    </Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../TruthWeaver.Abstractions/TruthWeaver.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

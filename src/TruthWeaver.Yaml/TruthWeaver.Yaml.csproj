@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>d4a2b3c5-6e7f-4a8b-9c0d-1e2f3a4b5c6d</ProjectGuid>
+    <RootNamespace>TruthWeaver.Yaml</RootNamespace>
+    <Description>
+      YAML tree support for TruthWeaver, isolated in its own package so a consumer with
+      no interest in YAML never acquires the YamlDotNet dependency transitively.
+    </Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../TruthWeaver/TruthWeaver.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+</Project>

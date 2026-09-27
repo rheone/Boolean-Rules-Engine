@@ -16,9 +16,15 @@ correctly against the renamed `.slnx` on next load.
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `CLAUDE.md` refers to the project as TruthWeaver
-- [ ] `AGENTS.md` refers to the project as TruthWeaver wherever it names the project
-- [ ] `.mcp.json`/`.cursor/mcp.json`/`.vscode/mcp.json`/`opencode.jsonc` contain no
+- [x] `CLAUDE.md` refers to the project as TruthWeaver
+- [x] `AGENTS.md` refers to the project as TruthWeaver wherever it names the project
+      (it had no project-name references beyond the CodeGraph boilerplate block, so no
+      change was needed)
+- [x] `.mcp.json`/`.cursor/mcp.json`/`.vscode/mcp.json`/`opencode.jsonc` contain no
       leftover `BooleanRulesEngine`/`Boolean-Rules-Engine` strings tied to this project
+      (`.mcp.json` and `opencode.jsonc` had none; `.cursor/mcp.json` and `.vscode/mcp.json`
+      are gitignored/local-only and only contain the local repo folder's absolute
+      filesystem path, `...\Boolean-Rules-Engine`, which is left as-is since the local
+      directory itself isn't being renamed by this effort)
