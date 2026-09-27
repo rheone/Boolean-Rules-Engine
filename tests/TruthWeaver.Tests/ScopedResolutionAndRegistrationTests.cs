@@ -72,7 +72,7 @@ public sealed class ScopedResolutionAndRegistrationTests
         // container must separately register that concrete type as a resolvable service, exactly as
         // it would for any other class-based dependency (ADR-0002).
         services.AddScoped<ScopedFlagPredicate>();
-        services.AddBooleanRulesEngine<RuleTestContext>(builder => builder.Add<ScopedFlagPredicate>());
+        services.AddTruthWeaver<RuleTestContext>(builder => builder.Add<ScopedFlagPredicate>());
 
         await using ServiceProvider provider = services.BuildServiceProvider();
         await using AsyncServiceScope scope = provider.CreateAsyncScope();

@@ -15,7 +15,7 @@ using TruthWeaver.Parsing;
 using TruthWeaver.Registry;
 
 /// <summary>
-/// Compiles rule text (DSL, JSON, or — via <c>BooleanRulesEngine.Yaml</c> — YAML) into an immutable
+/// Compiles rule text (DSL, JSON, or — via <c>TruthWeaver.Yaml</c> — YAML) into an immutable
 /// <see cref="CompiledRule{TContext}"/>, following the Parse → Validate → Analyze → Build pipeline
 /// (ADR-0003). Never throws for an authoring error: every problem, from a syntax error to a
 /// structural tautology, becomes a <see cref="Diagnostic"/> in the returned
@@ -80,7 +80,7 @@ public sealed class RuleCompiler<TContext>(
     }
 
     /// <summary>
-    /// Compiles an already-parsed raw tree. Internal, and visible to <c>BooleanRulesEngine.Yaml</c>
+    /// Compiles an already-parsed raw tree. Internal, and visible to <c>TruthWeaver.Yaml</c>
     /// via <c>InternalsVisibleTo</c>, so the YAML front end reuses this exact validation/analysis
     /// pipeline rather than re-implementing it.
     /// </summary>
@@ -149,7 +149,7 @@ public sealed class RuleCompiler<TContext>(
                 diagnostic.Span.Start,
                 diagnostic.Span.Length
             );
-            BooleanRulesEngineMetrics.CompileDiagnosticRaised(diagnostic.Severity);
+            TruthWeaverMetrics.CompileDiagnosticRaised(diagnostic.Severity);
         }
     }
 }

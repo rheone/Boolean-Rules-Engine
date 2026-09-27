@@ -3,7 +3,7 @@ namespace TruthWeaver.Abstractions;
 /// <summary>
 /// The compile-time-known shape of a predicate: its registered name, a short display label, a
 /// human-readable description, and its named-argument declarations. <c>RuleCompiler</c> (in the
-/// <c>BooleanRulesEngine</c> package) validates every term against its predicate's schema, so a
+/// <c>TruthWeaver</c> package) validates every term against its predicate's schema, so a
 /// missing or mistyped argument is a compile diagnostic rather than a runtime failure inside
 /// <see cref="IPredicate{TContext}"/>'s evaluation method.
 /// </summary>

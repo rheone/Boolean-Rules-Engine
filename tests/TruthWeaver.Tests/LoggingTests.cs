@@ -65,7 +65,7 @@ public sealed class LoggingTests
         Assert.Equal(LogLevel.Information, call.Level);
         Assert.Equal("my-rule", call.Field("RuleIdentifier"));
 
-        // Distinct event id from both the diagnostic (BRE) and fault log events.
+        // Distinct event id from both the compile-diagnostic and fault log events.
         Assert.NotEqual(0, call.EventId.Id);
     }
 

@@ -8,7 +8,7 @@ using TruthWeaver.Registry;
 /// <summary>
 /// The worked example ticket 02 asks for: register a <see cref="FakePredicates"/> predicate against a
 /// <see cref="PredicateRegistryBuilder{TContext}"/>, compile and evaluate a real rule against it, and
-/// assert the resulting <see cref="Decision"/> using the <c>BooleanRulesEngine.Testing</c> assertions
+/// assert the resulting <see cref="Decision"/> using the <c>TruthWeaver.Testing</c> assertions
 /// from ticket 01 - end to end, with no hand-written <see cref="IPredicate{TContext}"/> class.
 /// </summary>
 public sealed class EndToEndUsageExampleTests

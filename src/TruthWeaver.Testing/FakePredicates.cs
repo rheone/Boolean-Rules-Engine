@@ -6,7 +6,7 @@ using TruthWeaver.Abstractions;
 /// Fake/stub predicate factories for tests: a fixed answer, a Kleene (<see cref="TruthValue"/>)
 /// answer, a simulated fault, or a scripted sequence of answers across successive calls — without
 /// writing a hand-written <see cref="IPredicate{TContext}"/> class per test. Mirrors the shape of
-/// <c>BooleanRulesEngine.Predicates</c>'s ready-made predicate factories: each method returns the
+/// <c>TruthWeaver.Predicates</c>'s ready-made predicate factories: each method returns the
 /// schema plus a stateless evaluation delegate, ready for
 /// <c>PredicateRegistryBuilder&lt;TContext&gt;.Add(schema, evaluate)</c>.
 /// </summary>

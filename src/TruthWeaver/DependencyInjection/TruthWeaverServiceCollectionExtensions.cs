@@ -22,7 +22,7 @@ public static class TruthWeaverServiceCollectionExtensions
     /// <param name="configureRegistry">Builds the predicate registry via explicit registration.</param>
     /// <param name="options">Compiler resource limits and mode, or <see langword="null"/> for the defaults.</param>
     /// <returns><paramref name="services"/>, for chaining.</returns>
-    public static IServiceCollection AddBooleanRulesEngine<TContext>(
+    public static IServiceCollection AddTruthWeaver<TContext>(
         this IServiceCollection services,
         Action<PredicateRegistryBuilder<TContext>> configureRegistry,
         CompilerOptions? options = null

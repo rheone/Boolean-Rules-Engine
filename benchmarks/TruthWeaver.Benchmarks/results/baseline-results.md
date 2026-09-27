@@ -14,7 +14,7 @@ Job=ShortRun  Toolchain=InProcessEmitToolchain  IterationCount=3  LaunchCount=1 
 Reproduce with (see the repo README's "Benchmarks" section for the full command reference):
 
 ```powershell
-dotnet run -c Release --project benchmarks/BooleanRulesEngine.Benchmarks -- --filter "*" --job Short --inProcess --exporters github --artifacts ./benchmarks/BooleanRulesEngine.Benchmarks/results
+dotnet run -c Release --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --job Short --inProcess --exporters github --artifacts ./benchmarks/TruthWeaver.Benchmarks/results
 ```
 
 `--job Short` (~5-8s/case) keeps this baseline capture quick; re-run without `--job` (the BenchmarkDotNet default preset) for higher-confidence numbers before relying on them to judge a real regression.

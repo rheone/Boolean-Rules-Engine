@@ -32,7 +32,7 @@ public sealed class CompiledRule<TContext>
     public string CanonicalText => this.canonicalText.Value;
 
     /// <summary>
-    /// Gets the underlying expression tree. Internal — visible to <c>BooleanRulesEngine.Yaml</c> via
+    /// Gets the underlying expression tree. Internal — visible to <c>TruthWeaver.Yaml</c> via
     /// <c>InternalsVisibleTo</c>, so its YAML printer can render the same tree <see cref="CanonicalText"/>
     /// and <see cref="PrintJson"/> render, without this package needing to know YAML exists.
     /// </summary>

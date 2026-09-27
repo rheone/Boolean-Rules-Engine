@@ -19,7 +19,7 @@ public sealed class MetricsTests
     [Fact]
     public async Task Evaluating_a_rule_increments_the_evaluations_counter()
     {
-        using MeasurementCollector collector = new("boolean_rules_engine.evaluations");
+        using MeasurementCollector collector = new("truthweaver.evaluations");
         RuleCompiler<RuleTestContext> compiler = new(
             PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("p", true).Build()
         );
@@ -37,7 +37,7 @@ public sealed class MetricsTests
     [Fact]
     public async Task A_faulting_predicate_increments_the_faults_counter()
     {
-        using MeasurementCollector collector = new("boolean_rules_engine.faults");
+        using MeasurementCollector collector = new("truthweaver.faults");
         RuleCompiler<RuleTestContext> compiler = new(
             PredicateRegistry<RuleTestContext>.CreateBuilder().AddThrowing("flaky").Build()
         );
@@ -55,7 +55,7 @@ public sealed class MetricsTests
     [Fact]
     public void Compiling_a_rule_with_a_diagnostic_increments_the_compile_diagnostics_counter_tagged_by_severity()
     {
-        using MeasurementCollector collector = new("boolean_rules_engine.compile_diagnostics");
+        using MeasurementCollector collector = new("truthweaver.compile_diagnostics");
         RuleCompiler<RuleTestContext> compiler = new(PredicateRegistry<RuleTestContext>.CreateBuilder().Build());
 
         compiler.Compile("noSuchPredicate");
@@ -74,7 +74,7 @@ public sealed class MetricsTests
             {
                 InstrumentPublished = (instrument, meterListener) =>
                 {
-                    if (instrument.Meter.Name == BooleanRulesEngineMetrics.MeterName && instrument.Name == instrumentName)
+                    if (instrument.Meter.Name == TruthWeaverMetrics.MeterName && instrument.Name == instrumentName)
                     {
                         meterListener.EnableMeasurementEvents(instrument);
                     }
