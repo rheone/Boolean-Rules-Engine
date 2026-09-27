@@ -138,4 +138,99 @@ public sealed class RuleBuilderTests
 
         Assert.Equal("true", rule.CanonicalText);
     }
+
+    [Theory]
+    [InlineData(true, false, TruthValue.True)]
+    [InlineData(false, false, TruthValue.False)]
+    public Task Or_builder_evaluates_true_with_at_least_one_true_operand(bool a, bool b, TruthValue expected)
+    {
+        return EvaluateAsync([a, b], operands => RuleBuilder.Or(operands), expected);
+    }
+
+    [Theory]
+    [InlineData(false, false, false, TruthValue.False)]
+    [InlineData(true, false, false, TruthValue.True)]
+    [InlineData(true, true, false, TruthValue.False)]
+    public Task ExactlyOne_builder_evaluates_true_iff_exactly_one_operand_is_true(bool a, bool b, bool c, TruthValue expected)
+    {
+        return EvaluateAsync([a, b, c], operands => RuleBuilder.ExactlyOne(operands), expected);
+    }
+
+    [Theory]
+    [InlineData(true, false, false, TruthValue.True)]
+    [InlineData(true, true, false, TruthValue.False)]
+    public Task AtMost_builder_evaluates_correctly_near_the_boundary(bool a, bool b, bool c, TruthValue expected)
+    {
+        return EvaluateAsync([a, b, c], operands => RuleBuilder.AtMost(1, operands), expected);
+    }
+
+    [Theory]
+    [InlineData(true, true, false, TruthValue.True)]
+    [InlineData(true, false, false, TruthValue.False)]
+    public Task GreaterThan_builder_evaluates_correctly_near_the_boundary(bool a, bool b, bool c, TruthValue expected)
+    {
+        return EvaluateAsync([a, b, c], operands => RuleBuilder.GreaterThan(1, operands), expected);
+    }
+
+    [Theory]
+    [InlineData(false, false, false, TruthValue.True)]
+    [InlineData(true, true, false, TruthValue.False)]
+    public Task LessThan_builder_evaluates_correctly_near_the_boundary(bool a, bool b, bool c, TruthValue expected)
+    {
+        return EvaluateAsync([a, b, c], operands => RuleBuilder.LessThan(2, operands), expected);
+    }
+
+    [Theory]
+    [InlineData(true, true, false, TruthValue.True)]
+    [InlineData(true, true, true, TruthValue.False)]
+    public Task Exactly_builder_evaluates_correctly_near_the_boundary(bool a, bool b, bool c, TruthValue expected)
+    {
+        return EvaluateAsync([a, b, c], operands => RuleBuilder.Exactly(2, operands), expected);
+    }
+
+    [Fact]
+    public void ToJson_round_trips_to_a_rule_that_compiles_and_evaluates_identically()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddConstant("isManager", true)
+                .AddConstant("isSuspended", false)
+                .Build()
+        );
+        RuleBuilder original = RuleBuilder.And(
+            RuleBuilder.Predicate("isManager"),
+            RuleBuilder.Not(RuleBuilder.Predicate("isSuspended"))
+        );
+
+        string json = original.ToJson();
+        CompilationResult<RuleTestContext> reparsed = compiler.CompileJson(json);
+        CompiledRule<RuleTestContext> viaOriginal = original.Compile(compiler).CompiledRule!;
+
+        Assert.True(reparsed.Succeeded);
+        Assert.Equal(viaOriginal.CanonicalText, reparsed.CompiledRule!.CanonicalText);
+    }
+
+    private static async Task EvaluateAsync(bool[] operandValues, Func<RuleBuilder[], RuleBuilder> build, TruthValue expected)
+    {
+        PredicateRegistryBuilder<RuleTestContext> registryBuilder = PredicateRegistry<RuleTestContext>.CreateBuilder();
+        RuleBuilder[] operands = new RuleBuilder[operandValues.Length];
+        for (int i = 0; i < operandValues.Length; i++)
+        {
+            string name = ((char)('a' + i)).ToString();
+            registryBuilder = registryBuilder.AddConstant(name, operandValues[i]);
+            operands[i] = RuleBuilder.Predicate(name);
+        }
+
+        RuleCompiler<RuleTestContext> compiler = new(registryBuilder.Build());
+        CompiledRule<RuleTestContext> rule = build(operands).Compile(compiler).CompiledRule!;
+
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(expected, decision.Result);
+    }
 }

@@ -127,6 +127,38 @@ public sealed class EvaluationOptionsTests
         Assert.Contains(decision.Trace!.Entries, e => e.NotEvaluated);
     }
 
+    [Fact]
+    public async Task Genuine_cancellation_propagates_rather_than_being_recorded_as_a_fault()
+    {
+        using CancellationTokenSource cts = new();
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddCancelingPredicate("cancels", cts).Build()
+        );
+        CompiledRule<RuleTestContext> rule = compiler.Compile("cancels").CompiledRule!;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            rule.EvaluateAsync(new RuleTestContext(), EmptyServiceProvider.Instance, cancellationToken: cts.Token)
+        );
+    }
+
+    [Fact]
+    public async Task A_predicate_that_self_cancels_without_the_callers_token_being_cancelled_is_recorded_as_a_fault()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddSelfCancelingPredicate("selfCancels").Build()
+        );
+        CompiledRule<RuleTestContext> rule = compiler.Compile("selfCancels").CompiledRule!;
+
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Single(decision.Faults);
+        Assert.Equal(TruthValue.Unknown, decision.Result);
+    }
+
     private static Task<Decision> EvaluateWithFaultBudgetAsync()
     {
         RuleCompiler<RuleTestContext> compiler = new(

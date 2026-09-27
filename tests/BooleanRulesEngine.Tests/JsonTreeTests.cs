@@ -126,6 +126,33 @@ public sealed class JsonTreeTests
         Assert.Contains(result.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
+    [Theory]
+    [InlineData("not even json", "Malformed JSON:")]
+    [InlineData("""{"nothingRecognized": true}""", "must have a 'const', 'predicate', or 'op' key")]
+    [InlineData("""{"const": "notabool"}""", "'const' must be a JSON boolean.")]
+    [InlineData("""{"predicate": 123}""", "'predicate' must be a JSON string.")]
+    [InlineData("""{"predicate": "isManager", "args": [1, 2]}""", "'args' must be a JSON object.")]
+    [InlineData("""{"predicate": "isManager", "args": {"x": {"weird": 1}}}""", "Unsupported literal JSON value kind")]
+    [InlineData("""{"op": "and"}""", "requires an 'operands' array")]
+    [InlineData("""{"op": "not", "operands": [{"const": true}, {"const": false}]}""", "'not' requires exactly one operand.")]
+    [InlineData("""{"op": "bogus", "operands": []}""", "Unknown operator 'bogus'.")]
+    [InlineData("""{"op": "atLeast", "operands": [{"const": true}]}""", "requires a numeric 'k'")]
+    [InlineData("""{"op": "and", "operands": [1, 2]}""", "Expected a JSON object node but found")]
+    public void Every_distinct_malformed_tree_branch_raises_its_specific_message(string json, string expectedMessageSubstring)
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.CompileJson(json);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(
+            result.Diagnostics,
+            d =>
+                d.Code == DiagnosticCodes.MalformedTree
+                && d.Message.Contains(expectedMessageSubstring, StringComparison.Ordinal)
+        );
+    }
+
     private static RuleCompiler<RuleTestContext> CreateCompiler()
     {
         return new(

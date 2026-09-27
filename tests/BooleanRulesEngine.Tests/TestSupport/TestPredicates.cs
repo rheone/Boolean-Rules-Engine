@@ -71,6 +71,45 @@ public static class TestPredicates
         );
     }
 
+    /// <summary>
+    /// Registers a zero-argument predicate that cancels the supplied <see cref="CancellationTokenSource"/>
+    /// and then observes its own cancellation via the caller's token — used to exercise the genuine
+    /// cancellation path (as opposed to a self-thrown <see cref="OperationCanceledException"/> the
+    /// caller never requested).
+    /// </summary>
+    public static PredicateRegistryBuilder<RuleTestContext> AddCancelingPredicate(
+        this PredicateRegistryBuilder<RuleTestContext> builder,
+        string name,
+        CancellationTokenSource cancellationTokenSource
+    )
+    {
+        return builder.Add(
+            PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', cancels the caller's token then observes it."),
+            async (_, _, ct) =>
+            {
+                await cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                return true;
+            }
+        );
+    }
+
+    /// <summary>
+    /// Registers a zero-argument predicate that throws <see cref="OperationCanceledException"/> on its
+    /// own initiative, without the caller's token ever being cancelled — this must be recorded as an
+    /// ordinary <see cref="Fault"/>, not treated as a genuine cancellation.
+    /// </summary>
+    public static PredicateRegistryBuilder<RuleTestContext> AddSelfCancelingPredicate(
+        this PredicateRegistryBuilder<RuleTestContext> builder,
+        string name
+    )
+    {
+        return builder.Add(
+            PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', throws OperationCanceledException unprompted."),
+            (_, _, _) => throw new OperationCanceledException($"'{name}' canceled itself.")
+        );
+    }
+
     /// <summary>Registers a single-string-argument predicate whose truth is "does the argument equal <paramref name="matchValue"/>?" (case-sensitive).</summary>
     public static PredicateRegistryBuilder<RuleTestContext> AddStringArgPredicate(
         this PredicateRegistryBuilder<RuleTestContext> builder,

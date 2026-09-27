@@ -107,6 +107,42 @@ public sealed class AnalyzerTests
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
+    [Fact]
+    public void Term_count_at_or_under_the_analysis_cap_runs_analysis_normally()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompilerWithMaxAnalysisTerms(2);
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("a AND NOT a");
+
+        Assert.True(result.Succeeded);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.AnalysisSkippedTooManyTerms);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
+    }
+
+    [Fact]
+    public void Term_count_exceeding_the_analysis_cap_skips_analysis_and_suppresses_the_contradiction()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompilerWithMaxAnalysisTerms(1);
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("a AND NOT a AND b");
+
+        Assert.True(result.Succeeded);
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.AnalysisSkippedTooManyTerms, diagnostic.Code);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
+    }
+
+    [Fact]
+    public void Term_count_exactly_equal_to_the_analysis_cap_does_not_trigger_the_skip()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompilerWithMaxAnalysisTerms(1);
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("a AND a");
+
+        Assert.True(result.Succeeded);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.AnalysisSkippedTooManyTerms);
+    }
+
     private static RuleCompiler<RuleTestContext> CreateCompiler()
     {
         return new(
@@ -117,6 +153,14 @@ public sealed class AnalyzerTests
                 .AddConstant("b", true)
                 .AddConstant("c", true)
                 .Build()
+        );
+    }
+
+    private static RuleCompiler<RuleTestContext> CreateCompilerWithMaxAnalysisTerms(int maxAnalysisTerms)
+    {
+        return new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("a", true).AddConstant("b", true).Build(),
+            new CompilerOptions(MaxAnalysisTerms: maxAnalysisTerms)
         );
     }
 }

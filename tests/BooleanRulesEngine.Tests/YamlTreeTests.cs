@@ -127,6 +127,34 @@ public sealed class YamlTreeTests
         Assert.Contains(result.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
+    [Theory]
+    [InlineData("not: [valid, yaml: [", "Malformed YAML:")]
+    [InlineData("", "The YAML document is empty.")]
+    [InlineData("- just\n- a\n- sequence", "Expected a YAML mapping node but found")]
+    [InlineData("const: notabool", "'const' must be a YAML boolean.")]
+    [InlineData("predicate: [not, a, string]", "'predicate' must be a YAML string.")]
+    [InlineData("predicate: isManager\nargs: [not, a, mapping]", "'args' must be a YAML mapping.")]
+    [InlineData("predicate: isManager\nargs:\n  ? [not, a, scalar]\n  : true", "An argument name must be a YAML string.")]
+    [InlineData("op: and", "requires an 'operands' sequence")]
+    [InlineData("op: not\noperands:\n  - const: true\n  - const: false", "'not' requires exactly one operand.")]
+    [InlineData("op: bogus\noperands: []", "Unknown operator 'bogus'.")]
+    [InlineData("op: atLeast\noperands:\n  - const: true", "requires a numeric 'k'")]
+    [InlineData("predicate: isManager\nargs:\n  x:\n    weird: 1", "Unsupported YAML node type")]
+    public void Every_distinct_malformed_tree_branch_raises_its_specific_message(string yaml, string expectedMessageSubstring)
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.CompileYaml(yaml);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(
+            result.Diagnostics,
+            d =>
+                d.Code == DiagnosticCodes.MalformedTree
+                && d.Message.Contains(expectedMessageSubstring, StringComparison.Ordinal)
+        );
+    }
+
     private static RuleCompiler<RuleTestContext> CreateCompiler()
     {
         return new(

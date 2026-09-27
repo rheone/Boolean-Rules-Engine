@@ -4,3 +4,7 @@ using System.Runtime.CompilerServices;
 // variants, RawLiteral) and RuleCompiler.CompileFromNode so the YAML front end shares the exact same
 // validate/analyze/build pipeline as the DSL and JSON front ends, rather than re-implementing it.
 [assembly: InternalsVisibleTo("BooleanRulesEngine.Yaml")]
+
+// BooleanRulesEngine.Tests needs direct access to internal units (Lexer, DslParser, Analyzer,
+// BddManager, etc.) so unit tests aren't forced through the public RuleCompiler pipeline.
+[assembly: InternalsVisibleTo("BooleanRulesEngine.Tests")]
