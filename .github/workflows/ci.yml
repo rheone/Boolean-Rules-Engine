@@ -27,6 +27,13 @@ jobs:
         run: dotnet restore BooleanRulesEngine.slnx --locked-mode
 
       - name: Build
+        # This step doubles as the AOT/trim compatibility gate: every project under src/
+        # (src/Directory.Build.props) has IsAotCompatible enabled, which turns on the trim
+        # analyzer (IL2xxx) and NativeAOT analyzer (IL3xxx) for the shipping library packages,
+        # and src/Directory.Build.props promotes their warnings to build errors whenever the
+        # standard $CI=true environment variable that GitHub Actions sets is present - so a
+        # newly introduced reflection/dynamic-code pattern in a shipping package fails this
+        # step on any PR. Test and benchmark projects are outside src/ and are unaffected.
         run: dotnet build BooleanRulesEngine.slnx --configuration Release --no-restore
 
       - name: Test

@@ -1,0 +1,21 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- AOT/trim compatibility analysis for the shipping library packages (CONTEXT.md's
+       "Attribute-based / assembly-scanned predicate registration" deferred item calls out
+       trimming/AOT as a design constraint, not an afterthought - see the note added there).
+       IsAotCompatible turns on both the trim analyzer (IL2xxx) and the NativeAOT analyzer
+       (IL3xxx) for every project under src/, and CI promotes any warning they raise to a build
+       error so a newly introduced reflection/dynamic-code pattern fails the PR instead of
+       silently regressing compatibility. Local builds stay warning-only (matching the root
+       Directory.Build.props's own deliberately-commented-out TreatWarningsAsErrors) so this
+       never blocks inner-loop work - only CI enforces it.
+
+       Test and benchmark projects live outside this src/ subtree and are not covered: they are
+       never published as libraries, and benchmark/test tooling (reflection-heavy by nature) has
+       no need to be trim/AOT-safe. -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+    <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

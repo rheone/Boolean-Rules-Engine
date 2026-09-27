@@ -199,6 +199,44 @@ designed so each remains addable without a breaking rework.
 | **Minimal satisfying assignments** (BDD-derived "what facts would make this true") | The BDD exists anyway for constant/contradiction diagnostics; exposing satisfying-assignment enumeration is an authoring-tool feature with no current consumer. |
 | **Attribute-based / assembly-scanned predicate registration** | Explicit registration only in v1 — scanning is magic, breaks trimming/AOT, and the repo's own rule is "do not introduce unnecessary abstractions." |
 
+## AOT / trim compatibility
+
+The deferred item above treats trimming/AOT as a design constraint rather than an
+afterthought, so it's verified rather than assumed. `src/Directory.Build.props` sets
+`IsAotCompatible` for every shipping package (`BooleanRulesEngine.Abstractions`,
+`BooleanRulesEngine`, `BooleanRulesEngine.Predicates`, `BooleanRulesEngine.Testing`,
+`BooleanRulesEngine.Yaml`), enabling both the trim analyzer (`IL2xxx`) and the NativeAOT
+analyzer (`IL3xxx`), and CI (`.github/workflows/ci.yml`) promotes their warnings to build
+errors. As of this writing that analysis is clean: zero trim/AOT warnings across all five
+packages.
+
+This holds by construction, not by suppression:
+
+- The rule tree's JSON support (`BooleanRulesEngine/Json`) reads and writes `JsonElement`/
+  `JsonNode`/`JsonObject`/`JsonArray` directly — never `JsonSerializer.Deserialize<T>` — so
+  there is no reflection-based (de)serialization to source-generate around.
+- The DI registration extension (`AddBooleanRulesEngine<TContext>`) registers a
+  closed-generic instance and a factory delegate, not an open-generic or reflection-driven
+  registration.
+- No production code path uses `Activator.CreateInstance`, `MakeGenericMethod`, assembly
+  scanning, or runtime code generation (`System.Reflection.Emit`, `Expression.Compile`, etc.).
+
+**Known limitation — YamlDotNet:** `BooleanRulesEngine.Yaml` only depends on YamlDotNet's
+low-level `RepresentationModel` DOM (`YamlStream`/`YamlNode`), not its reflection-based
+object-graph (de)serializer, so nothing in this package's own code triggers a trim/AOT
+warning today. However, YamlDotNet 18.1.0 does not itself ship `IsTrimmable`/AOT annotations
+(no `ILLink` metadata in its NuGet package), so the trim/AOT analyzer can't see into it and
+verify its internals — a real incompatibility inside YamlDotNet's own reflection paths would
+not surface as a build warning here. `BooleanRulesEngine.Yaml` is trim/AOT-*analyzed* clean,
+not independently *proven* safe end-to-end; a consumer publishing with `PublishAot`/
+`PublishTrimmed` who reaches this package should smoke-test that specific scenario.
+
+No dedicated `PublishAot` smoke-test host was added: `PublishAot`/`PublishTrimmed` are
+publish-time settings for an executable, and none of these five packages is one. The
+build-time analyzer (`IsAotCompatible`) is the correct and sufficient check for a library —
+it's the same mechanism the .NET runtime's own libraries use to stay AOT-compatible without
+publishing themselves.
+
 ## Related documents
 
 - [ADR-0001: Kleene failure model](docs/adr/0001-kleene-failure-model.md)
