@@ -57,6 +57,14 @@ public sealed class PredicateArguments(IReadOnlyDictionary<string, LiteralValue>
         return this.Get(name, LiteralKind.DateTimeOffset).AsDateTimeOffset();
     }
 
+    /// <summary>Gets a <see cref="Guid"/> argument.</summary>
+    /// <param name="name">The argument name.</param>
+    /// <returns>The GUID value.</returns>
+    public Guid GetGuid(string name)
+    {
+        return this.Get(name, LiteralKind.Guid).AsGuid();
+    }
+
     /// <summary>Gets a <see cref="string"/> array argument.</summary>
     /// <param name="name">The argument name.</param>
     /// <returns>The array elements.</returns>
@@ -95,6 +103,14 @@ public sealed class PredicateArguments(IReadOnlyDictionary<string, LiteralValue>
     public IReadOnlyList<DateTimeOffset> GetDateTimeOffsetArray(string name)
     {
         return [.. this.Get(name, LiteralKind.DateTimeOffsetArray).AsArray().Select(v => v.AsDateTimeOffset())];
+    }
+
+    /// <summary>Gets a <see cref="Guid"/> array argument.</summary>
+    /// <param name="name">The argument name.</param>
+    /// <returns>The array elements.</returns>
+    public IReadOnlyList<Guid> GetGuidArray(string name)
+    {
+        return [.. this.Get(name, LiteralKind.GuidArray).AsArray().Select(v => v.AsGuid())];
     }
 
     /// <summary>Gets the raw literal value for an argument, regardless of kind.</summary>

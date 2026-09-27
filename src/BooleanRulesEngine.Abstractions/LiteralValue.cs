@@ -13,6 +13,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
     private readonly decimal decimalValue;
     private readonly bool booleanValue;
     private readonly DateTimeOffset dateTimeOffsetValue;
+    private readonly Guid guidValue;
     private readonly EquatableArray<LiteralValue> arrayValue;
 
     private LiteralValue(
@@ -22,6 +23,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
         decimal decimalValue,
         bool booleanValue,
         DateTimeOffset dateTimeOffsetValue,
+        Guid guidValue,
         EquatableArray<LiteralValue> arrayValue
     )
     {
@@ -31,6 +33,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
         this.decimalValue = decimalValue;
         this.booleanValue = booleanValue;
         this.dateTimeOffsetValue = dateTimeOffsetValue;
+        this.guidValue = guidValue;
         this.arrayValue = arrayValue;
     }
 
@@ -44,7 +47,8 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
                 or LiteralKind.Int64Array
                 or LiteralKind.DecimalArray
                 or LiteralKind.BooleanArray
-                or LiteralKind.DateTimeOffsetArray;
+                or LiteralKind.DateTimeOffsetArray
+                or LiteralKind.GuidArray;
 
     /// <summary>Determines whether two literals are equal by kind and value.</summary>
     /// <param name="left">The left literal.</param>
@@ -69,7 +73,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
     /// <returns>The wrapped literal.</returns>
     public static LiteralValue OfString(string value)
     {
-        return new(LiteralKind.String, value, default, default, default, default, default);
+        return new(LiteralKind.String, value, default, default, default, default, Guid.Empty, default);
     }
 
     /// <summary>Creates a <see cref="LiteralKind.Int64"/> value.</summary>
@@ -77,7 +81,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
     /// <returns>The wrapped literal.</returns>
     public static LiteralValue OfInt64(long value)
     {
-        return new(LiteralKind.Int64, default, value, default, default, default, default);
+        return new(LiteralKind.Int64, default, value, default, default, default, Guid.Empty, default);
     }
 
     /// <summary>Creates a <see cref="LiteralKind.Decimal"/> value.</summary>
@@ -85,7 +89,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
     /// <returns>The wrapped literal.</returns>
     public static LiteralValue OfDecimal(decimal value)
     {
-        return new(LiteralKind.Decimal, default, default, value, default, default, default);
+        return new(LiteralKind.Decimal, default, default, value, default, default, Guid.Empty, default);
     }
 
     /// <summary>Creates a <see cref="LiteralKind.Boolean"/> value.</summary>
@@ -93,7 +97,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
     /// <returns>The wrapped literal.</returns>
     public static LiteralValue OfBoolean(bool value)
     {
-        return new(LiteralKind.Boolean, default, default, default, value, default, default);
+        return new(LiteralKind.Boolean, default, default, default, value, default, Guid.Empty, default);
     }
 
     /// <summary>Creates a <see cref="LiteralKind.DateTimeOffset"/> value.</summary>
@@ -101,7 +105,15 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
     /// <returns>The wrapped literal.</returns>
     public static LiteralValue OfDateTimeOffset(DateTimeOffset value)
     {
-        return new(LiteralKind.DateTimeOffset, default, default, default, default, value, default);
+        return new(LiteralKind.DateTimeOffset, default, default, default, default, value, Guid.Empty, default);
+    }
+
+    /// <summary>Creates a <see cref="LiteralKind.Guid"/> value.</summary>
+    /// <param name="value">The GUID value.</param>
+    /// <returns>The wrapped literal.</returns>
+    public static LiteralValue OfGuid(Guid value)
+    {
+        return new(LiteralKind.Guid, default, default, default, default, default, value, default);
     }
 
     /// <summary>Creates an array literal of the given element kind.</summary>
@@ -124,7 +136,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             }
         }
 
-        return new LiteralValue(arrayKind, default, default, default, default, default, items);
+        return new LiteralValue(arrayKind, default, default, default, default, default, Guid.Empty, items);
     }
 
     /// <summary>Maps a scalar <see cref="LiteralKind"/> to its corresponding array kind.</summary>
@@ -139,6 +151,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             LiteralKind.Decimal => LiteralKind.DecimalArray,
             LiteralKind.Boolean => LiteralKind.BooleanArray,
             LiteralKind.DateTimeOffset => LiteralKind.DateTimeOffsetArray,
+            LiteralKind.Guid => LiteralKind.GuidArray,
             _ => throw new ArgumentException($"'{elementKind}' is not a scalar literal kind.", nameof(elementKind)),
         };
     }
@@ -155,6 +168,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             LiteralKind.DecimalArray => LiteralKind.Decimal,
             LiteralKind.BooleanArray => LiteralKind.Boolean,
             LiteralKind.DateTimeOffsetArray => LiteralKind.DateTimeOffset,
+            LiteralKind.GuidArray => LiteralKind.Guid,
             _ => throw new ArgumentException($"'{arrayKind}' is not an array literal kind.", nameof(arrayKind)),
         };
     }
@@ -201,6 +215,14 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             : throw WrongKind(LiteralKind.DateTimeOffset, this.Kind);
     }
 
+    /// <summary>Gets the wrapped <see cref="Guid"/> value.</summary>
+    /// <returns>The GUID value.</returns>
+    /// <exception cref="InvalidOperationException"><see cref="Kind"/> is not <see cref="LiteralKind.Guid"/>.</exception>
+    public Guid AsGuid()
+    {
+        return this.Kind == LiteralKind.Guid ? this.guidValue : throw WrongKind(LiteralKind.Guid, this.Kind);
+    }
+
     /// <summary>Gets the wrapped array's elements.</summary>
     /// <returns>The array elements, in order.</returns>
     /// <exception cref="InvalidOperationException"><see cref="Kind"/> is not an array kind.</exception>
@@ -226,6 +248,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             LiteralKind.Decimal => this.decimalValue == other.decimalValue,
             LiteralKind.Boolean => this.booleanValue == other.booleanValue,
             LiteralKind.DateTimeOffset => this.dateTimeOffsetValue == other.dateTimeOffsetValue,
+            LiteralKind.Guid => this.guidValue == other.guidValue,
             _ => this.arrayValue.Equals(other.arrayValue),
         };
     }
@@ -246,6 +269,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             LiteralKind.Decimal => HashCode.Combine(this.Kind, this.decimalValue),
             LiteralKind.Boolean => HashCode.Combine(this.Kind, this.booleanValue),
             LiteralKind.DateTimeOffset => HashCode.Combine(this.Kind, this.dateTimeOffsetValue),
+            LiteralKind.Guid => HashCode.Combine(this.Kind, this.guidValue),
             _ => HashCode.Combine(this.Kind, this.arrayValue),
         };
     }
@@ -260,6 +284,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             LiteralKind.Decimal => this.decimalValue.ToString(CultureInfo.InvariantCulture),
             LiteralKind.Boolean => this.booleanValue ? "true" : "false",
             LiteralKind.DateTimeOffset => this.dateTimeOffsetValue.ToString("O", CultureInfo.InvariantCulture),
+            LiteralKind.Guid => $"\"{this.guidValue}\"",
             _ => "[" + string.Join(", ", this.arrayValue.Select(v => v.ToString())) + "]",
         };
     }

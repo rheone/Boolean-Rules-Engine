@@ -93,6 +93,7 @@ internal static class JsonTreePrinter
             LiteralKind.Int64 => JsonValue.Create(value.AsInt64()),
             LiteralKind.Decimal => JsonValue.Create(value.AsDecimal()),
             LiteralKind.Boolean => JsonValue.Create(value.AsBoolean()),
+            LiteralKind.Guid => JsonValue.Create(value.AsGuid().ToString()),
             LiteralKind.DateTimeOffset => JsonValue.Create(
                 value.AsDateTimeOffset().ToString("O", CultureInfo.InvariantCulture)
             ),

@@ -123,6 +123,7 @@ internal static class YamlTreePrinter
                 value.AsDateTimeOffset().ToString("O", CultureInfo.InvariantCulture),
                 ScalarStyle.DoubleQuoted
             ),
+            LiteralKind.Guid => Scalar(value.AsGuid().ToString(), ScalarStyle.DoubleQuoted),
             _ => ArrayLiteralToNode(value),
         };
     }

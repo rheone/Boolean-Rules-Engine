@@ -352,11 +352,12 @@ term. See
 
 ## Examples
 
-Six examples, each adding one more piece — a single predicate, combining
+Seven examples, each adding one more piece — a single predicate, combining
 predicates, named arguments, `XOR`/`XNOR`/`ExactlyOne`/the threshold family,
-the full worked example in all three formats, then assembling that same rule
-with `RuleBuilder` instead of writing text — plus a bonus on turning a
-denial into a human-readable sentence.
+the full worked example in all three formats, assembling that same rule with
+`RuleBuilder` instead of writing text, and matching a value against one or
+several constants — plus a bonus on turning a denial into a human-readable
+sentence.
 
 ### 1. A single predicate
 
@@ -573,6 +574,69 @@ tautology/contradiction — nothing here bypasses the Validate/Analyze stages
 of the [compilation pipeline](#compilation-pipeline). See
 [Building rules programmatically](#building-rules-programmatically) below
 for the full API.
+
+### 7. Matching against a constant, or any of several constants
+
+"Has at least one training course of either A, B, or C" — two ways to write
+this, depending on whether the set of alternatives already has a predicate
+per value or not.
+
+**If a single-value predicate already exists** (e.g. [Example 3](#3-named-arguments)'s
+`hasTraining(training: "Q")`), just `OR` it together per alternative — no
+new predicate needed:
+
+```text
+hasTraining(training: "A") OR hasTraining(training: "B") OR hasTraining(training: "C")
+```
+
+Each call is a distinct term (and a distinct memoization unit), so this
+reads clearly for a handful of alternatives but gets verbose as the set
+grows, and the set of alternatives is baked into the rule text rather than
+passed as data.
+
+**For an arbitrary-size set, write a predicate that takes an array
+argument** and checks membership itself — one term, one predicate call,
+and the alternatives are rule-authored data rather than repeated rule
+structure:
+
+```csharp
+public sealed class HasAnyTrainingCourse : IPredicate<User>
+{
+    public static PredicateSchema Schema =>
+        new(
+            "hasAnyTrainingCourse",
+            "Has the current user completed at least one of the given training courses?",
+            [
+                new PredicateArgumentSchema(
+                    "courses",
+                    "The training course codes to check for (any match).",
+                    LiteralKind.StringArray
+                ),
+            ]);
+
+    public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct)
+    {
+        IReadOnlyList<string> courses = args.GetStringArray("courses");
+        return ValueTask.FromResult(courses.Any(user.Training.Contains));
+    }
+}
+```
+
+Used in a rule as:
+
+```text
+hasAnyTrainingCourse(courses: ["A", "B", "C"])
+```
+
+The same shape works for "equals one specific constant" too — just compare
+against a single value instead of checking array membership (e.g.
+`args.GetGuid("id") == expectedId`, or the `hasRole`/`hasId`-style
+single-argument predicates already shown). Whether the constant(s) come
+from a `LiteralKind.String`, `Int64`, `Decimal`, `Boolean`, `DateTimeOffset`,
+or `Guid` argument (scalar or array) is purely a schema choice — the
+compiler validates and converts each one identically (see
+[Guid literal tests](tests/BooleanRulesEngine.Tests/GuidLiteralTests.cs)
+for a worked `Guid` example).
 
 ### Bonus: explaining a denied decision
 

@@ -55,6 +55,12 @@ internal static class LiteralConversion
                     ):
                 value = LiteralValue.OfDateTimeOffset(dateTimeOffsetValue);
                 return true;
+            case LiteralKind.Guid
+                when raw.Form == RawLiteralForm.QuotedString
+                    && raw.Text is not null
+                    && Guid.TryParse(raw.Text, out Guid guidValue):
+                value = LiteralValue.OfGuid(guidValue);
+                return true;
             default:
                 value = default;
                 return false;
@@ -99,7 +105,8 @@ internal static class LiteralConversion
                 or LiteralKind.Int64Array
                 or LiteralKind.DecimalArray
                 or LiteralKind.BooleanArray
-                or LiteralKind.DateTimeOffsetArray;
+                or LiteralKind.DateTimeOffsetArray
+                or LiteralKind.GuidArray;
     }
 
     private static bool TryConvertArray(RawLiteral raw, LiteralKind expectedKind, out LiteralValue value)

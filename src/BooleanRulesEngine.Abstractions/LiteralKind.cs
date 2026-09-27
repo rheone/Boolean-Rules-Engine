@@ -21,6 +21,13 @@ public enum LiteralKind
     /// <summary>A <see cref="DateTimeOffset"/> value.</summary>
     DateTimeOffset,
 
+    /// <summary>
+    /// A <see cref="Guid"/> value. Written as a quoted string in the DSL (the same story as
+    /// <see cref="DateTimeOffset"/>: there is no dedicated literal syntax, just a schema that says to
+    /// parse the quoted text as a GUID rather than keep it as a plain string).
+    /// </summary>
+    Guid,
+
     /// <summary>An array of <see cref="string"/> values.</summary>
     StringArray,
 
@@ -35,4 +42,7 @@ public enum LiteralKind
 
     /// <summary>An array of <see cref="DateTimeOffset"/> values.</summary>
     DateTimeOffsetArray,
+
+    /// <summary>An array of <see cref="Guid"/> values.</summary>
+    GuidArray,
 }

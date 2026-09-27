@@ -89,4 +89,22 @@ public static class TestPredicates
                 ValueTask.FromResult(string.Equals(args.GetString(argumentName), matchValue, StringComparison.Ordinal))
         );
     }
+
+    /// <summary>Registers a single-GUID-argument predicate whose truth is "does the argument equal <paramref name="matchValue"/>?".</summary>
+    public static PredicateRegistryBuilder<RuleTestContext> AddGuidArgPredicate(
+        this PredicateRegistryBuilder<RuleTestContext> builder,
+        string name,
+        string argumentName,
+        Guid matchValue
+    )
+    {
+        return builder.Add(
+            new PredicateSchema(
+                name,
+                $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue}'.",
+                [new PredicateArgumentSchema(argumentName, $"The GUID to compare against '{matchValue}'.", LiteralKind.Guid)]
+            ),
+            (_, args, _) => ValueTask.FromResult(args.GetGuid(argumentName) == matchValue)
+        );
+    }
 }
