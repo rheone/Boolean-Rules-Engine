@@ -14,15 +14,20 @@
     <Copyright>Copyright 2024-2025 Robert H. Engelhardt</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <RepositoryUrl>https://github.com/rheone/interlocutor</RepositoryUrl>
+    <RepositoryUrl>https://github.com/rheone/Boolean-Rules-Engine</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/rheone/interlocutor</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/rheone/Boolean-Rules-Engine</PackageProjectUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <PackageTags>rules engine</PackageTags>
+    <PackageTags>rules engine;boolean;kleene;dsl</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- No PackageIcon yet: no icon asset exists in the repo, and a placeholder image is worse than none -
          add one and set PackageIcon when real branding exists, rather than shipping a fabricated stand-in. -->
+    <!-- Symbol packages + deterministic builds: the standard pairing with SourceLink above so a
+         consumer's debugger can step into this package's source from nuget.org/a symbol server. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <!-- Source Link -->

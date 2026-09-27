@@ -30,6 +30,18 @@ public sealed class CanonicalPrinterTests
         Assert.Equal("(isManager XOR isDepartmentHead)", rule.CanonicalText);
     }
 
+    [Fact]
+    public void And_operand_of_or_is_parenthesized_for_clarity_even_though_precedence_makes_it_unambiguous()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler
+            .Compile("isManager AND isDepartmentHead OR hasRole(role: \"Y\")")
+            .CompiledRule!;
+
+        Assert.Equal("(isManager AND isDepartmentHead) OR hasRole(role: \"Y\")", rule.CanonicalText);
+    }
+
     [Theory]
     [InlineData("isManager AND isDepartmentHead")]
     [InlineData("isManager OR isDepartmentHead")]

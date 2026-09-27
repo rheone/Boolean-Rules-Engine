@@ -2,13 +2,12 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-  <!-- Roslynator -->
+  <!-- Roslynator. (Roslynator.CodeFixes/Roslynator.Refactorings are IDE-extension-only packages,
+       not referenced by any PackageReference here, so they are deliberately not pinned.) -->
   <ItemGroup>
     <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />
     <PackageVersion Include="Roslynator.CodeAnalysis.Analyzers" Version="5.0.0" />
-    <PackageVersion Include="Roslynator.CodeFixes" Version="4.15.0" />
     <PackageVersion Include="Roslynator.Formatting.Analyzers" Version="5.0.0" />
-    <PackageVersion Include="Roslynator.Refactorings" Version="4.15.0" />
   </ItemGroup>
   <!-- StyleCop -->
   <ItemGroup>
@@ -33,14 +32,14 @@
        itself depends on (ADR-0004); the non-Abstractions packages are test-only, wiring a real DI
        container/logger in the DI-registration-extension tests (ticket 12). -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0-preview.6.26359.118" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0-preview.6.26359.118" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0-preview.7.26381.103" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="11.0.0-preview.7.26381.103" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0-rc.1.26425.128" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0-rc.1.26425.128" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0-rc.1.26425.128" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="11.0.0-rc.1.26425.128" />
   </ItemGroup>
   <!-- YamlDotNet - BooleanRulesEngine.Yaml's sole dependency beyond BooleanRulesEngine itself. -->
   <ItemGroup>
-    <PackageVersion Include="YamlDotNet" Version="16.3.0" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <!-- xUnit v3 + MTP test packages -->
   <ItemGroup>
