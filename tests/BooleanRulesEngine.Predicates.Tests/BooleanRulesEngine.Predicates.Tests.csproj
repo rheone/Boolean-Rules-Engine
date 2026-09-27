@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>43a1024e-77dc-413a-874d-3ddd4f484628</ProjectGuid>
+    <IsTestProject>true</IsTestProject>
+    <!-- CS1591 (missing XML doc comment) still fires here even though Directory.Build.targets sets
+         GenerateDocumentationFile=false for .Tests projects; test method names are the documentation
+         (standard xUnit convention - CLAUDE.md's own SA1600/SA1633 suppression applies the same logic
+         to production code), so this is suppressed explicitly rather than chased further. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/BooleanRulesEngine.Abstractions/BooleanRulesEngine.Abstractions.csproj" />
+    <ProjectReference Include="../../src/BooleanRulesEngine.Predicates/BooleanRulesEngine.Predicates.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

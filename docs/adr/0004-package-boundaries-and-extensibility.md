@@ -24,7 +24,7 @@ observability is deferred, not v1).
 
 ## Decision
 
-### Three packages
+### Four packages
 
 - **`BooleanRulesEngine.Abstractions`** — `IPredicate<TContext>`,
   `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault`.
@@ -40,6 +40,20 @@ observability is deferred, not v1).
 - **`BooleanRulesEngine.Yaml`** — YAML tree support, isolated here because
   it is the one place YamlDotNet is needed, and a consumer with no interest
   in YAML should not acquire that dependency transitively.
+- **`BooleanRulesEngine.Predicates`** — a convenience library of ready-made,
+  generic `IPredicate<TContext>`-shaped implementations (string comparison,
+  null/empty, set equality, regex matching), each parameterized by a
+  selector delegate supplied at registration. Depends on
+  `BooleanRulesEngine.Abstractions` alone — not `BooleanRulesEngine` — so a
+  service that wants these common predicates still doesn't acquire the
+  parser, compiler, or analyzer. It is deliberately its own package rather
+  than folded into `BooleanRulesEngine.Abstractions` itself: `Abstractions`
+  is a zero-opinion kernel (the contract every predicate author, including
+  this package, implements against), while `Predicates` is one opinionated,
+  optional convenience layer built on top of that contract — a host is free
+  to implement every predicate itself and never reference this package at
+  all. Any host project may opt into it; nothing in `BooleanRulesEngine`
+  itself depends on it.
 
 ```mermaid
 flowchart LR
@@ -62,17 +76,23 @@ flowchart LR
         Yaml["YAML tree support"]
     end
 
+    subgraph PredicatesPkg["BooleanRulesEngine.Predicates"]
+        Predicates["String/null-or-empty/set-equality/regex predicates"]
+    end
+
     Core --> Abstractions
     YamlPkg --> Core
+    PredicatesPkg --> Abstractions
     Core --> MEL["Microsoft.Extensions.Logging.Abstractions"]
     Core --> MEDI["Microsoft.Extensions.DependencyInjection.Abstractions"]
 
     App["Predicate-implementing service"] -.->|"references only"| Abstractions
     Host["Rule-authoring / evaluation host"] -->|"references"| Core
     Host -.->|"optional"| YamlPkg
+    Host -.->|"optional"| PredicatesPkg
 ```
 
-Splitting a monolithic package into these three later is a breaking change
+Splitting a monolithic package into these four later is a breaking change
 for anyone who already depends on the combined surface; shipping the split
 from the start costs nothing extra now.
 
