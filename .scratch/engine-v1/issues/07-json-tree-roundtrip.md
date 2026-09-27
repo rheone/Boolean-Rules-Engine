@@ -4,7 +4,7 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] The JSON shape from ADR-0003 (including the worked example) parses to a `CompiledRule` (or an intermediate AST feeding the same compiler pipeline as the DSL) structurally equal to parsing the equivalent DSL text
 - [ ] `AtLeast`'s threshold `k` round-trips correctly through the JSON form

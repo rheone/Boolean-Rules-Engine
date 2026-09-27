@@ -6,7 +6,7 @@ Mixing `XOR` with `AND`/`OR` in the same expression without parentheses is a com
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] `XOR(a, b)` parses and evaluates correctly for all nine combinations of `True`/`False`/`Unknown` on `a` and `b`
 - [ ] `XOR` given three or more operands is a compile `Error` diagnostic, not silently accepted with parity semantics

@@ -6,7 +6,7 @@ A fault in one operand does not abort the evaluation of the whole expression —
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] `hasRole AND isManager`-shaped rules (using the zero-arg predicates from ticket 02) parse and evaluate correctly for all combinations of `True`/`False`/`Unknown` operands, matching the `AND`/`OR`/`NOT` truth tables in ADR-0001 exactly
 - [ ] `NOT` binds tighter than `AND`, which binds tighter than `OR`, with no parentheses required for the common cases (e.g. `NOT a AND b` parses as `(NOT a) AND b`)

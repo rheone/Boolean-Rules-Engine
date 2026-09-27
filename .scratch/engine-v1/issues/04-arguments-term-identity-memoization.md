@@ -6,7 +6,7 @@ Term identity is enforced exactly as `CONTEXT.md` defines it: predicate name nor
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] A predicate can declare a `PredicateSchema` with one or more named arguments (name, type, required/default) and read them via a `PredicateArguments` accessor (`GetString`, `GetInt64`, `GetDecimal`, `GetBool`, `GetDateTimeOffset`, and array variants)
 - [ ] `hasRole(role: "Y")`-shaped terms parse with named arguments in any order in the source text, and a rule with a missing required argument or a type-mismatched argument value produces a compile `Error` diagnostic (source span included), not a runtime exception

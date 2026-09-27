@@ -8,7 +8,7 @@ A predicate that throws during evaluation is caught at the term boundary, record
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] `TruthValue` (`False`/`True`/`Unknown`), `Decision`, and `Fault` exist as described in ADR-0001; `bool?` does not appear anywhere on the public surface
 - [ ] `IPredicate<TContext>` and `PredicateSchema` exist per ADR-0002's shape (`static abstract PredicateSchema Schema`, `ValueTask<bool> EvaluateAsync(TContext, PredicateArguments, CancellationToken)` — the arguments accessor itself can be a stub for this ticket since no rule here has arguments)

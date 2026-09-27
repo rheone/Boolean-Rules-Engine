@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] `CompiledRule` exposes a canonical printed string form (e.g. `ToString()` or an explicit `Print()`/`CanonicalText` member)
 - [ ] Printing the worked example from ADR-0003 (`hasRole(role: "Y") AND (hasTraining(training: "Q") OR hasTraining(training: "Z") OR (isManager XOR isDepartmentHead))`) reproduces that exact text

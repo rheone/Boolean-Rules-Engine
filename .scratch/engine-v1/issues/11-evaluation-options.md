@@ -8,7 +8,7 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] With `FaultBudget = 1`, an evaluation that hits a second faulting term aborts immediately (the resulting `Decision` reflects an aborted evaluation, distinct from the unlimited-budget case where evaluation would have continued)
 - [ ] With the default (unlimited) `FaultBudget`, an evaluation with multiple faulting terms continues to completion exactly as in tickets 02/03

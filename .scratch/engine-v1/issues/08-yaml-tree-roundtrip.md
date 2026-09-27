@@ -4,7 +4,7 @@
 
 **Blocked by:** 07
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] The YAML form of the ADR-0003 worked example parses to a tree structurally equal to the DSL and JSON forms of the same rule
 - [ ] A `CompiledRule` can be printed to the YAML tree shape, and parsing that YAML back reproduces a structurally equal tree

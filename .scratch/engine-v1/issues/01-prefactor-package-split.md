@@ -12,7 +12,7 @@ The current placeholder `Rule.cs` (an abstract `Rule` with a synchronous paramet
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] Solution contains three projects/packages matching the dependency graph in ADR-0004 (`Abstractions` has zero third-party dependencies; `BooleanRulesEngine` depends on it plus the two named `Microsoft.Extensions.*.Abstractions` packages; `BooleanRulesEngine.Yaml` depends on `BooleanRulesEngine` plus YamlDotNet)
 - [ ] `BooleanRulesEngine.slnx` references all three projects (plus a test project per package, or a shared test project referencing all three — whichever this repo's existing test-project convention supports)

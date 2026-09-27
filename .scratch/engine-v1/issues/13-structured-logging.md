@@ -4,7 +4,7 @@
 
 **Blocked by:** 09
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] Evaluating a rule with a faulting predicate logs a structured event (via an injected `ILogger<T>`) including the term identity and exception, at an appropriate level (e.g. `Warning`)
 - [ ] Compiling a rule that produces any diagnostic logs a structured event per diagnostic, including its code, severity, and source span

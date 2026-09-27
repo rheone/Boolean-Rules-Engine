@@ -6,7 +6,7 @@ Also `CompilationMode.Lenient`: for the legitimate multi-service-shared-rule-sto
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] A rule exceeding the configured max tree depth produces a compile `Error` diagnostic rather than a stack overflow or hang
 - [ ] A rule exceeding the configured max node count produces a compile `Error` diagnostic rather than an unbounded compile time

@@ -6,7 +6,7 @@ This ticket is flagged in the spec as the one component least likely to be a dir
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] `hasRole(role: "Y") AND NOT hasRole(role: "Y")` produces a diagnostic identifying the sub-expression as a structural contradiction (always `False`), using term identity to recognize both references as the same variable
 - [ ] `hasRole(role: "Y") OR NOT hasRole(role: "Y")` produces a diagnostic identifying the sub-expression as a structural tautology (always `True`)

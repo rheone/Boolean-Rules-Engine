@@ -6,7 +6,7 @@ Also add DI registration extensions (`IServiceCollection` extension methods) for
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done (verified against existing codebase — already implemented prior to this pass)
 
 - [ ] A class-based `IPredicate<TContext>` can be registered against `PredicateRegistry` by type (not just by lambda), and a compiled rule referencing it evaluates correctly
 - [ ] Using a substitute `IServiceProvider` (NSubstitute) that returns a distinct scoped service instance per call, two `EvaluateAsync` calls on the same `CompiledRule` each resolve a fresh predicate instance from the `IServiceProvider` passed to that call — proving the predicate is not captured once at registration time
