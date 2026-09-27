@@ -63,6 +63,27 @@ public sealed class ScopedResolutionAndRegistrationTests
     }
 
     [Fact]
+    public async Task Class_based_predicate_with_no_service_registration_is_absorbed_as_a_fault_naming_the_unresolved_type()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().Add<ScopedFlagPredicate>().Build()
+        );
+        CompiledRule<RuleTestContext> rule = compiler.Compile("scopedFlag").CompiledRule!;
+
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            TestSupport.EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(TruthValue.Unknown, decision.Result);
+        Fault fault = Assert.Single(decision.Faults);
+        Assert.Equal("scopedFlag", fault.Term.PredicateName);
+        InvalidOperationException exception = Assert.IsType<InvalidOperationException>(fault.Exception);
+        Assert.Contains(nameof(ScopedFlagPredicate), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Service_collection_extension_wires_a_compiler_and_rule_using_only_container_resolved_services()
     {
         ServiceCollection services = new();
