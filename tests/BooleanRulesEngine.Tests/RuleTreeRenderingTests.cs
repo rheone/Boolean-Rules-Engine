@@ -3,6 +3,7 @@ namespace BooleanRulesEngine.Tests;
 using BooleanRulesEngine.Abstractions;
 using BooleanRulesEngine.Compilation;
 using BooleanRulesEngine.Evaluation;
+using BooleanRulesEngine.Printing;
 using BooleanRulesEngine.Registry;
 using BooleanRulesEngine.Tests.TestSupport;
 
@@ -94,6 +95,139 @@ public sealed class RuleTreeRenderingTests
         Assert.Contains("[false]", text);
         Assert.Contains("[skipped]", text);
         Assert.DoesNotContain("[true]", text);
+    }
+
+    [Theory]
+    [InlineData(OperatorStyle.Word, "AND", "OR", "NOT", "XOR", "XNOR")]
+    [InlineData(OperatorStyle.Symbolic, "∧", "∨", "¬", "⊕", "↔")]
+    [InlineData(OperatorStyle.CStyle, "&&", "||", "!", "^", "==")]
+    public void PlainText_renders_operators_in_the_requested_style(
+        OperatorStyle style,
+        string and,
+        string or,
+        string not,
+        string xor,
+        string xnor
+    )
+    {
+        Assert.Contains(and, PlainTextTreePrinter.Print(BinaryNode("AND"), style));
+        Assert.Contains(or, PlainTextTreePrinter.Print(BinaryNode("OR"), style));
+        Assert.Contains(not, PlainTextTreePrinter.Print(UnaryNode("NOT"), style));
+        Assert.Contains(xor, PlainTextTreePrinter.Print(BinaryNode("XOR"), style));
+        Assert.Contains(xnor, PlainTextTreePrinter.Print(BinaryNode("XNOR"), style));
+    }
+
+    [Theory]
+    [InlineData(OperatorStyle.Word, "AND", "OR", "NOT", "XOR", "XNOR")]
+    [InlineData(OperatorStyle.Symbolic, "∧", "∨", "¬", "⊕", "↔")]
+    [InlineData(OperatorStyle.CStyle, "&&", "||", "!", "^", "==")]
+    public void Mermaid_renders_operators_in_the_requested_style(
+        OperatorStyle style,
+        string and,
+        string or,
+        string not,
+        string xor,
+        string xnor
+    )
+    {
+        Assert.Contains(and, MermaidTreePrinter.Print(BinaryNode("AND"), style));
+        Assert.Contains(or, MermaidTreePrinter.Print(BinaryNode("OR"), style));
+        Assert.Contains(not, MermaidTreePrinter.Print(UnaryNode("NOT"), style));
+        Assert.Contains(xor, MermaidTreePrinter.Print(BinaryNode("XOR"), style));
+        Assert.Contains(xnor, MermaidTreePrinter.Print(BinaryNode("XNOR"), style));
+    }
+
+    [Theory]
+    [InlineData(OperatorStyle.Word)]
+    [InlineData(OperatorStyle.Symbolic)]
+    [InlineData(OperatorStyle.CStyle)]
+    public void PlainText_keeps_ExactlyOne_and_threshold_labels_in_word_form_in_every_style(OperatorStyle style)
+    {
+        RuleDescription exactlyOne = new("ExactlyOne", "desc", [Leaf("a"), Leaf("b")]);
+        RuleDescription atLeast = new("AtLeast(3)", "desc", [Leaf("a"), Leaf("b"), Leaf("c")]);
+
+        Assert.Contains("ExactlyOne", PlainTextTreePrinter.Print(exactlyOne, style));
+        Assert.Contains("AtLeast(3)", PlainTextTreePrinter.Print(atLeast, style));
+    }
+
+    [Theory]
+    [InlineData(OperatorStyle.Word)]
+    [InlineData(OperatorStyle.Symbolic)]
+    [InlineData(OperatorStyle.CStyle)]
+    public void Mermaid_keeps_ExactlyOne_and_threshold_labels_in_word_form_in_every_style(OperatorStyle style)
+    {
+        RuleDescription exactlyOne = new("ExactlyOne", "desc", [Leaf("a"), Leaf("b")]);
+        RuleDescription atLeast = new("AtLeast(3)", "desc", [Leaf("a"), Leaf("b"), Leaf("c")]);
+
+        Assert.Contains("ExactlyOne", MermaidTreePrinter.Print(exactlyOne, style));
+        Assert.Contains("AtLeast(3)", MermaidTreePrinter.Print(atLeast, style));
+    }
+
+    [Fact]
+    public void PlainText_default_style_is_Word_with_no_style_argument()
+    {
+        string text = PlainTextTreePrinter.Print(BinaryNode("AND"));
+
+        Assert.Contains("AND", text);
+    }
+
+    [Fact]
+    public void Mermaid_default_style_is_Word_with_no_style_argument()
+    {
+        string mermaid = MermaidTreePrinter.Print(BinaryNode("AND"));
+
+        Assert.Contains("AND", mermaid);
+    }
+
+    [Fact]
+    public async Task PlainText_evaluated_overload_accepts_an_operator_style()
+    {
+        CompiledRule<RuleTestContext> rule = Compile(
+            "a AND b",
+            registry => registry.AddConstant("a", true).AddConstant("b", true)
+        );
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        string text = PlainTextTreePrinter.Print(rule.Describe(), decision.EvaluatedTree!, OperatorStyle.Symbolic);
+
+        Assert.Contains("∧", text);
+    }
+
+    [Fact]
+    public async Task Mermaid_evaluated_overload_accepts_an_operator_style()
+    {
+        CompiledRule<RuleTestContext> rule = Compile(
+            "a AND b",
+            registry => registry.AddConstant("a", true).AddConstant("b", true)
+        );
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        string mermaid = MermaidTreePrinter.Print(rule.Describe(), decision.EvaluatedTree!, OperatorStyle.CStyle);
+
+        Assert.Contains("&&", mermaid);
+    }
+
+    private static RuleDescription BinaryNode(string label)
+    {
+        return new RuleDescription(label, "desc", [Leaf("a"), Leaf("b")]);
+    }
+
+    private static RuleDescription UnaryNode(string label)
+    {
+        return new RuleDescription(label, "desc", [Leaf("a")]);
+    }
+
+    private static RuleDescription Leaf(string label)
+    {
+        return new RuleDescription(label, "desc", []);
     }
 
     private static CompiledRule<RuleTestContext> Compile(

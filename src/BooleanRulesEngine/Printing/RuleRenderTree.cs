@@ -22,22 +22,33 @@ internal static class RuleRenderTree
 {
     /// <summary>Builds a purely structural render tree, with no evaluation coloring.</summary>
     /// <param name="description">The rule's described tree.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels.</param>
     /// <returns>The render tree.</returns>
-    public static RenderNode Build(RuleDescription description)
+    public static RenderNode Build(RuleDescription description, OperatorStyle style = OperatorStyle.Word)
     {
-        return Build(description, evaluated: null, ancestorSkipped: false);
+        return Build(description, evaluated: null, ancestorSkipped: false, style);
     }
 
     /// <summary>Builds a render tree colored by one evaluation's result tree.</summary>
     /// <param name="description">The rule's described tree.</param>
     /// <param name="evaluated">The root of the matching <see cref="Decision.EvaluatedTree"/>.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels.</param>
     /// <returns>The render tree.</returns>
-    public static RenderNode Build(RuleDescription description, EvaluatedNode evaluated)
+    public static RenderNode Build(
+        RuleDescription description,
+        EvaluatedNode evaluated,
+        OperatorStyle style = OperatorStyle.Word
+    )
     {
-        return Build(description, evaluated, ancestorSkipped: false);
+        return Build(description, evaluated, ancestorSkipped: false, style);
     }
 
-    private static RenderNode Build(RuleDescription description, EvaluatedNode? evaluated, bool ancestorSkipped)
+    private static RenderNode Build(
+        RuleDescription description,
+        EvaluatedNode? evaluated,
+        bool ancestorSkipped,
+        OperatorStyle style
+    )
     {
         AssertOperandCountsAligned(description, evaluated);
 
@@ -52,10 +63,49 @@ internal static class RuleRenderTree
         for (int i = 0; i < description.Operands.Count; i++)
         {
             EvaluatedNode? childEvaluated = children is { Count: > 0 } ? children[i] : null;
-            renderedChildren.Add(Build(description.Operands[i], childEvaluated, skipped));
+            renderedChildren.Add(Build(description.Operands[i], childEvaluated, skipped, style));
         }
 
-        return new RenderNode(description.Label, state, renderedChildren);
+        return new RenderNode(StyledLabel(description, style), state, renderedChildren);
+    }
+
+    /// <summary>
+    /// Renders <paramref name="description"/>'s label in <paramref name="style"/>. Only an operator
+    /// node's exact word-form label (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>XNOR</c>) with
+    /// at least one operand is eligible — a term or constant leaf (always zero operands) is never
+    /// restyled even if a predicate's authored label happens to collide with one of those words, and
+    /// <c>ExactlyOne</c>/threshold labels (e.g. <c>AtLeast(3)</c>) fall through unchanged in every
+    /// style, since they have no symbolic or C-style spelling.
+    /// </summary>
+    private static string StyledLabel(RuleDescription description, OperatorStyle style)
+    {
+        if (style == OperatorStyle.Word || description.Operands.Count == 0)
+        {
+            return description.Label;
+        }
+
+        return style switch
+        {
+            OperatorStyle.Symbolic => description.Label switch
+            {
+                "AND" => "∧",
+                "OR" => "∨",
+                "NOT" => "¬",
+                "XOR" => "⊕",
+                "XNOR" => "↔",
+                _ => description.Label,
+            },
+            OperatorStyle.CStyle => description.Label switch
+            {
+                "AND" => "&&",
+                "OR" => "||",
+                "NOT" => "!",
+                "XOR" => "^",
+                "XNOR" => "==",
+                _ => description.Label,
+            },
+            _ => throw new InvalidOperationException($"Unhandled operator style '{style}'."),
+        };
     }
 
     /// <summary>

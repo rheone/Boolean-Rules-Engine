@@ -15,19 +15,21 @@ public static class PlainTextTreePrinter
 {
     /// <summary>Prints a rule's structure only, with no evaluation annotations.</summary>
     /// <param name="root">The rule's described tree.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
     /// <returns>The indented tree text.</returns>
-    public static string Print(RuleDescription root)
+    public static string Print(RuleDescription root, OperatorStyle style = OperatorStyle.Word)
     {
-        return Print(RuleRenderTree.Build(root));
+        return Print(RuleRenderTree.Build(root, style));
     }
 
     /// <summary>Prints a rule's structure, annotated by one evaluation's result and short-circuit path.</summary>
     /// <param name="root">The rule's described tree.</param>
     /// <param name="evaluatedTree">The matching <see cref="Decision.EvaluatedTree"/> from that evaluation.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
     /// <returns>The indented tree text.</returns>
-    public static string Print(RuleDescription root, EvaluatedNode evaluatedTree)
+    public static string Print(RuleDescription root, EvaluatedNode evaluatedTree, OperatorStyle style = OperatorStyle.Word)
     {
-        return Print(RuleRenderTree.Build(root, evaluatedTree));
+        return Print(RuleRenderTree.Build(root, evaluatedTree, style));
     }
 
     private static string Print(RenderNode root)
