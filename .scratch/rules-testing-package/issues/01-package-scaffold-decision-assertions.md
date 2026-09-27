@@ -4,9 +4,9 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] New `BooleanRulesEngine.Testing` project depends only on `BooleanRulesEngine.Abstractions`
-- [ ] Fluent assertions exist for at least: `Decision.IsSatisfied`, the resulting `TruthValue`, and presence/absence of a `Fault`
-- [ ] A consumer test project referencing the package can assert on a `Decision` without accessing `IsSatisfied`/`Faults` directly
-- [ ] Project follows repo conventions (CSharpier formatting, nullable reference types enabled, file-scoped namespaces, StyleCop clean, no unnecessary abstractions)
+- [x] New `BooleanRulesEngine.Testing` project depends only on `BooleanRulesEngine.Abstractions`
+- [x] Fluent assertions exist for at least: `Decision.IsSatisfied`, the resulting `TruthValue`, and presence/absence of a `Fault`
+- [x] A consumer test project referencing the package can assert on a `Decision` without accessing `IsSatisfied`/`Faults` directly
+- [x] Project follows repo conventions (CSharpier formatting, nullable reference types enabled, file-scoped namespaces, StyleCop clean, no unnecessary abstractions)

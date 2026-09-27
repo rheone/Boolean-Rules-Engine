@@ -4,8 +4,8 @@
 
 **Blocked by:** 01 (BooleanRulesEngine.Testing package with fluent Decision assertions)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A fake predicate helper lets a test register a named predicate returning a fixed `bool` (or Kleene value) without a hand-written class
-- [ ] A fake predicate helper supports simulating a fault (a thrown exception) for testing `Unknown`/fault-absorption behavior
-- [ ] Documentation/example shows registering a fake predicate against a `PredicateRegistryBuilder<TContext>` and asserting the resulting `Decision` using the assertions from ticket 01
+- [x] A fake predicate helper lets a test register a named predicate returning a fixed `bool` (or Kleene value) without a hand-written class
+- [x] A fake predicate helper supports simulating a fault (a thrown exception) for testing `Unknown`/fault-absorption behavior
+- [x] Documentation/example shows registering a fake predicate against a `PredicateRegistryBuilder<TContext>` and asserting the resulting `Decision` using the assertions from ticket 01
