@@ -31,32 +31,17 @@ internal static class JsonTreePrinter
         }
 
         NodeShape shape = ExpressionShape.Of(node);
-        JsonObject obj = new() { ["op"] = JsonOpName(shape.OpName), ["operands"] = OperandsArray(shape.Operands) };
+        JsonObject obj = new()
+        {
+            ["op"] = TreeFormatOpNames.ToTreeFormat(shape.OpName),
+            ["operands"] = OperandsArray(shape.Operands),
+        };
         if (shape.K is { } k)
         {
             obj["k"] = k;
         }
 
         return obj;
-    }
-
-    private static string JsonOpName(string opName)
-    {
-        return opName switch
-        {
-            "Not" => "not",
-            "And" => "and",
-            "Or" => "or",
-            "Xor" => "xor",
-            "Xnor" => "xnor",
-            "ExactlyOne" => "exactlyOne",
-            "AtLeast" => "atLeast",
-            "AtMost" => "atMost",
-            "GreaterThan" => "greaterThan",
-            "LessThan" => "lessThan",
-            "Exactly" => "exactly",
-            _ => throw new InvalidOperationException($"Unhandled op-name '{opName}'."),
-        };
     }
 
     private static JsonArray OperandsArray(IReadOnlyList<Expression> operands)

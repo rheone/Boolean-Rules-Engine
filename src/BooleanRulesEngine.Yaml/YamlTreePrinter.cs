@@ -39,28 +39,10 @@ internal static class YamlTreePrinter
         }
 
         NodeShape shape = ExpressionShape.Of(node);
+        string op = TreeFormatOpNames.ToTreeFormat(shape.OpName);
         return shape.K is { } k
-            ? OperatorNodeWithThreshold(YamlOpName(shape.OpName), k, shape.Operands.Select(ToNode))
-            : OperatorNode(YamlOpName(shape.OpName), shape.Operands.Select(ToNode));
-    }
-
-    private static string YamlOpName(string opName)
-    {
-        return opName switch
-        {
-            "Not" => "not",
-            "And" => "and",
-            "Or" => "or",
-            "Xor" => "xor",
-            "Xnor" => "xnor",
-            "ExactlyOne" => "exactlyOne",
-            "AtLeast" => "atLeast",
-            "AtMost" => "atMost",
-            "GreaterThan" => "greaterThan",
-            "LessThan" => "lessThan",
-            "Exactly" => "exactly",
-            _ => throw new InvalidOperationException($"Unhandled op-name '{opName}'."),
-        };
+            ? OperatorNodeWithThreshold(op, k, shape.Operands.Select(ToNode))
+            : OperatorNode(op, shape.Operands.Select(ToNode));
     }
 
     private static YamlScalarNode Scalar(string text, ScalarStyle style)

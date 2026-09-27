@@ -170,13 +170,19 @@ internal static class YamlTreeParser
             operands.Add(operand);
         }
 
-        switch (op.ToUpperInvariant())
+        if (!TreeFormatOpNames.TryFromTreeFormat(op, out string? canonicalOpName))
         {
-            case "AND":
+            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Unknown operator '{op}'.", SourceSpan.None));
+            return null;
+        }
+
+        switch (canonicalOpName)
+        {
+            case "And":
                 return new AndNode(operands, SourceSpan.None);
-            case "OR":
+            case "Or":
                 return new OrNode(operands, SourceSpan.None);
-            case "NOT":
+            case "Not":
                 if (operands.Count != 1)
                 {
                     diagnostics.Add(
@@ -186,25 +192,24 @@ internal static class YamlTreeParser
                 }
 
                 return new NotNode(operands[0], SourceSpan.None);
-            case "XOR":
+            case "Xor":
                 return new XorNode(operands, SourceSpan.None);
-            case "XNOR":
+            case "Xnor":
                 return new XnorNode(operands, SourceSpan.None);
-            case "EXACTLYONE":
+            case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
-            case "ATLEAST":
+            case "AtLeast":
                 return ParseThreshold(mapping, op, ThresholdComparison.AtLeast, operands, diagnostics);
-            case "ATMOST":
+            case "AtMost":
                 return ParseThreshold(mapping, op, ThresholdComparison.AtMost, operands, diagnostics);
-            case "GREATERTHAN":
+            case "GreaterThan":
                 return ParseThreshold(mapping, op, ThresholdComparison.GreaterThan, operands, diagnostics);
-            case "LESSTHAN":
+            case "LessThan":
                 return ParseThreshold(mapping, op, ThresholdComparison.LessThan, operands, diagnostics);
-            case "EXACTLY":
+            case "Exactly":
                 return ParseThreshold(mapping, op, ThresholdComparison.Exactly, operands, diagnostics);
             default:
-                diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Unknown operator '{op}'.", SourceSpan.None));
-                return null;
+                throw new InvalidOperationException($"Unhandled canonical op-name '{canonicalOpName}'.");
         }
     }
 

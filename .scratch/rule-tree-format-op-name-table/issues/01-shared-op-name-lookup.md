@@ -4,10 +4,10 @@
 
 **Blocked by:** `expression-node-shape-seam` #01 (shared node-shape seam for Expression)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A single op-name lookup exists mapping every operator to its tree-format string and back
-- [ ] `JsonTreePrinter` and `YamlTreePrinter` both consume the lookup instead of their own inline op-name strings and duplicated `ThresholdOpName` methods
-- [ ] `JsonTreeParser` and `YamlTreeParser` both consume the lookup instead of their own duplicated op-name dispatch switch
-- [ ] A shared test asserts JSON and YAML accept/produce the identical set of op-name strings for every operator
-- [ ] No behavior change: existing JSON/YAML round-trip tests pass unchanged
+- [x] A single op-name lookup exists mapping every operator to its tree-format string and back
+- [x] `JsonTreePrinter` and `YamlTreePrinter` both consume the lookup instead of their own inline op-name strings and duplicated `ThresholdOpName` methods
+- [x] `JsonTreeParser` and `YamlTreeParser` both consume the lookup instead of their own duplicated op-name dispatch switch
+- [x] A shared test asserts JSON and YAML accept/produce the identical set of op-name strings for every operator
+- [x] No behavior change: existing JSON/YAML round-trip tests pass unchanged
