@@ -40,10 +40,19 @@ Cover:
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] New `DslParserTests.cs` under `tests/BooleanRulesEngine.Tests/`
-- [ ] Every bullet above has a corresponding test
-- [ ] `dotnet test` passes
-- [ ] No change to `DslParser.cs` unless a test reveals a real defect — note any such finding in
+- [x] New `DslParserTests.cs` under `tests/BooleanRulesEngine.Tests/`
+- [x] Every bullet above has a corresponding test
+- [x] `dotnet test` passes
+- [x] No change to `DslParser.cs` unless a test reveals a real defect — note any such finding in
       this ticket's Comments
+
+## Comments
+
+Added `DslParserTests.cs` covering trailing-garbage recovery, ambiguous `XOR`/`AND`/`OR` mixing
+(with and without parentheses), `XOR`/`XNOR` chain mixing, the `ParsePrimary` fallback error path,
+the `ParseThreshold` missing-integer default, the `ParseArgument`/`ParseLiteral` missing-`:` and
+non-literal-value recovery paths, empty and unterminated array literals, and `IsReservedWord`
+case-insensitivity. No defects found; no change to `DslParser.cs`; `dotnet test` passes
+(307/307).

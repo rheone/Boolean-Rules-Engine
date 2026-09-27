@@ -25,7 +25,13 @@ Cover:
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Each bullet above has a corresponding test in `RuleBuilderTests.cs`
-- [ ] `dotnet test` passes
+- [x] Each bullet above has a corresponding test in `RuleBuilderTests.cs`
+- [x] `dotnet test` passes
+
+## Comments
+
+Added theory-based tests to `RuleBuilderTests.cs` for `Or`, `ExactlyOne`, `AtMost`, `GreaterThan`,
+`LessThan`, `Exactly`, and a `ToJson()` round-trip test that reparses the emitted JSON, recompiles
+it, and asserts identical evaluation to the original tree. `dotnet test` passes (307/307).

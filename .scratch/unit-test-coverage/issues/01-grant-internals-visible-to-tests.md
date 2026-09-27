@@ -9,10 +9,16 @@ pipeline.
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `BooleanRulesEngine.Tests` can construct and call `internal` types from
+- [x] `BooleanRulesEngine.Tests` can construct and call `internal` types from
       `BooleanRulesEngine` directly (verify with a throwaway `new Lexer("true")` in a scratch
       test, then remove it — the real tests land in later tickets)
-- [ ] `dotnet build` and `dotnet test` still succeed
-- [ ] No production (non-test) behavior changes
+- [x] `dotnet build` and `dotnet test` still succeed
+- [x] No production (non-test) behavior changes
+
+## Comments
+
+Added `[assembly: InternalsVisibleTo("BooleanRulesEngine.Tests")]` to `AssemblyInfo.cs` alongside
+the existing `BooleanRulesEngine.Yaml` grant. Tickets 02-06 confirm direct access works. No
+production behavior changed; `dotnet test` passes (307/307).

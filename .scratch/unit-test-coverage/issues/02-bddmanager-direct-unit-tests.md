@@ -33,10 +33,18 @@ Cover, using `Variable`, `And`, `Or`, `Not`, `Xor`, and `Ite` directly:
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] New `BddManagerTests.cs` under `tests/BooleanRulesEngine.Tests/`
-- [ ] Every bullet above has a corresponding test (or `[Theory]` cases covering the truth table)
-- [ ] `dotnet test` passes
-- [ ] No change to `BddManager.cs` unless a test reveals a real defect — note any such finding in
+- [x] New `BddManagerTests.cs` under `tests/BooleanRulesEngine.Tests/`
+- [x] Every bullet above has a corresponding test (or `[Theory]` cases covering the truth table)
+- [x] `dotnet test` passes
+- [x] No change to `BddManager.cs` unless a test reveals a real defect — note any such finding in
       this ticket's Comments
+
+## Comments
+
+Added `BddManagerTests.cs` covering `Variable` uniquification, the `Ite` terminal short-circuits
+for `And`/`Or` self-negation and idempotence, unique-table structural sharing, the `Xor` truth
+table, a three-variable `Ite` cross-checked against brute-force truth-table evaluation, and
+`iteCache` reuse under repeated calls. No defects found; no change to `BddManager.cs`; `dotnet
+test` passes (307/307).

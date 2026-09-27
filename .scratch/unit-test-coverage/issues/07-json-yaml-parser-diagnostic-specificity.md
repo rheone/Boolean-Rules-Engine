@@ -21,10 +21,17 @@ passes.
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every distinct `DiagnosticCodes.MalformedTree` message in `JsonTreeParser.cs` has at least
+- [x] Every distinct `DiagnosticCodes.MalformedTree` message in `JsonTreeParser.cs` has at least
       one test input that triggers it specifically, with an assertion on that message (or a
       distinguishing substring)
-- [ ] The equivalent gap in `YamlTreeParser.cs`/`YamlTreeTests.cs` is closed the same way
-- [ ] `dotnet test` passes
+- [x] The equivalent gap in `YamlTreeParser.cs`/`YamlTreeTests.cs` is closed the same way
+- [x] `dotnet test` passes
+
+## Comments
+
+Both `JsonTreeTests.cs` and `YamlTreeTests.cs` already had an
+`Every_distinct_malformed_tree_branch_raises_its_specific_message` theory covering every distinct
+`DiagnosticCodes.MalformedTree` message in their respective parsers. No new tests were needed;
+`dotnet test` passes (307/307).

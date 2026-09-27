@@ -32,10 +32,18 @@ Cover:
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] All three bullets above have corresponding tests (checking first whether
+- [x] All three bullets above have corresponding tests (checking first whether
       `EvaluationOptionsTests.cs` already covers the fault-budget boundary, to avoid duplication)
-- [ ] `dotnet test` passes
-- [ ] No change to `Evaluator.cs` unless a test reveals a real defect — note any such finding in
+- [x] `dotnet test` passes
+- [x] No change to `Evaluator.cs` unless a test reveals a real defect — note any such finding in
       this ticket's Comments
+
+## Comments
+
+All three cases were already present in `EvaluationOptionsTests.cs`:
+`Genuine_cancellation_propagates_rather_than_being_recorded_as_a_fault`,
+`A_predicate_that_self_cancels_without_the_callers_token_being_cancelled_is_recorded_as_a_fault`,
+and `Fault_budget_of_one_tolerates_the_first_fault_and_aborts_on_the_second`. No new tests or
+`Evaluator.cs` changes were needed; `dotnet test` passes (307/307).

@@ -26,9 +26,17 @@ Write these first (TDD), confirm they pass against current behavior, and only to
 **Blocked by:** none (uses the existing public `RuleCompiler` surface — no `InternalsVisibleTo`
 needed, since `CompilerOptions` and `DiagnosticCodes` are already public/accessible to tests)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] All three bullets above have corresponding tests in `AnalyzerTests.cs`
-- [ ] `dotnet test` passes
-- [ ] No change to `Analyzer.cs` unless a test reveals a real defect — note any such finding in
+- [x] All three bullets above have corresponding tests in `AnalyzerTests.cs`
+- [x] `dotnet test` passes
+- [x] No change to `Analyzer.cs` unless a test reveals a real defect — note any such finding in
       this ticket's Comments
+
+## Comments
+
+Added three tests to `AnalyzerTests.cs` covering: term count at/under `MaxAnalysisTerms` runs
+analysis normally, term count exceeding the cap produces exactly one
+`AnalysisSkippedTooManyTerms` diagnostic with no tautology/contradiction diagnostics, and a term
+count exactly equal to the cap does not trigger the skip (confirming the strictly-greater-than
+boundary). No defects found; no change to `Analyzer.cs`; `dotnet test` passes (307/307).

@@ -33,12 +33,20 @@ Cover:
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] New `LexerTests.cs` under `tests/BooleanRulesEngine.Tests/`
-- [ ] Every bullet above has a corresponding test
-- [ ] `dotnet test` passes
-- [ ] No change to `Lexer.cs` unless a test reveals a real defect — note any such finding in this
+- [x] New `LexerTests.cs` under `tests/BooleanRulesEngine.Tests/`
+- [x] Every bullet above has a corresponding test
+- [x] `dotnet test` passes
+- [x] No change to `Lexer.cs` unless a test reveals a real defect — note any such finding in this
       ticket's Comments (the unrecognized-escape-sequence gap is already tracked separately in
       `.scratch/dsl-escaping/issues/02-diagnose-unrecognized-escape.md` — don't duplicate that fix
       here, just test today's actual behavior)
+
+## Comments
+
+Added `LexerTests.cs` covering every punctuation token, the negative-number and bare-minus
+dispatch, decimal numbers and the trailing-dot lookahead, string escape decoding and unterminated
+strings, the unrecognized-character diagnostic-and-continue path, empty/whitespace-only
+tokenization, and identifier boundary reading. No defects found; no change to `Lexer.cs`; `dotnet
+test` passes (307/307).
