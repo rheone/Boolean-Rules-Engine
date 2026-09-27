@@ -1,6 +1,7 @@
 namespace TruthWeaver.Tests;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using TruthWeaver.Abstractions;
 using TruthWeaver.Compilation;
@@ -107,6 +108,60 @@ public sealed class ScopedResolutionAndRegistrationTests
         );
 
         Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public void Service_collection_extension_threads_supplied_compiler_options_through_to_the_resolved_compiler()
+    {
+        ServiceCollection services = new();
+        services.AddTruthWeaver<RuleTestContext>(_ => { }, new CompilerOptions(Mode: CompilationMode.Lenient));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        RuleCompiler<RuleTestContext> compiler = provider.GetRequiredService<RuleCompiler<RuleTestContext>>();
+
+        // Under Strict (the default), an unregistered predicate name is a compile Error and
+        // CompiledRule is null; under Lenient it compiles successfully as an always-Unknown term.
+        // Observing the latter confirms the supplied options — not the defaults — reached the compiler.
+        CompilationResult<RuleTestContext> result = compiler.Compile("noSuchPredicate");
+
+        Assert.NotNull(result.CompiledRule);
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void Service_collection_extension_resolves_a_registered_logger_and_the_compiler_uses_it()
+    {
+        ILogger<RuleCompiler<RuleTestContext>> logger = Substitute.For<ILogger<RuleCompiler<RuleTestContext>>>();
+        logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
+
+        ServiceCollection services = new();
+        services.AddSingleton(logger);
+        services.AddTruthWeaver<RuleTestContext>(_ => { });
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        RuleCompiler<RuleTestContext> compiler = provider.GetRequiredService<RuleCompiler<RuleTestContext>>();
+
+        compiler.Compile("noSuchPredicate");
+
+        LoggerTestExtensions.LoggedCall call = Assert.Single(logger.GetLoggedCalls());
+        Assert.Equal(LogLevel.Error, call.Level);
+    }
+
+    [Fact]
+    public void Service_collection_extension_resolves_and_compiles_without_error_when_no_logger_is_registered()
+    {
+        ServiceCollection services = new();
+        services.AddTruthWeaver<RuleTestContext>(builder => builder.Add<ScopedFlagPredicate>());
+        services.AddScoped<IScopedFlag>(_ => new StubScopedFlag(true));
+        services.AddScoped<ScopedFlagPredicate>();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        RuleCompiler<RuleTestContext> compiler = provider.GetRequiredService<RuleCompiler<RuleTestContext>>();
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("scopedFlag");
+
+        Assert.NotNull(result.CompiledRule);
+        Assert.Empty(result.Diagnostics);
     }
 
     private sealed class StubScopedFlag(bool value) : IScopedFlag
