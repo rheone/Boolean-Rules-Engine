@@ -11,7 +11,7 @@ public sealed class ScopedFlagPredicate(IScopedFlag flag) : IPredicate<RuleTestC
 
     /// <inheritdoc />
     public static PredicateSchema Schema =>
-        PredicateSchema.NoArguments("scopedFlag", "True iff the scoped IScopedFlag dependency's Value is set.");
+        PredicateSchema.NoArguments("scopedFlag", "Scoped Flag", "True iff the scoped IScopedFlag dependency's Value is set.");
 
     /// <inheritdoc />
     public ValueTask<bool> EvaluateAsync(RuleTestContext context, PredicateArguments args, CancellationToken cancellationToken)

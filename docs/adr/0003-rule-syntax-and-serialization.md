@@ -243,7 +243,7 @@ spelling for the same operator would just be another synonym to document,
 parse, and test, which this ADR's original decision already argues against
 for `IMPLIES`/symbol aliases.
 
-### Required predicate descriptions
+### Required predicate descriptions, and a required predicate label
 
 `PredicateSchema` and `PredicateArgumentSchema` both gained a required,
 read-only `Description` string. This was not part of the original operator
@@ -252,6 +252,31 @@ predicate-authoring-contract change, not a rule-syntax change, and it exists
 so a rule-authoring UI or generated documentation always has something to
 show for every registered predicate and its arguments, rather than an empty
 string a UI would have to guard against.
+
+`PredicateSchema` later gained a second required string, `Label` — a short,
+human-friendly display name distinct from the machine-facing `Name` used in
+rule text (e.g. `Name: "hasRole"`, `Label: "Has Role"`). The distinction
+matters because `Name` is load-bearing for term identity (CONTEXT.md) and
+therefore can't casually change once rules reference it, while `Label` is
+purely presentational and free to be renamed, capitalized, or localized
+without touching a single persisted rule.
+
+### Operator label/description, and `CompiledRule.Describe()`
+
+Predicates carry `Label`/`Description` on their schema; the closed set of
+*operators* (`AND`/`OR`/`NOT`/`XOR`/`XNOR`/`ExactlyOne`/the threshold family/
+the constants) needed the equivalent, so a rule-authoring UI or a generated
+"what does this rule mean" report can describe every node of a compiled
+expression tree, not just its predicate leaves. `OperatorInfo.Describe`
+(`BooleanRulesEngine.Ast`) returns an `OperatorDescriptor` (`Label`,
+`Description`) for any operator node; `CompiledRule<TContext>.Describe()`
+walks the whole tree and returns a `RuleDescription` (`Label`, `Description`,
+`Operands`) recursively, resolving each term's `Label`/`Description` from its
+predicate's registered `PredicateSchema` via the new public
+`PredicateRegistry<TContext>.TryGetSchema`. `RuleDescription` is a plain DTO,
+not the AST itself — the closed-set `Expression`/`RuleNode` types stay
+internal-to-the-package (ADR-0004); nothing here opens them up as a second,
+parallel public surface.
 
 ### Canonical printer: parenthesize mixed operators for clarity
 

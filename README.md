@@ -32,6 +32,7 @@ anything else.
 - [Building rules programmatically](#building-rules-programmatically)
   - [Converting between DSL, JSON, and YAML](#converting-between-dsl-json-and-yaml)
   - [`RuleBuilder` reference](#rulebuilder-reference)
+  - [Describing a compiled rule](#describing-a-compiled-rule)
 - [Evaluation flow](#evaluation-flow)
 - [Compilation pipeline](#compilation-pipeline)
 - [Feature highlights](#feature-highlights)
@@ -61,7 +62,7 @@ anything else.
    public sealed class IsManager : IPredicate<User>
    {
        public static PredicateSchema Schema =>
-           PredicateSchema.NoArguments("isManager", "Does the current user hold the manager role?");
+           PredicateSchema.NoArguments("isManager", "Is Manager", "Does the current user hold the manager role?");
 
        public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct) =>
            ValueTask.FromResult(user.IsManager);
@@ -267,7 +268,7 @@ class resolved from DI).
 
 ```csharp
 .Add(
-    PredicateSchema.NoArguments("isSuspended", "Is the current user's account suspended?"),
+    PredicateSchema.NoArguments("isSuspended", "Is Suspended", "Is the current user's account suspended?"),
     (user, args, ct) => ValueTask.FromResult(user.IsSuspended))
 ```
 
@@ -303,6 +304,7 @@ public sealed class HasEnoughRecentApprovals : IPredicate<Resource>
     public static PredicateSchema Schema =>
         new(
             "hasEnoughRecentApprovals",
+            "Has Enough Recent Approvals",
             "Has the resource received at least the given number of approvals within the given time window?",
             [
                 new PredicateArgumentSchema("minCount", "The minimum number of approvals required.", LiteralKind.Int64),
@@ -393,6 +395,7 @@ PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder()
     .Add(
         new PredicateSchema(
             "hasRole",
+            "Has Role",
             "Does the current user hold the given role?",
             [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]),
         (user, args, ct) => ValueTask.FromResult(user.Roles.Contains(args.GetString("role"))))
@@ -404,8 +407,12 @@ predicate with several arguments written in any order compile to the same
 term identity); argument *values* are case-sensitive (`"Y"` and `"y"` are
 different terms — see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
 `Description` is required on both `PredicateSchema` and
-`PredicateArgumentSchema` so a rule-authoring UI or generated documentation
-always has something to show for every predicate and argument.
+`PredicateArgumentSchema`, and `PredicateSchema` also requires a `Label` — a
+short display name distinct from the machine-facing `Name` used in rule text
+(e.g. `Name: "hasRole"`, `Label: "Has Role"`) — so a rule-authoring UI or
+generated documentation always has something to show for every predicate and
+argument. See [Describing a compiled rule](#describing-a-compiled-rule)
+below for how this pairs with operators' own label/description.
 
 ### 4. `XOR`, `XNOR`, `ExactlyOne`, and the threshold family
 
@@ -498,12 +505,14 @@ PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder()
     .Add(
         new PredicateSchema(
             "hasRole",
+            "Has Role",
             "Does the current user hold the given role?",
             [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]),
         (user, args, ct) => ValueTask.FromResult(user.Roles.Contains(args.GetString("role"))))
     .Add(
         new PredicateSchema(
             "hasTraining",
+            "Has Training",
             "Has the current user completed the given training course?",
             [new PredicateArgumentSchema("training", "The training course code to check for.", LiteralKind.String)]),
         (user, args, ct) => ValueTask.FromResult(user.Training.Contains(args.GetString("training"))))
@@ -605,6 +614,7 @@ public sealed class HasAnyTrainingCourse : IPredicate<User>
     public static PredicateSchema Schema =>
         new(
             "hasAnyTrainingCourse",
+            "Has Any Training Course",
             "Has the current user completed at least one of the given training courses?",
             [
                 new PredicateArgumentSchema(
@@ -617,7 +627,8 @@ public sealed class HasAnyTrainingCourse : IPredicate<User>
     public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct)
     {
         IReadOnlyList<string> courses = args.GetStringArray("courses");
-        return ValueTask.FromResult(courses.Any(user.Training.Contains));
+        bool result = courses.Any(course => user.Training.Any(t => string.Equals(t, course, StringComparison.Ordinal)));
+        return ValueTask.FromResult(result);
     }
 }
 ```
@@ -628,6 +639,19 @@ Used in a rule as:
 hasAnyTrainingCourse(courses: ["A", "B", "C"])
 ```
 
+**Case sensitivity is the predicate's own decision, not the engine's.** Term
+identity (which two term references count as "the same variable" for
+memoization) is always exact/case-sensitive — `"A"` and `"a"` are different
+arguments, full stop (see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
+But *what the predicate does* with the string it reads via `GetString`/
+`GetStringArray` is ordinary C#: the example above uses
+`StringComparison.Ordinal` (case-sensitive); switch that one argument to
+`StringComparison.OrdinalIgnoreCase` and the same predicate becomes
+case-insensitive, with no other change. If both variants are needed, they're
+two distinct predicates (e.g. `hasAnyTrainingCourse` vs.
+`hasAnyTrainingCourseIgnoreCase`) rather than a flag threaded through rule
+text, keeping each one's behavior fixed and inspectable from its name alone.
+
 The same shape works for "equals one specific constant" too — just compare
 against a single value instead of checking array membership (e.g.
 `args.GetGuid("id") == expectedId`, or the `hasRole`/`hasId`-style
@@ -637,6 +661,38 @@ or `Guid` argument (scalar or array) is purely a schema choice — the
 compiler validates and converts each one identically (see
 [Guid literal tests](tests/BooleanRulesEngine.Tests/GuidLiteralTests.cs)
 for a worked `Guid` example).
+
+**"Matches a pattern" instead of "matches a fixed set"** is the same idea
+again, just with `Regex.IsMatch` instead of set membership — the pattern
+itself is a rule-authored `string` argument, not a special literal kind:
+
+```csharp
+public sealed class HasTrainingCourseMatching : IPredicate<User>
+{
+    public static PredicateSchema Schema =>
+        new(
+            "hasTrainingCourseMatching",
+            "Has Training Course Matching",
+            "Has the current user completed a training course whose code matches the given regular expression?",
+            [new PredicateArgumentSchema("pattern", "The regular expression to match a course code against.", LiteralKind.String)]);
+
+    public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct)
+    {
+        Regex pattern = new(args.GetString("pattern"), RegexOptions.None, TimeSpan.FromMilliseconds(100));
+        return ValueTask.FromResult(user.Training.Any(pattern.IsMatch));
+    }
+}
+```
+
+Used in a rule as `hasTrainingCourseMatching(pattern: "^SEC-\\d{3}$")` — "any
+training course code of the form `SEC-123`." Pass `RegexOptions.IgnoreCase`
+instead of `RegexOptions.None` for a case-insensitive match, same as the
+`StringComparison` choice above. The explicit timeout matters here more than
+in the other examples: unlike a fixed-set comparison, a pattern is
+rule-authored text that could — accidentally or not — be pathologically
+slow to match (catastrophic backtracking), and a predicate is exactly where
+that risk should be contained, rather than letting it stall evaluation for
+every rule that reaches this term.
 
 ### Bonus: explaining a denied decision
 
@@ -780,6 +836,40 @@ Validate/Analyze pipeline described in
 too, e.g. for logging or persisting the tree a builder assembled without
 compiling it immediately.
 
+### Describing a compiled rule
+
+Every predicate carries a required `Label`/`Description` on its
+`PredicateSchema` ([Predicate types](#predicate-types)); every operator has
+the equivalent, exposed via `OperatorInfo.Describe` in
+`BooleanRulesEngine.Ast`. `CompiledRule<TContext>.Describe()` combines both
+into one recursive, walkable description of an entire compiled rule —
+useful for a rule-authoring UI or a generated "what does this rule mean"
+report, without needing access to the closed-set AST types themselves:
+
+```csharp
+CompiledRule<User> rule = compiler.Compile("isManager AND hasRole(role: \"Y\")").CompiledRule!;
+
+RuleDescription description = rule.Describe();
+// description.Label       == "AND"
+// description.Description == "True iff every operand is true. Short-circuits at the first False."
+// description.Operands[0].Label == "Is Manager"   (from IsManager's PredicateSchema.Label)
+// description.Operands[1].Label == "Has Role"     (from hasRole's PredicateSchema.Label)
+```
+
+A simple recursive print, for the shape of a "what does this rule mean"
+report:
+
+```csharp
+void Print(RuleDescription node, int depth = 0)
+{
+    Console.WriteLine($"{new string(' ', depth * 2)}{node.Label} — {node.Description}");
+    foreach (RuleDescription operand in node.Operands)
+    {
+        Print(operand, depth + 1);
+    }
+}
+```
+
 ## Feature highlights
 
 - **Kleene three-valued logic.** Every operator — `AND`/`OR`/`NOT`/`XOR`/
@@ -835,12 +925,14 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `Fault` | A record of one predicate failing to produce an answer during one evaluation: the faulting term's identity plus the exception. Faults are absorbed as `Unknown`, never rethrown. |
 | Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently-coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
-| Operator | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, the threshold family, and the `true`/`false` constants — the closed set of ways to combine terms and sub-expressions. See [Operators](#operators). |
-| Predicate | A registered, reusable implementation (e.g. `hasRole`, `isManager`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Description`; see [Predicate types](#predicate-types). |
+| Operator | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, the threshold family, and the `true`/`false` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
+| `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`BooleanRulesEngine.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
+| Predicate | A registered, reusable implementation (e.g. `hasRole`, `isManager`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Label` and `Description`; see [Predicate types](#predicate-types). |
 | `PredicateArguments` | The non-generic accessor (`GetString`, `GetInt64`, ...) a predicate uses to read its own term's arguments inside `EvaluateAsync`. |
-| `PredicateRegistry<TContext>` | Where predicates are registered under a name, with their `PredicateSchema`. Built once via `PredicateRegistryBuilder<TContext>`; no attribute or assembly scanning. |
-| `PredicateSchema` | A predicate's registered name, a required read-only `Description`, and its named-argument declarations (each also carrying a required `Description`), validated against a term's arguments at compile time. |
+| `PredicateRegistry<TContext>` | Where predicates are registered under a name, with their `PredicateSchema`. Built once via `PredicateRegistryBuilder<TContext>`; no attribute or assembly scanning. `TryGetSchema` looks one up by name. |
+| `PredicateSchema` | A predicate's registered name, a required read-only `Label` and `Description`, and its named-argument declarations (each also carrying a required `Description`), validated against a term's arguments at compile time. |
 | `RuleBuilder` | A fluent API (`BooleanRulesEngine.Building`) for assembling a rule tree from application logic without hand-writing DSL/JSON/YAML text; renders to the same JSON tree shape and compiles through the same `CompileJson` pipeline. See [Building rules programmatically](#building-rules-programmatically). |
+| `RuleDescription` | The recursive result of `CompiledRule<TContext>.Describe()`: a node's `Label`, `Description`, and its `Operands` described the same way — the "what does this rule mean" view of a compiled tree, without exposing the AST types themselves. See [Describing a compiled rule](#describing-a-compiled-rule). |
 | Rule | A named unit of persistence: metadata plus one expression. What gets compiled into a `CompiledRule<TContext>`. |
 | Short-circuit | `AND` stops evaluating operands at the first `False`; `OR` stops at the first `True`. Skipped operands are recorded as `NotEvaluated` in the trace, not omitted. |
 | Term | A predicate bound to concrete, literal arguments (e.g. `hasRole(role: "Y")`) — the tree's leaf node, and the unit of memoization. |

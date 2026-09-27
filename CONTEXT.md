@@ -27,12 +27,12 @@ layer this may grow later.
 | **Expression** | The boolean tree: operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasRole` or `isManager`. The *function*, not any particular call to it. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasRole(role: "Y")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
-| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `true`/`false`. Never called a "gate." |
+| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `true`/`false`. Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
 | **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |
 | **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. |
 | **CompiledRule** | The immutable, thread-safe result of compiling a rule's text. Safe to cache and share; compile once, evaluate many times. |
-| **PredicateRegistry** | Where predicate implementations are registered under a name, with their argument schema. Every predicate and argument carries a required, read-only `Description` string. |
+| **PredicateRegistry** | Where predicate implementations are registered under a name, with their argument schema. Every predicate carries a required, read-only `Label` and `Description`; every argument carries a required `Description`. |
 
 Avoid these near-synonyms once the term above is established: "term" and
 "predicate" are not interchangeable (a predicate is the function; a term is

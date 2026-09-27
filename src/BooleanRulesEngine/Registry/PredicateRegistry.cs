@@ -1,5 +1,7 @@
 namespace BooleanRulesEngine.Registry;
 
+using BooleanRulesEngine.Abstractions;
+
 /// <summary>
 /// Where predicate implementations are registered under a name, with their argument schema
 /// (CONTEXT.md). Immutable once built; registration is exclusively through
@@ -21,6 +23,26 @@ public sealed class PredicateRegistry<TContext>
     public static PredicateRegistryBuilder<TContext> CreateBuilder()
     {
         return new();
+    }
+
+    /// <summary>
+    /// Looks up a predicate's schema by name, case-insensitively — the label/description source for a
+    /// <see cref="Ast.TermExpression"/> node, since a term itself carries only its resolved identity,
+    /// not the descriptive metadata authored on its predicate's registration.
+    /// </summary>
+    /// <param name="name">The predicate name as written in rule text.</param>
+    /// <param name="schema">The matching schema, if found.</param>
+    /// <returns><see langword="true"/> if a predicate with this name (case-insensitive) is registered.</returns>
+    public bool TryGetSchema(string name, out PredicateSchema? schema)
+    {
+        if (this.TryGet(name, out PredicateDescriptor<TContext>? descriptor))
+        {
+            schema = descriptor!.Schema;
+            return true;
+        }
+
+        schema = null;
+        return false;
     }
 
     /// <summary>Looks up a predicate by name, case-insensitively.</summary>

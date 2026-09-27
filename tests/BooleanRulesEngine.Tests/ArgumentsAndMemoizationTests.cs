@@ -62,6 +62,7 @@ public sealed class ArgumentsAndMemoizationTests
             .Add(
                 new PredicateSchema(
                     "hasBoth",
+                    "hasBoth",
                     "Test predicate, always true.",
                     [
                         new PredicateArgumentSchema("a", "First argument.", LiteralKind.String),
@@ -136,6 +137,7 @@ public sealed class ArgumentsAndMemoizationTests
             .Add(
                 new PredicateSchema(
                     "hasAnyRole",
+                    "hasAnyRole",
                     "Test predicate, always true.",
                     [new PredicateArgumentSchema("roles", "The roles to check.", LiteralKind.StringArray)]
                 ),
@@ -156,6 +158,7 @@ public sealed class ArgumentsAndMemoizationTests
             ? builder.AddStringArgPredicate("hasRole", "role", "Y")
             : builder.Add(
                 new PredicateSchema(
+                    "hasRole",
                     "hasRole",
                     "Test predicate, true iff the role argument equals \"Y\".",
                     [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]

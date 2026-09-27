@@ -18,7 +18,7 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            PredicateSchema.NoArguments(name, $"Test predicate '{name}', always {value}."),
+            PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', always {value}."),
             (_, _, _) => ValueTask.FromResult(value)
         );
     }
@@ -32,7 +32,7 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            PredicateSchema.NoArguments(name, $"Test predicate '{name}', always {value}, logs invocations."),
+            PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', always {value}, logs invocations."),
             (_, _, _) =>
             {
                 invocationLog.Add(name);
@@ -48,7 +48,7 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            PredicateSchema.NoArguments(name, $"Test predicate '{name}', always faults."),
+            PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', always faults."),
             (_, _, _) => throw new InvalidOperationException($"'{name}' faulted.")
         );
     }
@@ -62,7 +62,7 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            PredicateSchema.NoArguments(name, $"Test predicate '{name}', delays then returns {value}."),
+            PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', delays then returns {value}."),
             async (_, _, ct) =>
             {
                 await Task.Delay(delay, ct).ConfigureAwait(false);
@@ -82,6 +82,7 @@ public static class TestPredicates
         return builder.Add(
             new PredicateSchema(
                 name,
+                name,
                 $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue}'.",
                 [new PredicateArgumentSchema(argumentName, $"The value to compare against '{matchValue}'.", LiteralKind.String)]
             ),
@@ -100,6 +101,7 @@ public static class TestPredicates
     {
         return builder.Add(
             new PredicateSchema(
+                name,
                 name,
                 $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue}'.",
                 [new PredicateArgumentSchema(argumentName, $"The GUID to compare against '{matchValue}'.", LiteralKind.Guid)]

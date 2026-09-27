@@ -45,6 +45,18 @@ public sealed class CompiledRule<TContext>
         return JsonTreePrinter.Print(this.Root);
     }
 
+    /// <summary>
+    /// Describes this rule's expression tree recursively — every operator's label/description (from
+    /// <see cref="OperatorInfo"/>) and every term's label/description (from its predicate's registered
+    /// <see cref="PredicateSchema"/>), without exposing the underlying closed-set AST types
+    /// themselves. Useful for a rule-authoring UI or a generated "what does this rule mean" report.
+    /// </summary>
+    /// <returns>The root node's description, with every operand described the same way.</returns>
+    public RuleDescription Describe()
+    {
+        return DescribeNode(this.Root, this.registry);
+    }
+
     /// <summary>Evaluates this rule against a context.</summary>
     /// <param name="context">The application-supplied evaluation context.</param>
     /// <param name="services">
@@ -87,5 +99,35 @@ public sealed class CompiledRule<TContext>
     public override string ToString()
     {
         return this.CanonicalText;
+    }
+
+    private static RuleDescription DescribeNode(Expression node, PredicateRegistry<TContext> registry)
+    {
+        if (node is TermExpression term)
+        {
+            (string label, string description) = registry.TryGetSchema(term.Identity.PredicateName, out PredicateSchema? schema)
+                ? (schema!.Label, schema.Description)
+                : (term.Identity.PredicateName, "An unregistered predicate (CompilationMode.Lenient).");
+            return new RuleDescription(label, description, []);
+        }
+
+        OperatorDescriptor descriptor = OperatorInfo.Describe(node);
+        IReadOnlyList<Expression> operands = node switch
+        {
+            NotExpression n => [n.Operand],
+            AndExpression a => a.Operands,
+            OrExpression o => o.Operands,
+            XorExpression x => [x.Left, x.Right],
+            XnorExpression xn => [xn.Left, xn.Right],
+            ExactlyOneExpression e => e.Operands,
+            ThresholdExpression th => th.Operands,
+            _ => [],
+        };
+
+        return new RuleDescription(
+            descriptor.Label,
+            descriptor.Description,
+            [.. operands.Select(operand => DescribeNode(operand, registry))]
+        );
     }
 }
