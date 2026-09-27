@@ -1,6 +1,7 @@
 namespace BooleanRulesEngine.Yaml;
 
 using System.Diagnostics.CodeAnalysis;
+using BooleanRulesEngine.Ast;
 using BooleanRulesEngine.Diagnostics;
 using BooleanRulesEngine.Parsing;
 using YamlDotNet.Core;
@@ -187,26 +188,47 @@ internal static class YamlTreeParser
                 return new NotNode(operands[0], SourceSpan.None);
             case "XOR":
                 return new XorNode(operands, SourceSpan.None);
+            case "XNOR":
+                return new XnorNode(operands, SourceSpan.None);
             case "EXACTLYONE":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "ATLEAST":
-                if (
-                    !TryGetChild(mapping, "k", out YamlNode? kNode)
-                    || kNode is not YamlScalarNode { Value: { } kText }
-                    || !int.TryParse(kText, out int k)
-                )
-                {
-                    diagnostics.Add(
-                        Diagnostic.Error(DiagnosticCodes.MalformedTree, "'atLeast' requires a numeric 'k'.", SourceSpan.None)
-                    );
-                    return null;
-                }
-
-                return new AtLeastNode(k, operands, SourceSpan.None);
+                return ParseThreshold(mapping, op, ThresholdComparison.AtLeast, operands, diagnostics);
+            case "ATMOST":
+                return ParseThreshold(mapping, op, ThresholdComparison.AtMost, operands, diagnostics);
+            case "GREATERTHAN":
+                return ParseThreshold(mapping, op, ThresholdComparison.GreaterThan, operands, diagnostics);
+            case "LESSTHAN":
+                return ParseThreshold(mapping, op, ThresholdComparison.LessThan, operands, diagnostics);
+            case "EXACTLY":
+                return ParseThreshold(mapping, op, ThresholdComparison.Exactly, operands, diagnostics);
             default:
                 diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Unknown operator '{op}'.", SourceSpan.None));
                 return null;
         }
+    }
+
+    private static RuleNode? ParseThreshold(
+        YamlMappingNode mapping,
+        string op,
+        ThresholdComparison comparison,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
+    {
+        if (
+            !TryGetChild(mapping, "k", out YamlNode? kNode)
+            || kNode is not YamlScalarNode { Value: { } kText }
+            || !int.TryParse(kText, out int k)
+        )
+        {
+            diagnostics.Add(
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"'{op}' requires a numeric 'k'.", SourceSpan.None)
+            );
+            return null;
+        }
+
+        return new ThresholdNode(comparison, k, operands, SourceSpan.None);
     }
 
     private static RawLiteral? ParseLiteral(YamlNode node, List<Diagnostic> diagnostics)

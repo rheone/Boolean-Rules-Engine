@@ -18,14 +18,20 @@ public static class DiagnosticCodes
     /// <summary>A term supplies an argument name the predicate's schema does not declare.</summary>
     public const string UnknownArgument = "BRE0005";
 
-    /// <summary><c>XOR</c> was given more than two operands.</summary>
+    /// <summary><c>XOR</c> or <c>XNOR</c> was given more than two operands.</summary>
     public const string XorArityViolation = "BRE0006";
 
-    /// <summary><c>XOR</c> was combined with <c>AND</c>/<c>OR</c> at the same syntactic level without parentheses.</summary>
+    /// <summary>
+    /// <c>XOR</c>/<c>XNOR</c> was combined with <c>AND</c>/<c>OR</c>, or <c>XOR</c> was combined with
+    /// <c>XNOR</c>, at the same syntactic level without parentheses.
+    /// </summary>
     public const string AmbiguousOperatorMixing = "BRE0007";
 
-    /// <summary><c>AtLeast(k, ...)</c> was given a <c>k</c> outside <c>1..operandCount</c>.</summary>
-    public const string InvalidAtLeastThreshold = "BRE0008";
+    /// <summary>
+    /// A count-threshold operator (<c>AtLeast</c>/<c>AtMost</c>/<c>GreaterThan</c>/<c>LessThan</c>/
+    /// <c>Exactly</c>) was given a <c>k</c> that makes it a structural constant for its operand count.
+    /// </summary>
+    public const string InvalidThresholdValue = "BRE0008";
 
     /// <summary>The expression tree exceeds <c>CompilerOptions.MaxDepth</c>.</summary>
     public const string MaxDepthExceeded = "BRE0009";

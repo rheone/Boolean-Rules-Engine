@@ -1,6 +1,7 @@
 namespace BooleanRulesEngine.Json;
 
 using System.Text.Json;
+using BooleanRulesEngine.Ast;
 using BooleanRulesEngine.Diagnostics;
 using BooleanRulesEngine.Parsing;
 
@@ -175,22 +176,43 @@ internal static class JsonTreeParser
                 return new NotNode(operands[0], SourceSpan.None);
             case "XOR":
                 return new XorNode(operands, SourceSpan.None);
+            case "XNOR":
+                return new XnorNode(operands, SourceSpan.None);
             case "EXACTLYONE":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "ATLEAST":
-                if (!element.TryGetProperty("k", out JsonElement kElement) || kElement.ValueKind != JsonValueKind.Number)
-                {
-                    diagnostics.Add(
-                        Diagnostic.Error(DiagnosticCodes.MalformedTree, "'atLeast' requires a numeric 'k'.", SourceSpan.None)
-                    );
-                    return null;
-                }
-
-                return new AtLeastNode(kElement.GetInt32(), operands, SourceSpan.None);
+                return ParseThreshold(element, op, ThresholdComparison.AtLeast, operands, diagnostics);
+            case "ATMOST":
+                return ParseThreshold(element, op, ThresholdComparison.AtMost, operands, diagnostics);
+            case "GREATERTHAN":
+                return ParseThreshold(element, op, ThresholdComparison.GreaterThan, operands, diagnostics);
+            case "LESSTHAN":
+                return ParseThreshold(element, op, ThresholdComparison.LessThan, operands, diagnostics);
+            case "EXACTLY":
+                return ParseThreshold(element, op, ThresholdComparison.Exactly, operands, diagnostics);
             default:
                 diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Unknown operator '{op}'.", SourceSpan.None));
                 return null;
         }
+    }
+
+    private static RuleNode? ParseThreshold(
+        JsonElement element,
+        string op,
+        ThresholdComparison comparison,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
+    {
+        if (!element.TryGetProperty("k", out JsonElement kElement) || kElement.ValueKind != JsonValueKind.Number)
+        {
+            diagnostics.Add(
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"'{op}' requires a numeric 'k'.", SourceSpan.None)
+            );
+            return null;
+        }
+
+        return new ThresholdNode(comparison, kElement.GetInt32(), operands, SourceSpan.None);
     }
 
     private static RawLiteral? ParseLiteral(JsonElement element, List<Diagnostic> diagnostics)

@@ -58,6 +58,26 @@ internal sealed class RuleNodeCompiler<TContext>
         return new TermIdentity(node.PredicateName, args);
     }
 
+    /// <summary>
+    /// The threshold values that would make a comparison structurally trivial (always true or always
+    /// false regardless of what the operands evaluate to) for a given operand count — e.g.
+    /// <c>AtLeast(0, ...)</c> is always true, <c>AtLeast(n + 1, ...)</c> is always false. Rejecting
+    /// these catches an authoring mistake at compile time rather than silently accepting a constant
+    /// rule, the same rationale ticket 09 applied to the original <c>AtLeast</c> operator.
+    /// </summary>
+    private static (int MinK, int MaxK) ValidThresholdRange(ThresholdComparison comparison, int operandCount)
+    {
+        return comparison switch
+        {
+            ThresholdComparison.AtLeast => (1, operandCount),
+            ThresholdComparison.AtMost => (0, operandCount - 1),
+            ThresholdComparison.GreaterThan => (0, operandCount - 1),
+            ThresholdComparison.LessThan => (1, operandCount),
+            ThresholdComparison.Exactly => (0, operandCount),
+            _ => throw new InvalidOperationException($"Unhandled threshold comparison '{comparison}'."),
+        };
+    }
+
     private Expression Build(RuleNode node, int depth)
     {
         this.nodeCount++;
@@ -111,6 +131,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 operands => new OrExpression(new EquatableArray<Expression>(operands))
             ),
             XorNode x => this.BuildXor(x, depth),
+            XnorNode xn => this.BuildXnor(xn, depth),
             ExactlyOneNode e => this.BuildVariadic(
                 e.Operands,
                 depth,
@@ -118,7 +139,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 2,
                 operands => new ExactlyOneExpression(new EquatableArray<Expression>(operands))
             ),
-            AtLeastNode al => this.BuildAtLeast(al, depth),
+            ThresholdNode th => this.BuildThreshold(th, depth),
             _ => throw new InvalidOperationException($"Unhandled rule node type '{node.GetType()}'."),
         };
     }
@@ -171,22 +192,42 @@ internal sealed class RuleNodeCompiler<TContext>
         return new XorExpression(left, right);
     }
 
-    private Expression BuildAtLeast(AtLeastNode node, int depth)
+    private Expression BuildXnor(XnorNode node, int depth)
     {
-        if (node.Operands.Count < 1)
+        if (node.Operands.Count != 2)
         {
             this.diagnostics.Add(
-                Diagnostic.Error(DiagnosticCodes.MalformedTree, "AtLeast requires at least one operand.", node.Span)
+                Diagnostic.Error(
+                    DiagnosticCodes.XorArityViolation,
+                    $"XNOR is binary only; found {node.Operands.Count} operands.",
+                    node.Span
+                )
             );
             return new ConstantExpression(false);
         }
 
-        if (node.K < 1 || node.K > node.Operands.Count)
+        Expression left = this.Build(node.Operands[0], depth + 1);
+        Expression right = this.Build(node.Operands[1], depth + 1);
+        return new XnorExpression(left, right);
+    }
+
+    private Expression BuildThreshold(ThresholdNode node, int depth)
+    {
+        if (node.Operands.Count < 1)
+        {
+            this.diagnostics.Add(
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"{node.Comparison} requires at least one operand.", node.Span)
+            );
+            return new ConstantExpression(false);
+        }
+
+        (int minK, int maxK) = ValidThresholdRange(node.Comparison, node.Operands.Count);
+        if (node.K < minK || node.K > maxK)
         {
             this.diagnostics.Add(
                 Diagnostic.Error(
-                    DiagnosticCodes.InvalidAtLeastThreshold,
-                    $"AtLeast's threshold k={node.K} must satisfy 1 <= k <= {node.Operands.Count} (the operand count).",
+                    DiagnosticCodes.InvalidThresholdValue,
+                    $"{node.Comparison}'s threshold k={node.K} must satisfy {minK} <= k <= {maxK} for {node.Operands.Count} operand(s) (any value outside that range makes the result a structural constant).",
                     node.Span
                 )
             );
@@ -199,7 +240,7 @@ internal sealed class RuleNodeCompiler<TContext>
             built.Add(this.Build(operand, depth + 1));
         }
 
-        return new AtLeastExpression(node.K, new EquatableArray<Expression>(built));
+        return new ThresholdExpression(node.Comparison, node.K, new EquatableArray<Expression>(built));
     }
 
     private Expression BuildTerm(TermNode node)

@@ -1,5 +1,6 @@
 namespace BooleanRulesEngine.Parsing;
 
+using BooleanRulesEngine.Ast;
 using BooleanRulesEngine.Diagnostics;
 
 // SA1402 relaxed: a single closed-set discriminated union describing raw (pre-validation) parse
@@ -45,11 +46,22 @@ internal sealed record OrNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span)
 /// </summary>
 internal sealed record XorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
+/// <summary>
+/// A raw <c>XNOR</c> reference (logical biconditional / <c>IFF</c>). Same operand-count validation
+/// story as <see cref="XorNode"/>: <c>RuleNodeCompiler</c> uniformly rejects anything other than
+/// exactly two operands.
+/// </summary>
+internal sealed record XnorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
 /// <summary>N-ary "exactly one of these is true".</summary>
 internal sealed record ExactlyOneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
-/// <summary>N-ary threshold; <paramref name="K"/> is validated by the compiler, not the parser.</summary>
-internal sealed record AtLeastNode(int K, IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+/// <summary>
+/// N-ary count-threshold reference (<c>AtLeast</c>/<c>AtMost</c>/<c>GreaterThan</c>/<c>LessThan</c>/
+/// <c>Exactly</c>); <paramref name="K"/>'s valid range is validated by the compiler, not the parser.
+/// </summary>
+internal sealed record ThresholdNode(ThresholdComparison Comparison, int K, IReadOnlyList<RuleNode> Operands, SourceSpan Span)
+    : RuleNode(Span);
 
 /// <summary>
 /// A placeholder produced only after a syntax/structure error has already been reported, so parsing

@@ -31,6 +31,7 @@ internal static class CanonicalPrinter
         return (node, context) switch
         {
             (XorExpression, _) => true,
+            (XnorExpression, _) => true,
             (AndExpression, PrintContext.AndOperand or PrintContext.NotOperand or PrintContext.XorOperand) => true,
             (
                 OrExpression,
@@ -55,11 +56,14 @@ internal static class CanonicalPrinter
             XorExpression x => PrintNode(x.Left, PrintContext.XorOperand)
                 + " XOR "
                 + PrintNode(x.Right, PrintContext.XorOperand),
+            XnorExpression xn => PrintNode(xn.Left, PrintContext.XorOperand)
+                + " XNOR "
+                + PrintNode(xn.Right, PrintContext.XorOperand),
             ExactlyOneExpression e => "ExactlyOne("
                 + string.Join(", ", e.Operands.Select(o => PrintNode(o, PrintContext.Top)))
                 + ")",
-            AtLeastExpression al => $"AtLeast({al.K}, "
-                + string.Join(", ", al.Operands.Select(o => PrintNode(o, PrintContext.Top)))
+            ThresholdExpression th => $"{th.Comparison}({th.K}, "
+                + string.Join(", ", th.Operands.Select(o => PrintNode(o, PrintContext.Top)))
                 + ")",
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),
         };

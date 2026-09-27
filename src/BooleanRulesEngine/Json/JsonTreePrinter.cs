@@ -28,14 +28,32 @@ internal static class JsonTreePrinter
             AndExpression a => new JsonObject { ["op"] = "and", ["operands"] = OperandsArray(a.Operands) },
             OrExpression o => new JsonObject { ["op"] = "or", ["operands"] = OperandsArray(o.Operands) },
             XorExpression x => new JsonObject { ["op"] = "xor", ["operands"] = new JsonArray(ToNode(x.Left), ToNode(x.Right)) },
-            ExactlyOneExpression e => new JsonObject { ["op"] = "exactlyOne", ["operands"] = OperandsArray(e.Operands) },
-            AtLeastExpression al => new JsonObject
+            XnorExpression xn => new JsonObject
             {
-                ["op"] = "atLeast",
-                ["k"] = al.K,
-                ["operands"] = OperandsArray(al.Operands),
+                ["op"] = "xnor",
+                ["operands"] = new JsonArray(ToNode(xn.Left), ToNode(xn.Right)),
+            },
+            ExactlyOneExpression e => new JsonObject { ["op"] = "exactlyOne", ["operands"] = OperandsArray(e.Operands) },
+            ThresholdExpression th => new JsonObject
+            {
+                ["op"] = ThresholdOpName(th.Comparison),
+                ["k"] = th.K,
+                ["operands"] = OperandsArray(th.Operands),
             },
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),
+        };
+    }
+
+    private static string ThresholdOpName(ThresholdComparison comparison)
+    {
+        return comparison switch
+        {
+            ThresholdComparison.AtLeast => "atLeast",
+            ThresholdComparison.AtMost => "atMost",
+            ThresholdComparison.GreaterThan => "greaterThan",
+            ThresholdComparison.LessThan => "lessThan",
+            ThresholdComparison.Exactly => "exactly",
+            _ => throw new InvalidOperationException($"Unhandled threshold comparison '{comparison}'."),
         };
     }
 

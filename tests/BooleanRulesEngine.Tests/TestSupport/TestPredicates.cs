@@ -17,7 +17,10 @@ public static class TestPredicates
         bool value
     )
     {
-        return builder.Add(PredicateSchema.NoArguments(name), (_, _, _) => ValueTask.FromResult(value));
+        return builder.Add(
+            PredicateSchema.NoArguments(name, $"Test predicate '{name}', always {value}."),
+            (_, _, _) => ValueTask.FromResult(value)
+        );
     }
 
     /// <summary>Registers a zero-argument predicate that records each invocation (for memoization/short-circuit tests) and returns a fixed value.</summary>
@@ -29,7 +32,7 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            PredicateSchema.NoArguments(name),
+            PredicateSchema.NoArguments(name, $"Test predicate '{name}', always {value}, logs invocations."),
             (_, _, _) =>
             {
                 invocationLog.Add(name);
@@ -45,7 +48,7 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            PredicateSchema.NoArguments(name),
+            PredicateSchema.NoArguments(name, $"Test predicate '{name}', always faults."),
             (_, _, _) => throw new InvalidOperationException($"'{name}' faulted.")
         );
     }
@@ -59,7 +62,7 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            PredicateSchema.NoArguments(name),
+            PredicateSchema.NoArguments(name, $"Test predicate '{name}', delays then returns {value}."),
             async (_, _, ct) =>
             {
                 await Task.Delay(delay, ct).ConfigureAwait(false);
@@ -77,7 +80,11 @@ public static class TestPredicates
     )
     {
         return builder.Add(
-            new PredicateSchema(name, [new PredicateArgumentSchema(argumentName, LiteralKind.String)]),
+            new PredicateSchema(
+                name,
+                $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue}'.",
+                [new PredicateArgumentSchema(argumentName, $"The value to compare against '{matchValue}'.", LiteralKind.String)]
+            ),
             (_, args, _) =>
                 ValueTask.FromResult(string.Equals(args.GetString(argumentName), matchValue, StringComparison.Ordinal))
         );

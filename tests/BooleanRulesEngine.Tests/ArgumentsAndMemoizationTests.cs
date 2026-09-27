@@ -62,7 +62,11 @@ public sealed class ArgumentsAndMemoizationTests
             .Add(
                 new PredicateSchema(
                     "hasBoth",
-                    [new PredicateArgumentSchema("a", LiteralKind.String), new PredicateArgumentSchema("b", LiteralKind.String)]
+                    "Test predicate, always true.",
+                    [
+                        new PredicateArgumentSchema("a", "First argument.", LiteralKind.String),
+                        new PredicateArgumentSchema("b", "Second argument.", LiteralKind.String),
+                    ]
                 ),
                 (_, _, _) => ValueTask.FromResult(true)
             );
@@ -130,7 +134,11 @@ public sealed class ArgumentsAndMemoizationTests
         PredicateRegistryBuilder<RuleTestContext> builder = PredicateRegistry<RuleTestContext>
             .CreateBuilder()
             .Add(
-                new PredicateSchema("hasAnyRole", [new PredicateArgumentSchema("roles", LiteralKind.StringArray)]),
+                new PredicateSchema(
+                    "hasAnyRole",
+                    "Test predicate, always true.",
+                    [new PredicateArgumentSchema("roles", "The roles to check.", LiteralKind.StringArray)]
+                ),
                 (_, _, _) => ValueTask.FromResult(true)
             );
         RuleCompiler<RuleTestContext> compiler = new(builder.Build());
@@ -147,7 +155,11 @@ public sealed class ArgumentsAndMemoizationTests
         builder = invocationLog is null
             ? builder.AddStringArgPredicate("hasRole", "role", "Y")
             : builder.Add(
-                new PredicateSchema("hasRole", [new PredicateArgumentSchema("role", LiteralKind.String)]),
+                new PredicateSchema(
+                    "hasRole",
+                    "Test predicate, true iff the role argument equals \"Y\".",
+                    [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]
+                ),
                 (_, args, _) =>
                 {
                     invocationLog.Add($"hasRole(role: \"{args.GetString("role")}\")");

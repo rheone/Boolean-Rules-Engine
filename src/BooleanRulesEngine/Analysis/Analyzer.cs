@@ -71,6 +71,10 @@ internal static class Analyzer
                 CollectTerms(x.Left, terms);
                 CollectTerms(x.Right, terms);
                 break;
+            case XnorExpression xn:
+                CollectTerms(xn.Left, terms);
+                CollectTerms(xn.Right, terms);
+                break;
             case ExactlyOneExpression e:
                 foreach (Expression o in e.Operands)
                 {
@@ -78,8 +82,8 @@ internal static class Analyzer
                 }
 
                 break;
-            case AtLeastExpression al:
-                foreach (Expression o in al.Operands)
+            case ThresholdExpression th:
+                foreach (Expression o in th.Operands)
                 {
                     CollectTerms(o, terms);
                 }
@@ -175,6 +179,11 @@ internal static class Analyzer
                     Build(x.Right, bdd, variableIndex, diagnostics)
                 );
                 break;
+            case XnorExpression xn:
+                nodeId = bdd.Not(
+                    bdd.Xor(Build(xn.Left, bdd, variableIndex, diagnostics), Build(xn.Right, bdd, variableIndex, diagnostics))
+                );
+                break;
             case ExactlyOneExpression e:
                 List<int> exactlyOneOperandIds = [.. e.Operands.Select(o => Build(o, bdd, variableIndex, diagnostics))];
                 nodeId = bdd.And(
@@ -182,9 +191,20 @@ internal static class Analyzer
                     bdd.Not(AtLeastBdd(bdd, exactlyOneOperandIds, 2, 0))
                 );
                 break;
-            case AtLeastExpression al:
-                List<int> atLeastOperandIds = [.. al.Operands.Select(o => Build(o, bdd, variableIndex, diagnostics))];
-                nodeId = AtLeastBdd(bdd, atLeastOperandIds, al.K, 0);
+            case ThresholdExpression th:
+                List<int> thresholdOperandIds = [.. th.Operands.Select(o => Build(o, bdd, variableIndex, diagnostics))];
+                nodeId = th.Comparison switch
+                {
+                    ThresholdComparison.AtLeast => AtLeastBdd(bdd, thresholdOperandIds, th.K, 0),
+                    ThresholdComparison.AtMost => bdd.Not(AtLeastBdd(bdd, thresholdOperandIds, th.K + 1, 0)),
+                    ThresholdComparison.GreaterThan => AtLeastBdd(bdd, thresholdOperandIds, th.K + 1, 0),
+                    ThresholdComparison.LessThan => bdd.Not(AtLeastBdd(bdd, thresholdOperandIds, th.K, 0)),
+                    ThresholdComparison.Exactly => bdd.And(
+                        AtLeastBdd(bdd, thresholdOperandIds, th.K, 0),
+                        bdd.Not(AtLeastBdd(bdd, thresholdOperandIds, th.K + 1, 0))
+                    ),
+                    _ => throw new InvalidOperationException($"Unhandled threshold comparison '{th.Comparison}'."),
+                };
                 break;
             default:
                 throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'.");

@@ -1,5 +1,6 @@
 namespace BooleanRulesEngine.Parsing;
 
+using BooleanRulesEngine.Ast;
 using BooleanRulesEngine.Diagnostics;
 
 /// <summary>
@@ -18,10 +19,15 @@ internal sealed class DslParser
         "OR",
         "NOT",
         "XOR",
+        "XNOR",
         "TRUE",
         "FALSE",
         "EXACTLYONE",
         "ATLEAST",
+        "ATMOST",
+        "GREATERTHAN",
+        "LESSTHAN",
+        "EXACTLY",
     };
 
     private readonly IReadOnlyList<Token> tokens;
@@ -149,8 +155,20 @@ internal sealed class DslParser
         RuleNode node = this.ParseNotExpression();
         List<RuleNode> operands = [node];
         int start = node.Span.Start;
-        while (this.TryConsumeKeyword("XOR"))
+        bool? isXnor = null;
+        while (this.IsKeyword("XOR") || this.IsKeyword("XNOR"))
         {
+            bool currentIsXnor = this.IsKeyword("XNOR");
+            if (isXnor is bool previous && previous != currentIsXnor)
+            {
+                this.ReportAmbiguousMixing(
+                    SpanCovering(start, this.Current.Span.End),
+                    "Mixing XOR with XNOR at the same level requires explicit parentheses."
+                );
+            }
+
+            isXnor = currentIsXnor;
+            this.position++;
             operands.Add(this.ParseNotExpression());
         }
 
@@ -160,7 +178,8 @@ internal sealed class DslParser
         }
 
         SourceSpan span = SpanCovering(start, operands[^1].Span.End);
-        return (new XorNode(operands, span), true);
+        RuleNode result = isXnor == true ? new XnorNode(operands, span) : new XorNode(operands, span);
+        return (result, true);
     }
 
     private RuleNode ParseNotExpression()
@@ -206,7 +225,27 @@ internal sealed class DslParser
 
         if (this.IsKeyword("ATLEAST"))
         {
-            return this.ParseAtLeast();
+            return this.ParseThreshold(ThresholdComparison.AtLeast);
+        }
+
+        if (this.IsKeyword("ATMOST"))
+        {
+            return this.ParseThreshold(ThresholdComparison.AtMost);
+        }
+
+        if (this.IsKeyword("GREATERTHAN"))
+        {
+            return this.ParseThreshold(ThresholdComparison.GreaterThan);
+        }
+
+        if (this.IsKeyword("LESSTHAN"))
+        {
+            return this.ParseThreshold(ThresholdComparison.LessThan);
+        }
+
+        if (this.IsKeyword("EXACTLY"))
+        {
+            return this.ParseThreshold(ThresholdComparison.Exactly);
         }
 
         if (this.Current.Kind == TokenKind.Identifier)
@@ -329,7 +368,7 @@ internal sealed class DslParser
         return new ExactlyOneNode(operands, SpanCovering(start, this.tokens[this.position - 1].Span.End));
     }
 
-    private RuleNode ParseAtLeast()
+    private RuleNode ParseThreshold(ThresholdComparison comparison)
     {
         int start = this.Current.Span.Start;
         this.position++;
@@ -345,7 +384,7 @@ internal sealed class DslParser
             this.diagnostics.Add(
                 Diagnostic.Error(
                     DiagnosticCodes.SyntaxError,
-                    "Expected an integer threshold as AtLeast's first argument.",
+                    $"Expected an integer threshold as {comparison}'s first argument.",
                     this.Current.Span
                 )
             );
@@ -360,7 +399,7 @@ internal sealed class DslParser
 
         int end = this.Current.Span.End;
         this.Expect(TokenKind.RParen, "')'");
-        return new AtLeastNode(k, operands, SpanCovering(start, end));
+        return new ThresholdNode(comparison, k, operands, SpanCovering(start, end));
     }
 
     private List<RuleNode> ParseParenthesizedOperandList()
@@ -398,14 +437,11 @@ internal sealed class DslParser
         );
     }
 
-    private void ReportAmbiguousMixing(SourceSpan span)
+    private void ReportAmbiguousMixing(
+        SourceSpan span,
+        string message = "Mixing XOR with AND/OR at the same level requires explicit parentheses."
+    )
     {
-        this.diagnostics.Add(
-            Diagnostic.Error(
-                DiagnosticCodes.AmbiguousOperatorMixing,
-                "Mixing XOR with AND/OR at the same level requires explicit parentheses.",
-                span
-            )
-        );
+        this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.AmbiguousOperatorMixing, message, span));
     }
 }

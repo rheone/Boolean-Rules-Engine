@@ -51,8 +51,9 @@ internal sealed class Evaluator<TContext>(
             AndExpression => "AND",
             OrExpression => "OR",
             XorExpression => "XOR",
+            XnorExpression => "XNOR",
             ExactlyOneExpression => "ExactlyOne",
-            AtLeastExpression al => $"AtLeast({al.K})",
+            ThresholdExpression th => $"{th.Comparison}({th.K})",
             _ => node.GetType().Name,
         };
     }
@@ -99,6 +100,11 @@ internal sealed class Evaluator<TContext>(
         return (left == TruthValue.True) ^ (right == TruthValue.True) ? TruthValue.True : TruthValue.False;
     }
 
+    private static TruthValue KleeneXnor(TruthValue left, TruthValue right)
+    {
+        return KleeneNot(KleeneXor(left, right));
+    }
+
     private static TruthValue EvaluateExactlyOne(IReadOnlyList<TruthValue> operandValues)
     {
         int trueCount = operandValues.Count(v => v == TruthValue.True);
@@ -117,17 +123,48 @@ internal sealed class Evaluator<TContext>(
         return trueCount == 1 ? TruthValue.True : TruthValue.False;
     }
 
-    private static TruthValue EvaluateAtLeast(int k, IReadOnlyList<TruthValue> operandValues)
+    /// <summary>
+    /// Evaluates any count-threshold comparison against the range of true-operand counts still
+    /// reachable given how many operands remain <see cref="TruthValue.Unknown"/> — determinate only
+    /// when the comparison agrees at both the lowest and highest possible count (monotonic
+    /// comparisons) or when there is no remaining ambiguity at all (<see cref="ThresholdComparison.Exactly"/>,
+    /// which is not monotonic in the count).
+    /// </summary>
+    private static TruthValue EvaluateThreshold(ThresholdComparison comparison, int k, IReadOnlyList<TruthValue> operandValues)
     {
         int trueCount = operandValues.Count(v => v == TruthValue.True);
         int unknownCount = operandValues.Count(v => v == TruthValue.Unknown);
+        int minCount = trueCount;
+        int maxCount = trueCount + unknownCount;
 
-        if (trueCount >= k)
+        if (comparison == ThresholdComparison.Exactly)
+        {
+            if (k < minCount || k > maxCount)
+            {
+                return TruthValue.False;
+            }
+
+            return unknownCount == 0 ? TruthValue.True : TruthValue.Unknown;
+        }
+
+        bool SatisfiesAt(int count) =>
+            comparison switch
+            {
+                ThresholdComparison.AtLeast => count >= k,
+                ThresholdComparison.AtMost => count <= k,
+                ThresholdComparison.GreaterThan => count > k,
+                ThresholdComparison.LessThan => count < k,
+                _ => throw new InvalidOperationException($"Unhandled threshold comparison '{comparison}'."),
+            };
+
+        bool satisfiesMin = SatisfiesAt(minCount);
+        bool satisfiesMax = SatisfiesAt(maxCount);
+        if (satisfiesMin && satisfiesMax)
         {
             return TruthValue.True;
         }
 
-        return trueCount + unknownCount < k ? TruthValue.False : TruthValue.Unknown;
+        return !satisfiesMin && !satisfiesMax ? TruthValue.False : TruthValue.Unknown;
     }
 
     private async ValueTask<TruthValue> EvalAsync(Expression node)
@@ -161,10 +198,15 @@ internal sealed class Evaluator<TContext>(
                     await this.EvalAsync(x.Left).ConfigureAwait(false),
                     await this.EvalAsync(x.Right).ConfigureAwait(false)
                 );
+            case XnorExpression xn:
+                return KleeneXnor(
+                    await this.EvalAsync(xn.Left).ConfigureAwait(false),
+                    await this.EvalAsync(xn.Right).ConfigureAwait(false)
+                );
             case ExactlyOneExpression e:
                 return EvaluateExactlyOne(await this.EvalAllAsync(e.Operands).ConfigureAwait(false));
-            case AtLeastExpression al:
-                return EvaluateAtLeast(al.K, await this.EvalAllAsync(al.Operands).ConfigureAwait(false));
+            case ThresholdExpression th:
+                return EvaluateThreshold(th.Comparison, th.K, await this.EvalAllAsync(th.Operands).ConfigureAwait(false));
             default:
                 throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'.");
         }

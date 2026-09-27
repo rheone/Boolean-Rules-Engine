@@ -36,9 +36,27 @@ internal static class YamlTreePrinter
             AndExpression a => OperatorNode("and", a.Operands.Select(ToNode)),
             OrExpression o => OperatorNode("or", o.Operands.Select(ToNode)),
             XorExpression x => OperatorNode("xor", [ToNode(x.Left), ToNode(x.Right)]),
+            XnorExpression xn => OperatorNode("xnor", [ToNode(xn.Left), ToNode(xn.Right)]),
             ExactlyOneExpression e => OperatorNode("exactlyOne", e.Operands.Select(ToNode)),
-            AtLeastExpression al => OperatorNodeWithThreshold("atLeast", al.K, al.Operands.Select(ToNode)),
+            ThresholdExpression th => OperatorNodeWithThreshold(
+                ThresholdOpName(th.Comparison),
+                th.K,
+                th.Operands.Select(ToNode)
+            ),
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),
+        };
+    }
+
+    private static string ThresholdOpName(ThresholdComparison comparison)
+    {
+        return comparison switch
+        {
+            ThresholdComparison.AtLeast => "atLeast",
+            ThresholdComparison.AtMost => "atMost",
+            ThresholdComparison.GreaterThan => "greaterThan",
+            ThresholdComparison.LessThan => "lessThan",
+            ThresholdComparison.Exactly => "exactly",
+            _ => throw new InvalidOperationException($"Unhandled threshold comparison '{comparison}'."),
         };
     }
 

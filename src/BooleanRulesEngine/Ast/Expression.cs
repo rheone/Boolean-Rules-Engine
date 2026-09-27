@@ -7,6 +7,25 @@ using BooleanRulesEngine.Abstractions;
 // read together than split across eight near-empty files.
 #pragma warning disable SA1402
 
+/// <summary>Which comparison a <see cref="ThresholdExpression"/> applies against its true-operand count.</summary>
+public enum ThresholdComparison
+{
+    /// <summary><c>AtLeast(k, ...)</c>: true iff the true-operand count is <c>&gt;= k</c>.</summary>
+    AtLeast,
+
+    /// <summary><c>AtMost(k, ...)</c>: true iff the true-operand count is <c>&lt;= k</c>.</summary>
+    AtMost,
+
+    /// <summary><c>GreaterThan(k, ...)</c>: true iff the true-operand count is <c>&gt; k</c>.</summary>
+    GreaterThan,
+
+    /// <summary><c>LessThan(k, ...)</c>: true iff the true-operand count is <c>&lt; k</c>.</summary>
+    LessThan,
+
+    /// <summary><c>Exactly(k, ...)</c>: true iff the true-operand count is exactly <c>k</c>.</summary>
+    Exactly,
+}
+
 /// <summary>
 /// The base of the immutable expression tree a <c>CompiledRule</c> wraps (CONTEXT.md's conceptual
 /// model). Every node type below is a closed set by design (ADR-0004) — adding an operator is a
@@ -47,11 +66,26 @@ public sealed record OrExpression(EquatableArray<Expression> Operands) : Express
 /// <param name="Right">The right operand.</param>
 public sealed record XorExpression(Expression Left, Expression Right) : Expression;
 
+/// <summary>
+/// Binary exclusive-nor (logical biconditional / <c>IFF</c>) — the negation of <see cref="XorExpression"/>,
+/// deliberately not generalized to n-ary parity for the same reason <c>XOR</c> isn't (ADR-0003).
+/// </summary>
+/// <param name="Left">The left operand.</param>
+/// <param name="Right">The right operand.</param>
+public sealed record XnorExpression(Expression Left, Expression Right) : Expression;
+
 /// <summary>N-ary "exactly one of these operands is true".</summary>
 /// <param name="Operands">The operands (at least two).</param>
 public sealed record ExactlyOneExpression(EquatableArray<Expression> Operands) : Expression;
 
-/// <summary>N-ary threshold: true iff at least <paramref name="K"/> operands are true.</summary>
-/// <param name="K">The threshold, with <c>1 &lt;= K &lt;= Operands.Count</c>.</param>
+/// <summary>
+/// N-ary count-threshold operator: <c>AtLeast(k, ...)</c>, <c>AtMost(k, ...)</c>,
+/// <c>GreaterThan(k, ...)</c>, <c>LessThan(k, ...)</c>, and <c>Exactly(k, ...)</c> all compile to
+/// this one node, parameterized by <see cref="ThresholdComparison"/> — they differ only in which
+/// comparison against the count of true operands they apply.
+/// </summary>
+/// <param name="Comparison">Which comparison against the true-operand count this threshold applies.</param>
+/// <param name="K">The threshold value being compared against. Valid range depends on <paramref name="Comparison"/> and the operand count — see <c>RuleNodeCompiler</c>.</param>
 /// <param name="Operands">The operands.</param>
-public sealed record AtLeastExpression(int K, EquatableArray<Expression> Operands) : Expression;
+public sealed record ThresholdExpression(ThresholdComparison Comparison, int K, EquatableArray<Expression> Operands)
+    : Expression;
