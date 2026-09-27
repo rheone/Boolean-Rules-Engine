@@ -43,18 +43,26 @@ internal sealed class Evaluator<TContext>(
 
     private static string Describe(Expression node)
     {
-        return node switch
+        if (node is ConstantExpression c)
         {
-            ConstantExpression c => c.Value ? "true" : "false",
-            TermExpression t => t.Identity.ToString(),
-            NotExpression => "NOT",
-            AndExpression => "AND",
-            OrExpression => "OR",
-            XorExpression => "XOR",
-            XnorExpression => "XNOR",
-            ExactlyOneExpression => "ExactlyOne",
-            ThresholdExpression th => $"{th.Comparison}({th.K})",
-            _ => node.GetType().Name,
+            return c.Value ? "true" : "false";
+        }
+
+        if (node is TermExpression t)
+        {
+            return t.Identity.ToString();
+        }
+
+        NodeShape shape = ExpressionShape.Of(node);
+        return shape.OpName switch
+        {
+            "Not" => "NOT",
+            "And" => "AND",
+            "Or" => "OR",
+            "Xor" => "XOR",
+            "Xnor" => "XNOR",
+            "ExactlyOne" => "ExactlyOne",
+            _ => $"{shape.OpName}({shape.K})",
         };
     }
 

@@ -117,6 +117,40 @@ defines and compiles through the existing `CompileJson`, so it's a
 convenience wrapper over the closed operator set above, not a new surface
 that would need to independently track every operator this package adds.
 
+### Amendment: the real per-operator touch-point count, after the shared node-shape seam
+
+The "operator set is closed... adding a new operator is a versioned change" language above scoped
+the cost of a new operator to four subsystems (parser, compiler, evaluator, analyzer). In practice,
+by the time `BooleanRulesEngine.Yaml` and the JSON/canonical-text printers existed, adding a new
+operator touched **six** independent switches over `Expression` that each re-derived the same
+structural fact — a node's op-name, its threshold `K` (when applicable), and its operand list:
+`OperatorInfo`, `CanonicalPrinter`, `JsonTreePrinter`, `YamlTreePrinter`, `Evaluator` (its trace/skip
+`Describe` helper), and `CompiledRule` (its `Describe()` operand-extraction switch). None of those six
+were the four subsystems this ADR originally scoped (parser, compiler, evaluator's actual eval
+dispatch, analyzer) — they were rendering/description call sites layered on afterward, each
+re-implementing the same structural lookup independently.
+
+`BooleanRulesEngine.Ast.ExpressionShape.Of` (internal, `src/BooleanRulesEngine/Ast/NodeShape.cs`) now
+supplies that one structural fact from a single switch. Adding a new operator variant to the closed
+set still means editing several places, but the count is smaller and each remaining edit is now
+irreducibly format- or behavior-specific rather than a duplicate of the same structural
+pattern-match:
+
+1. `Expression.cs` — add the record.
+2. The parser/compiler front ends (DSL, JSON, YAML) — teach them the new keyword/shape.
+3. `ExpressionShape.Of` — **one** new case for op-name/K/operands (was six before this ticket).
+4. `Evaluator`'s `EvalAsync` switch — the new operator's actual Kleene evaluation algorithm (never
+   collapsible into the seam — it's genuinely distinct control flow per operator).
+5. The analyzer's BDD encoding, if the operator needs one.
+6. Per-format label/keyword strings in `OperatorInfo`, `CanonicalPrinter`,
+   `JsonTreePrinter`/`YamlTreePrinter` — each format still needs to know what to *call* the new
+   op-name in its own vocabulary, but no longer needs its own switch to find the op-name/K/operands
+   in the first place.
+
+The structural duplication (six identical `Expression` switches) is gone; what remains is
+irreducible — genuinely different behavior or vocabulary per subsystem, not the same fact
+re-derived six times.
+
 ## Consequences
 
 - A service that only implements domain predicates (e.g. a shared

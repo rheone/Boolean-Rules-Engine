@@ -28,35 +28,38 @@ internal static class YamlTreePrinter
 
     private static YamlNode ToNode(Expression node)
     {
-        return node switch
+        if (node is ConstantExpression c)
         {
-            ConstantExpression c => Mapping(("const", Scalar(c.Value ? "true" : "false", ScalarStyle.Plain))),
-            TermExpression t => TermToNode(t),
-            NotExpression n => OperatorNode("not", [ToNode(n.Operand)]),
-            AndExpression a => OperatorNode("and", a.Operands.Select(ToNode)),
-            OrExpression o => OperatorNode("or", o.Operands.Select(ToNode)),
-            XorExpression x => OperatorNode("xor", [ToNode(x.Left), ToNode(x.Right)]),
-            XnorExpression xn => OperatorNode("xnor", [ToNode(xn.Left), ToNode(xn.Right)]),
-            ExactlyOneExpression e => OperatorNode("exactlyOne", e.Operands.Select(ToNode)),
-            ThresholdExpression th => OperatorNodeWithThreshold(
-                ThresholdOpName(th.Comparison),
-                th.K,
-                th.Operands.Select(ToNode)
-            ),
-            _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),
-        };
+            return Mapping(("const", Scalar(c.Value ? "true" : "false", ScalarStyle.Plain)));
+        }
+
+        if (node is TermExpression t)
+        {
+            return TermToNode(t);
+        }
+
+        NodeShape shape = ExpressionShape.Of(node);
+        return shape.K is { } k
+            ? OperatorNodeWithThreshold(YamlOpName(shape.OpName), k, shape.Operands.Select(ToNode))
+            : OperatorNode(YamlOpName(shape.OpName), shape.Operands.Select(ToNode));
     }
 
-    private static string ThresholdOpName(ThresholdComparison comparison)
+    private static string YamlOpName(string opName)
     {
-        return comparison switch
+        return opName switch
         {
-            ThresholdComparison.AtLeast => "atLeast",
-            ThresholdComparison.AtMost => "atMost",
-            ThresholdComparison.GreaterThan => "greaterThan",
-            ThresholdComparison.LessThan => "lessThan",
-            ThresholdComparison.Exactly => "exactly",
-            _ => throw new InvalidOperationException($"Unhandled threshold comparison '{comparison}'."),
+            "Not" => "not",
+            "And" => "and",
+            "Or" => "or",
+            "Xor" => "xor",
+            "Xnor" => "xnor",
+            "ExactlyOne" => "exactlyOne",
+            "AtLeast" => "atLeast",
+            "AtMost" => "atMost",
+            "GreaterThan" => "greaterThan",
+            "LessThan" => "lessThan",
+            "Exactly" => "exactly",
+            _ => throw new InvalidOperationException($"Unhandled op-name '{opName}'."),
         };
     }
 

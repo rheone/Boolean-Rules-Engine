@@ -61,23 +61,24 @@ internal static class CanonicalPrinter
             ConstantExpression c => c.Value ? "true" : "false",
             TermExpression t => t.Identity.ToString(),
             NotExpression n => "NOT " + PrintNode(n.Operand, PrintContext.NotOperand),
-            AndExpression a => string.Join(" AND ", a.Operands.Select(o => PrintNode(o, PrintContext.AndOperand))),
-            OrExpression o => string.Join(" OR ", o.Operands.Select(o2 => PrintNode(o2, PrintContext.OrOperand))),
+            AndExpression => JoinOperands(node, " AND ", PrintContext.AndOperand),
+            OrExpression => JoinOperands(node, " OR ", PrintContext.OrOperand),
             XorExpression x => PrintNode(x.Left, PrintContext.XorOperand)
                 + " XOR "
                 + PrintNode(x.Right, PrintContext.XorOperand),
             XnorExpression xn => PrintNode(xn.Left, PrintContext.XorOperand)
                 + " XNOR "
                 + PrintNode(xn.Right, PrintContext.XorOperand),
-            ExactlyOneExpression e => "ExactlyOne("
-                + string.Join(", ", e.Operands.Select(o => PrintNode(o, PrintContext.Top)))
-                + ")",
-            ThresholdExpression th => $"{th.Comparison}({th.K}, "
-                + string.Join(", ", th.Operands.Select(o => PrintNode(o, PrintContext.Top)))
-                + ")",
+            ExactlyOneExpression => $"ExactlyOne({JoinOperands(node, ", ", PrintContext.Top)})",
+            ThresholdExpression th => $"{th.Comparison}({th.K}, {JoinOperands(node, ", ", PrintContext.Top)})",
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),
         };
 
         return NeedsWrap(node, context) ? $"({inner})" : inner;
+    }
+
+    private static string JoinOperands(Expression node, string separator, PrintContext operandContext)
+    {
+        return string.Join(separator, ExpressionShape.Of(node).Operands.Select(o => PrintNode(o, operandContext)));
     }
 }

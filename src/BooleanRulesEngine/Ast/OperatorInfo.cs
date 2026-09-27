@@ -15,49 +15,51 @@ public static class OperatorInfo
     /// <exception cref="ArgumentException"><paramref name="node"/> is a <see cref="TermExpression"/>.</exception>
     public static OperatorDescriptor Describe(Expression node)
     {
-        return node switch
+        if (node is ConstantExpression c)
         {
-            ConstantExpression c => c.Value
+            return c.Value
                 ? new OperatorDescriptor("True", "A fixed truth value.")
-                : new OperatorDescriptor("False", "A fixed truth value."),
-            NotExpression => new OperatorDescriptor("NOT", "Logical negation. Unknown stays Unknown."),
-            AndExpression => new OperatorDescriptor(
-                "AND",
-                "True iff every operand is true. Short-circuits at the first False."
-            ),
-            OrExpression => new OperatorDescriptor(
-                "OR",
-                "True iff at least one operand is true. Short-circuits at the first True."
-            ),
-            XorExpression => new OperatorDescriptor(
-                "XOR",
-                "True iff exactly one of the two operands is true. Unknown if either operand is Unknown."
-            ),
-            XnorExpression => new OperatorDescriptor(
-                "XNOR",
-                "Logical biconditional (IFF) — true iff both operands agree (both true or both false). The negation of XOR."
-            ),
-            ExactlyOneExpression => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
-            ThresholdExpression th => new OperatorDescriptor($"{th.Comparison}({th.K})", ThresholdDescription(th)),
-            TermExpression => throw new ArgumentException(
+                : new OperatorDescriptor("False", "A fixed truth value.");
+        }
+
+        if (node is TermExpression)
+        {
+            throw new ArgumentException(
                 "A TermExpression has no operator descriptor — look up its label/description from the "
                     + "registered PredicateSchema via the term's predicate name instead.",
                 nameof(node)
+            );
+        }
+
+        NodeShape shape = ExpressionShape.Of(node);
+        return shape.OpName switch
+        {
+            "Not" => new OperatorDescriptor("NOT", "Logical negation. Unknown stays Unknown."),
+            "And" => new OperatorDescriptor("AND", "True iff every operand is true. Short-circuits at the first False."),
+            "Or" => new OperatorDescriptor("OR", "True iff at least one operand is true. Short-circuits at the first True."),
+            "Xor" => new OperatorDescriptor(
+                "XOR",
+                "True iff exactly one of the two operands is true. Unknown if either operand is Unknown."
             ),
-            _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),
+            "Xnor" => new OperatorDescriptor(
+                "XNOR",
+                "Logical biconditional (IFF) — true iff both operands agree (both true or both false). The negation of XOR."
+            ),
+            "ExactlyOne" => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
+            _ => new OperatorDescriptor($"{shape.OpName}({shape.K})", ThresholdDescription(shape)),
         };
     }
 
-    private static string ThresholdDescription(ThresholdExpression threshold)
+    private static string ThresholdDescription(NodeShape threshold)
     {
-        return threshold.Comparison switch
+        return threshold.OpName switch
         {
-            ThresholdComparison.AtLeast => $"True iff at least {threshold.K} of the operands are true.",
-            ThresholdComparison.AtMost => $"True iff at most {threshold.K} of the operands are true.",
-            ThresholdComparison.GreaterThan => $"True iff more than {threshold.K} of the operands are true.",
-            ThresholdComparison.LessThan => $"True iff fewer than {threshold.K} of the operands are true.",
-            ThresholdComparison.Exactly => $"True iff exactly {threshold.K} of the operands are true.",
-            _ => throw new InvalidOperationException($"Unhandled threshold comparison '{threshold.Comparison}'."),
+            "AtLeast" => $"True iff at least {threshold.K} of the operands are true.",
+            "AtMost" => $"True iff at most {threshold.K} of the operands are true.",
+            "GreaterThan" => $"True iff more than {threshold.K} of the operands are true.",
+            "LessThan" => $"True iff fewer than {threshold.K} of the operands are true.",
+            "Exactly" => $"True iff exactly {threshold.K} of the operands are true.",
+            _ => throw new InvalidOperationException($"Unhandled threshold comparison '{threshold.OpName}'."),
         };
     }
 }

@@ -150,17 +150,8 @@ public sealed class CompiledRule<TContext>
         }
 
         OperatorDescriptor descriptor = OperatorInfo.Describe(node);
-        IReadOnlyList<Expression> operands = node switch
-        {
-            NotExpression n => [n.Operand],
-            AndExpression a => a.Operands,
-            OrExpression o => o.Operands,
-            XorExpression x => [x.Left, x.Right],
-            XnorExpression xn => [xn.Left, xn.Right],
-            ExactlyOneExpression e => e.Operands,
-            ThresholdExpression th => th.Operands,
-            _ => [],
-        };
+        IReadOnlyList<Expression> operands =
+            node is ConstantExpression ? Array.Empty<Expression>() : ExpressionShape.Of(node).Operands;
 
         return new RuleDescription(
             descriptor.Label,

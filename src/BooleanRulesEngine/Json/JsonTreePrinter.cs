@@ -20,44 +20,46 @@ internal static class JsonTreePrinter
 
     private static JsonNode ToNode(Expression node)
     {
-        return node switch
+        if (node is ConstantExpression c)
         {
-            ConstantExpression c => new JsonObject { ["const"] = c.Value },
-            TermExpression t => TermToNode(t),
-            NotExpression n => new JsonObject { ["op"] = "not", ["operands"] = new JsonArray(ToNode(n.Operand)) },
-            AndExpression a => new JsonObject { ["op"] = "and", ["operands"] = OperandsArray(a.Operands) },
-            OrExpression o => new JsonObject { ["op"] = "or", ["operands"] = OperandsArray(o.Operands) },
-            XorExpression x => new JsonObject { ["op"] = "xor", ["operands"] = new JsonArray(ToNode(x.Left), ToNode(x.Right)) },
-            XnorExpression xn => new JsonObject
-            {
-                ["op"] = "xnor",
-                ["operands"] = new JsonArray(ToNode(xn.Left), ToNode(xn.Right)),
-            },
-            ExactlyOneExpression e => new JsonObject { ["op"] = "exactlyOne", ["operands"] = OperandsArray(e.Operands) },
-            ThresholdExpression th => new JsonObject
-            {
-                ["op"] = ThresholdOpName(th.Comparison),
-                ["k"] = th.K,
-                ["operands"] = OperandsArray(th.Operands),
-            },
-            _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),
-        };
+            return new JsonObject { ["const"] = c.Value };
+        }
+
+        if (node is TermExpression t)
+        {
+            return TermToNode(t);
+        }
+
+        NodeShape shape = ExpressionShape.Of(node);
+        JsonObject obj = new() { ["op"] = JsonOpName(shape.OpName), ["operands"] = OperandsArray(shape.Operands) };
+        if (shape.K is { } k)
+        {
+            obj["k"] = k;
+        }
+
+        return obj;
     }
 
-    private static string ThresholdOpName(ThresholdComparison comparison)
+    private static string JsonOpName(string opName)
     {
-        return comparison switch
+        return opName switch
         {
-            ThresholdComparison.AtLeast => "atLeast",
-            ThresholdComparison.AtMost => "atMost",
-            ThresholdComparison.GreaterThan => "greaterThan",
-            ThresholdComparison.LessThan => "lessThan",
-            ThresholdComparison.Exactly => "exactly",
-            _ => throw new InvalidOperationException($"Unhandled threshold comparison '{comparison}'."),
+            "Not" => "not",
+            "And" => "and",
+            "Or" => "or",
+            "Xor" => "xor",
+            "Xnor" => "xnor",
+            "ExactlyOne" => "exactlyOne",
+            "AtLeast" => "atLeast",
+            "AtMost" => "atMost",
+            "GreaterThan" => "greaterThan",
+            "LessThan" => "lessThan",
+            "Exactly" => "exactly",
+            _ => throw new InvalidOperationException($"Unhandled op-name '{opName}'."),
         };
     }
 
-    private static JsonArray OperandsArray(EquatableArray<Expression> operands)
+    private static JsonArray OperandsArray(IReadOnlyList<Expression> operands)
     {
         JsonArray array = [];
         foreach (Expression operand in operands)
