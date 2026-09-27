@@ -33,11 +33,14 @@ csharp_style_expression_bodied_properties = true:suggestion
 csharp_style_expression_bodied_indexers = true:suggestion
 csharp_style_expression_bodied_accessors = true:suggestion
 
-# Qualification
-dotnet_style_qualification_for_field = false:suggestion
-dotnet_style_qualification_for_property = false:suggestion
-dotnet_style_qualification_for_method = false:suggestion
-dotnet_style_qualification_for_event = false:suggestion
+# Qualification: this repo qualifies member access with "this." throughout (StyleCop's SA1101
+# requires it), so the preference here is "true", not "false" - the previous "false" setting
+# actively fought the codebase's own convention, flagging every correct "this." as IDE0003
+# ("name can be simplified") and failing `dotnet format --verify-no-changes`.
+dotnet_style_qualification_for_field = true:suggestion
+dotnet_style_qualification_for_property = true:suggestion
+dotnet_style_qualification_for_method = true:suggestion
+dotnet_style_qualification_for_event = true:suggestion
 
 # Accessibility
 dotnet_style_require_accessibility_modifiers = always:warning
@@ -48,14 +51,10 @@ dotnet_style_null_propagation = true:suggestion
 dotnet_style_object_initializer = true:suggestion
 dotnet_style_collection_initializer = true:suggestion
 
-# Naming
-dotnet_naming_symbols.private_fields.applicable_kinds = field
-dotnet_naming_symbols.private_fields.applicable_accessibilities = private
-dotnet_naming_style._camel_case.capitalization = camel_case
-dotnet_naming_style._camel_case.required_prefix = _
-dotnet_naming_rule.private_fields_should_be_camel_case.symbols = private_fields
-dotnet_naming_rule.private_fields_should_be_camel_case.style = _camel_case
-dotnet_naming_rule.private_fields_should_be_camel_case.severity = warning
+# Naming: private fields are plain camelCase, qualified with "this." (not an "_" prefix) throughout
+# this codebase - a leftover "require an _ prefix" naming rule here would contradict every existing
+# field in the repo, so none is configured; StyleCop's SA1309 already rejects underscore-prefixed
+# fields by default, and the "this." qualification convention is enforced by SA1101 instead.
 
 # Documentation: CSharpier/modern C# formatting takes precedence over
 # legacy formatting rules where the two overlap.
@@ -74,6 +73,21 @@ dotnet_diagnostic.SA1111.severity = none
 # do/while's "} while (...)" sharing a line. Same rationale as above.
 dotnet_diagnostic.SA1500.severity = none
 dotnet_diagnostic.SA1502.severity = none
+
+# IDE0028 ("collection initialization can be simplified") is disabled: applying its own code fix to
+# a `new List<T>(capacity)` or `new HashSet<T>(comparer)` call - i.e. a constructor argument, not an
+# initializer - corrupts the call into invalid syntax like `[with(capacity)]`. Confirmed reproducible
+# against this exact Roslyn/SDK version (dotnet format 11.0.100-rc.1.26425.128) on every occurrence
+# in this repo; verified by hand each time and always reverted. Do not run `dotnet format` in apply
+# mode (only `--verify-no-changes`) until this is fixed upstream.
+dotnet_diagnostic.IDE0028.severity = none
+
+# CA1859 ("change return type for improved performance") is disabled for this repo's internal
+# parser/serializer helper methods (e.g. RuleNode ParseTerm(...), JsonNode TermToNode(...)): they
+# deliberately return the shared base/interface type because sibling methods in the same dispatch
+# switch must return that same type, and CA1859's suggestion would only apply to a few of them
+# without fighting that shared shape everywhere else.
+dotnet_diagnostic.CA1859.severity = none
 
 [*.csproj]
 indent_size = 2

@@ -114,9 +114,13 @@ public sealed class RuleCompiler<TContext>(
     {
         foreach (Diagnostic diagnostic in diagnostics)
         {
+#pragma warning disable CA1873 // ToLogLevel is a cheap enum-to-enum switch, not the kind of
+            // expensive call this rule warns about; the level must be computed
+            // up front to know which level to check IsEnabled against at all.
             RuleCompilerLog.DiagnosticProduced(
                 this.logger,
                 RuleCompilerLog.ToLogLevel(diagnostic.Severity),
+#pragma warning restore CA1873
                 diagnostic.Code,
                 diagnostic.Severity,
                 diagnostic.Message,

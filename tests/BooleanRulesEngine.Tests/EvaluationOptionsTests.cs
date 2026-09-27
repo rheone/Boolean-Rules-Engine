@@ -19,14 +19,6 @@ public sealed class EvaluationOptionsTests
     }
 
     [Fact]
-    public async Task Fault_budget_abort_leaves_the_trace_with_unevaluated_entries()
-    {
-        Decision decision = await EvaluateWithFaultBudgetAsync();
-
-        Assert.Contains(decision.Trace!.Entries, e => e.NotEvaluated);
-    }
-
-    [Fact]
     public async Task Unlimited_default_fault_budget_continues_to_completion_with_multiple_faults()
     {
         RuleCompiler<RuleTestContext> compiler = new(
@@ -121,6 +113,18 @@ public sealed class EvaluationOptionsTests
         );
 
         Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+#pragma warning disable CA1822 // kept as an instance method for reading-order symmetry with its
+    // sibling fault-budget test above (SA1204 would otherwise force
+    // every static member in this class ahead of every instance one).
+    public async Task Fault_budget_abort_leaves_the_trace_with_unevaluated_entries()
+#pragma warning restore CA1822
+    {
+        Decision decision = await EvaluateWithFaultBudgetAsync();
+
+        Assert.Contains(decision.Trace!.Entries, e => e.NotEvaluated);
     }
 
     private static Task<Decision> EvaluateWithFaultBudgetAsync()

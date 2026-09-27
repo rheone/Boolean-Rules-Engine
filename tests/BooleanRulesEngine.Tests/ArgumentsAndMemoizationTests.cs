@@ -64,7 +64,7 @@ public sealed class ArgumentsAndMemoizationTests
                     "hasBoth",
                     [new PredicateArgumentSchema("a", LiteralKind.String), new PredicateArgumentSchema("b", LiteralKind.String)]
                 ),
-                (_, args, _) => ValueTask.FromResult(true)
+                (_, _, _) => ValueTask.FromResult(true)
             );
         RuleCompiler<RuleTestContext> compiler = new(builder.Build());
 
