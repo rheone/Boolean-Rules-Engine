@@ -72,6 +72,13 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="11.0.100-rc.1.26425.128" />
   </ItemGroup>
+  <!-- NetArchTest - architecture-test-project-only, asserting the ADR-0004 package-boundary rules
+       (e.g. TruthWeaver.Abstractions has zero dependencies on the other TruthWeaver.* assemblies,
+       TruthWeaver.Predicates/Testing depend on Abstractions alone) as a build-time check rather than
+       something only a code reviewer notices. Not referenced by any shipping project. -->
+  <ItemGroup>
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+  </ItemGroup>
   <!-- BenchmarkDotNet - benchmarks-project-only (ticket: BenchmarkDotNet suite for compile and eval
        performance). Never referenced by src/ or shipped in any package; the benchmarks project is a
        throwaway console app that measures RuleCompiler/CompiledRule performance from outside the

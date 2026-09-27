@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>88933765-7203-4377-8f08-1c7d4b00eb27</ProjectGuid>
+    <IsTestProject>true</IsTestProject>
+    <!-- CS1591 (missing XML doc comment) still fires here even though Directory.Build.targets sets
+         GenerateDocumentationFile=false for .Tests projects; test method names are the documentation
+         (standard xUnit convention - CLAUDE.md's own SA1600/SA1633 suppression applies the same logic
+         to production code), so this is suppressed explicitly rather than chased further. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Every shipping project, referenced purely so this project's own build forces them all to build
+       first and so NetArchTest can load each assembly by type instead of a brittle on-disk path. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/TruthWeaver.Abstractions/TruthWeaver.Abstractions.csproj" />
+    <ProjectReference Include="../../src/TruthWeaver/TruthWeaver.csproj" />
+    <ProjectReference Include="../../src/TruthWeaver.Yaml/TruthWeaver.Yaml.csproj" />
+    <ProjectReference Include="../../src/TruthWeaver.Predicates/TruthWeaver.Predicates.csproj" />
+    <ProjectReference Include="../../src/TruthWeaver.Testing/TruthWeaver.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+</Project>

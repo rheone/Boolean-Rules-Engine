@@ -16,6 +16,12 @@
     <Project Name="TruthWeaver.Predicates.Tests" Configuration="Release|AnyCPU" Build="true" />
     <Project Name="TruthWeaver.Testing.Tests" Configuration="Debug|AnyCPU" Build="true" />
     <Project Name="TruthWeaver.Testing.Tests" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Abstractions.Tests" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Abstractions.Tests" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Yaml.Tests" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Yaml.Tests" Configuration="Release|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Architecture.Tests" Configuration="Debug|AnyCPU" Build="true" />
+    <Project Name="TruthWeaver.Architecture.Tests" Configuration="Release|AnyCPU" Build="true" />
     <Project Name="TruthWeaver.Benchmarks" Configuration="Debug|AnyCPU" Build="true" />
     <Project Name="TruthWeaver.Benchmarks" Configuration="Release|AnyCPU" Build="true" />
   </Solution>
@@ -27,5 +33,8 @@
   <Project Path="tests\TruthWeaver.Tests\TruthWeaver.Tests.csproj" />
   <Project Path="tests\TruthWeaver.Predicates.Tests\TruthWeaver.Predicates.Tests.csproj" />
   <Project Path="tests\TruthWeaver.Testing.Tests\TruthWeaver.Testing.Tests.csproj" />
+  <Project Path="tests\TruthWeaver.Abstractions.Tests\TruthWeaver.Abstractions.Tests.csproj" />
+  <Project Path="tests\TruthWeaver.Yaml.Tests\TruthWeaver.Yaml.Tests.csproj" />
+  <Project Path="tests\TruthWeaver.Architecture.Tests\TruthWeaver.Architecture.Tests.csproj" />
   <Project Path="benchmarks\TruthWeaver.Benchmarks\TruthWeaver.Benchmarks.csproj" />
 </Solution>
