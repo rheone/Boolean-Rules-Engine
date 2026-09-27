@@ -51,6 +51,41 @@ public sealed class LoggingTests
     }
 
     [Fact]
+    public void Compiling_a_rule_with_a_warning_diagnostic_logs_at_warning_level()
+    {
+        ILogger<RuleCompiler<RuleTestContext>> logger = CreateEnabledLogger();
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("a", true).Build(),
+            logger: logger
+        );
+
+        compiler.Compile("a AND NOT a");
+
+        LoggerTestExtensions.LoggedCall call = Assert.Single(logger.GetLoggedCalls());
+        Assert.Equal(LogLevel.Warning, call.Level);
+        Assert.Equal(DiagnosticCodes.StructuralContradiction, call.Field("Code"));
+        Assert.Equal(DiagnosticSeverity.Warning, call.Field("Severity"));
+    }
+
+    [Fact]
+    public void Compiling_a_rule_with_an_info_diagnostic_logs_at_information_level()
+    {
+        ILogger<RuleCompiler<RuleTestContext>> logger = CreateEnabledLogger();
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("a", true).AddConstant("b", true).Build(),
+            new CompilerOptions(MaxAnalysisTerms: 1),
+            logger: logger
+        );
+
+        compiler.Compile("a AND NOT a AND b");
+
+        LoggerTestExtensions.LoggedCall call = Assert.Single(logger.GetLoggedCalls());
+        Assert.Equal(LogLevel.Information, call.Level);
+        Assert.Equal(DiagnosticCodes.AnalysisSkippedTooManyTerms, call.Field("Code"));
+        Assert.Equal(DiagnosticSeverity.Info, call.Field("Severity"));
+    }
+
+    [Fact]
     public void Rule_swap_notification_logs_a_distinct_structured_event()
     {
         ILogger<RuleCompiler<RuleTestContext>> logger = CreateEnabledLogger();
