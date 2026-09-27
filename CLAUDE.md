@@ -5,7 +5,8 @@
 This repository contains the **TruthWeaver** C# library.
 
 Target framework: `net11.0`
-Pinned SDK: `11.0.100-rc.1.26425.128` (see `global.json`)
+Minimum SDK: `11.0.100-rc.1.26425.128`, rolling forward to any later major
+SDK, including preview/RC (see `global.json`)
 
 The repository uses:
 

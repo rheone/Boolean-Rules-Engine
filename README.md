@@ -19,7 +19,10 @@ anything else.
 <details>
 <summary><strong>Table of contents</strong></summary>
 
+- [Requirements](#requirements)
 - [Getting started](#getting-started)
+- [Features](#features)
+- [A tour of the codebase](#a-tour-of-the-codebase)
 - [What it is (and isn't)](#what-it-is-and-isnt)
 - [Operators](#operators)
   - [Order of operations](#order-of-operations)
@@ -33,16 +36,24 @@ anything else.
   - [Converting between DSL, JSON, and YAML](#converting-between-dsl-json-and-yaml)
   - [`RuleBuilder` reference](#rulebuilder-reference)
   - [Describing a compiled rule](#describing-a-compiled-rule)
+  - [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram)
 - [Evaluation flow](#evaluation-flow)
 - [Compilation pipeline](#compilation-pipeline)
-- [Feature highlights](#feature-highlights)
 - [Glossary](#glossary)
 - [Appendix: Truth tables](#appendix-truth-tables)
 - [Benchmarks](#benchmarks)
 - [Design documents](#design-documents)
-- [Repository layout](#repository-layout)
+- [License](#license)
 
 </details>
+
+## Requirements
+
+Building from source needs at least the SDK version floor in
+[`global.json`](global.json) — currently `11.0.100-rc.1.26425.128` — but
+`rollForward: latestMajor` with `allowPrerelease: true` means any later
+major .NET SDK on the machine, preview or RC included, is accepted. This
+isn't a pin to that exact patch.
 
 ## Getting started
 
@@ -96,9 +107,156 @@ anything else.
    ```
 
 That's the whole lifecycle: implement → register → compile once → evaluate
-many times. The [Examples](#examples) section below builds up from here to
-named arguments, the full operator set, and the full ADR-0003 worked example
-in DSL, JSON, and YAML.
+many times. [A tour of the codebase](#a-tour-of-the-codebase) below maps
+that lifecycle onto the actual folders, and [Examples](#examples) builds up
+from here to named arguments, the full operator set, and the full ADR-0003
+worked example in DSL, JSON, and YAML.
+
+## Features
+
+- **Kleene three-valued logic.** Every operator follows the three-valued
+  truth tables in [ADR-0001](docs/adr/0001-kleene-failure-model.md) (full
+  tables: [Appendix](#appendix-truth-tables)) — a predicate fault becomes
+  `Unknown`, never a thrown exception or a silently coerced `false`. Entry
+  point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
+- **Per-evaluation memoization.** A term referenced from multiple branches
+  of the same rule is invoked at most once per evaluation, keyed by
+  structural term identity (see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
+  Entry point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
+- **A BDD-based analyzer**, not brute-force truth tables, flags structurally
+  constant or contradictory sub-expressions (e.g.
+  `hasRole(role: "Y") AND NOT hasRole(role: "Y")`) as compile diagnostics.
+  Entry point: [`Analyzer`](src/TruthWeaver/Analysis/Analyzer.cs) and
+  [`BddManager`](src/TruthWeaver/Analysis/BddManager.cs).
+- **Resource limits and `CompilationMode.Lenient`.** `CompilerOptions`
+  bounds tree depth, node count, and the analyzer's term cap so an
+  admin-authored rule can't hang a request thread; `Lenient` mode compiles
+  an unregistered predicate to a permanent `Unknown` term instead of an
+  error. Entry point: [`CompilerOptions`](src/TruthWeaver/Compilation/CompilerOptions.cs).
+- **`EvaluationOptions`**: an opt-in `FaultBudget` for fail-fast behavior
+  during a known outage, an `Exhaustive` mode that runs every reachable term
+  without changing the result, and an overall evaluation timeout linked into
+  the caller's `CancellationToken`. Entry point:
+  [`EvaluationOptions`](src/TruthWeaver/Evaluation/EvaluationOptions.cs).
+- **Scoped DI resolution.** Class-based predicates resolve fresh from the
+  `IServiceProvider` supplied to each evaluation call, so a predicate with a
+  scoped dependency works correctly even though a `CompiledRule<TContext>`
+  is long-lived and shared. Entry point:
+  [`TruthWeaverServiceCollectionExtensions`](src/TruthWeaver/DependencyInjection/TruthWeaverServiceCollectionExtensions.cs).
+- **Structured logging and metrics.** Faults, compile diagnostics, and
+  rule-swap notifications log as structured events through `ILogger<T>`; a
+  `"TruthWeaver"` `Meter` exposes counters for evaluations, faults, and
+  compile diagnostics, observable through OpenTelemetry's `AddMeter` with no
+  new dependency. Entry points: [`src/TruthWeaver/Logging`](src/TruthWeaver/Logging)
+  and [`TruthWeaverMetrics`](src/TruthWeaver/Metrics/TruthWeaverMetrics.cs).
+- **Structural rule diffing.** `RuleDiff.Compare` compares two compiled
+  rules and reports which operator, term, or constant nodes were added,
+  removed, or changed, each located by operand-index path and paired with a
+  human-readable description — useful for "what did this edit actually
+  change" tooling. Entry point:
+  [`RuleDiff`](src/TruthWeaver/Diffing/RuleDiff.cs).
+- **Diagram rendering.** A compiled rule renders as a Mermaid flowchart,
+  optionally colored by one evaluation's result and short-circuit path — see
+  [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram). Entry
+  point: [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs).
+- **Ready-made predicates.** `TruthWeaver.Predicates` ships generic
+  string-comparison, null/empty, set-equality, and regex-matching predicate
+  factories so common checks don't need a hand-written class. Entry point:
+  [`src/TruthWeaver.Predicates`](src/TruthWeaver.Predicates).
+- **Test support.** `TruthWeaver.Testing` ships fluent `Decision`
+  assertions and fake/scripted predicate factories (fixed answer, simulated
+  fault, sequenced answers) for testing without a hand-written
+  `IPredicate<TContext>` per test. Entry point:
+  [`src/TruthWeaver.Testing`](src/TruthWeaver.Testing).
+
+## A tour of the codebase
+
+The five `src` projects mirror the rule lifecycle from
+[Getting started](#getting-started): a predicate-implementing service only
+needs the zero-dependency kernel, while a rule-authoring host pulls in the
+parser, compiler, analyzer, and evaluator.
+
+```mermaid
+flowchart TD
+    subgraph Kernel["TruthWeaver.Abstractions — the zero-dependency kernel"]
+        IPredicate["IPredicate&lt;TContext&gt;, PredicateSchema"]
+        Types["TruthValue, Decision, Fault, Trace"]
+    end
+
+    subgraph Core["TruthWeaver — parse, compile, analyze, evaluate"]
+        direction TB
+        Parsing["Parsing<br/>DSL lexer + parser"]
+        Ast["Ast<br/>Expression tree, operator metadata"]
+        Compilation["Compilation<br/>RuleCompiler, CompilerOptions"]
+        Analysis["Analysis<br/>BddManager, constant/contradiction analyzer"]
+        Building["Building<br/>RuleBuilder (assemble without text)"]
+        Registry["Registry<br/>PredicateRegistry(Builder)"]
+        Evaluation["Evaluation<br/>Evaluator, CompiledRule, EvaluationOptions"]
+        Diagnostics["Diagnostics<br/>Diagnostic, DiagnosticSeverity"]
+        Json["Json<br/>JSON tree parser/printer + schema"]
+        Printing["Printing<br/>CanonicalPrinter, MermaidTreePrinter"]
+        Diffing["Diffing<br/>RuleDiff, RuleDiffPrinter"]
+        Logging["Logging<br/>structured log events"]
+        Metrics["Metrics<br/>TruthWeaverMetrics (Meter)"]
+        DI["DependencyInjection<br/>AddTruthWeaver extension"]
+
+        Parsing --> Ast
+        Building --> Ast
+        Json --> Ast
+        Ast --> Compilation
+        Compilation --> Analysis
+        Compilation --> Registry
+        Analysis --> Diagnostics
+        Compilation --> Diagnostics
+        Ast --> Evaluation
+        Ast --> Printing
+        Ast --> Diffing
+    end
+
+    subgraph YamlPkg["TruthWeaver.Yaml"]
+        Yaml["YAML tree parser/printer"]
+    end
+
+    subgraph Extras["Optional add-ons"]
+        Predicates["TruthWeaver.Predicates<br/>ready-made IPredicate implementations"]
+        Testing["TruthWeaver.Testing<br/>Decision assertions, fake predicates"]
+    end
+
+    Core --> Kernel
+    YamlPkg --> Core
+    Predicates --> Kernel
+    Testing --> Kernel
+```
+
+Starting points for common tasks:
+
+| Task | Start here |
+| --- | --- |
+| Implement a new predicate | [`IPredicate<TContext>`](src/TruthWeaver.Abstractions/IPredicate.cs), or a factory in [`TruthWeaver.Predicates`](src/TruthWeaver.Predicates) if it's a generic string/collection/regex check |
+| Register predicates and compile a rule | [`PredicateRegistryBuilder`](src/TruthWeaver/Registry/PredicateRegistryBuilder.cs), [`RuleCompiler`](src/TruthWeaver/Compilation/RuleCompiler.cs) |
+| Understand DSL parsing | [`Lexer`](src/TruthWeaver/Parsing/Lexer.cs) → [`DslParser`](src/TruthWeaver/Parsing/DslParser.cs) |
+| Understand the compiled tree shape | [`Expression`](src/TruthWeaver/Ast/Expression.cs) |
+| Understand constant/contradiction detection | [`BddManager`](src/TruthWeaver/Analysis/BddManager.cs), [`Analyzer`](src/TruthWeaver/Analysis/Analyzer.cs) |
+| Understand evaluation and short-circuiting | [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs), [`CompiledRule`](src/TruthWeaver/Evaluation/CompiledRule.cs) |
+| Assemble a rule without hand-writing text | [`RuleBuilder`](src/TruthWeaver/Building/RuleBuilder.cs) |
+| Print or diagram a compiled rule | [`CanonicalPrinter`](src/TruthWeaver/Printing/CanonicalPrinter.cs), [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs) |
+| Diff two compiled rules | [`RuleDiff`](src/TruthWeaver/Diffing/RuleDiff.cs) |
+| Wire into a DI container | [`TruthWeaverServiceCollectionExtensions`](src/TruthWeaver/DependencyInjection/TruthWeaverServiceCollectionExtensions.cs) |
+| Compile JSON or YAML instead of the DSL | [`JsonTreeParser`](src/TruthWeaver/Json/JsonTreeParser.cs), [`YamlTreeParser`](src/TruthWeaver.Yaml/YamlTreeParser.cs) |
+| Write a unit test against a `Decision` | [`DecisionAssertions`](src/TruthWeaver.Testing/DecisionAssertions.cs), [`FakePredicates`](src/TruthWeaver.Testing/FakePredicates.cs) |
+
+Beyond `src`, the rest of the repository:
+
+- [`tests/TruthWeaver.Tests`](tests/TruthWeaver.Tests) — unit tests for all
+  five packages, one file per behavior area (parsing, compilation,
+  evaluation, memoization, YAML/JSON round-tripping, diffing, and so on).
+- [`benchmarks/TruthWeaver.Benchmarks`](benchmarks/TruthWeaver.Benchmarks) —
+  a BenchmarkDotNet suite measuring compile-time and evaluation-time cost
+  (dev-only; see [Benchmarks](#benchmarks)).
+- [`docs/adr/`](docs/adr/) — the architecture decision records behind every
+  major design choice.
+- [`CONTEXT.md`](CONTEXT.md) — the domain vocabulary and conceptual model,
+  kept in sync with the code.
 
 ## What it is (and isn't)
 
@@ -183,8 +341,10 @@ Every operator above follows the three-valued Kleene truth tables in
 | Package | Depends on | Ships |
 | --- | --- | --- |
 | `TruthWeaver.Abstractions` | *(nothing third-party)* | `IPredicate<TContext>`, `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault` — everything a predicate-implementing service needs. |
-| `TruthWeaver` | `Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions` | The DSL parser, `RuleCompiler<TContext>`, `CompiledRule<TContext>`, the BDD-based analyzer, the evaluator, `System.Text.Json` tree support, and DI registration extensions. |
+| `TruthWeaver` | `Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions` | The DSL parser, `RuleCompiler<TContext>`, `CompiledRule<TContext>`, the BDD-based analyzer, the evaluator, `System.Text.Json` tree support, printing/diffing, and DI registration extensions. |
 | `TruthWeaver.Yaml` | `TruthWeaver`, YamlDotNet | YAML tree support (`CompileYaml`/`PrintYaml`), isolated so a consumer with no interest in YAML never pulls in YamlDotNet. |
+| `TruthWeaver.Predicates` | `TruthWeaver.Abstractions` | Ready-made generic `IPredicate<TContext>` factories — string comparison, null/empty, set equality, regex matching — for a consumer that wants common checks without writing a class, and without acquiring the parser, compiler, or analyzer. |
+| `TruthWeaver.Testing` | `TruthWeaver.Abstractions` | Fluent `Decision` assertions and fake/scripted predicate factories for tests, without a hand-written `IPredicate<TContext>` per test. |
 
 ```mermaid
 flowchart LR
@@ -207,12 +367,24 @@ flowchart LR
         Yaml["YAML tree support"]
     end
 
+    subgraph PredicatesPkg["TruthWeaver.Predicates"]
+        ReadyMade["Ready-made predicate factories"]
+    end
+
+    subgraph TestingPkg["TruthWeaver.Testing"]
+        Assertions["Decision assertions + fake predicates"]
+    end
+
     Core --> Abstractions
     YamlPkg --> Core
+    PredicatesPkg --> Abstractions
+    TestingPkg --> Abstractions
 
     App["Predicate-implementing service"] -.->|"references only"| Abstractions
     Host["Rule-authoring / evaluation host"] -->|"references"| Core
     Host -.->|"optional"| YamlPkg
+    Host -.->|"optional"| PredicatesPkg
+    Host -.->|"optional, test projects only"| TestingPkg
 ```
 
 A service that only *implements* domain predicates references
@@ -264,6 +436,12 @@ class resolved from DI).
 | Lambda, 1 arg | one | stateless delegate with a 1-argument schema | The common case — a stateless check parameterized by the rule text, e.g. `hasRole(role: "Y")`. |
 | Class-based (DI), 0 args | none | `IPredicate<TContext>` | Needs a scoped/injected dependency but no rule-authored parameter. |
 | Class-based (DI), n args | several | `IPredicate<TContext>` with a multi-argument schema | Needs both rule-authored parameters *and* one or more injected dependencies. |
+
+Before writing one by hand, check whether
+[`TruthWeaver.Predicates`](src/TruthWeaver.Predicates) already has it —
+`StringPredicates`, `CollectionPredicates`, and `RegexPredicates` cover
+string comparison, null/empty checks, set equality, and regex matching as
+generic factories parameterized by a value selector.
 
 ### 0 arguments, stateless lambda
 
@@ -695,6 +873,10 @@ slow to match (catastrophic backtracking), and a predicate is exactly where
 that risk should be contained, rather than letting it stall evaluation for
 every rule that reaches this term.
 
+`RegexPredicates` in [`TruthWeaver.Predicates`](src/TruthWeaver.Predicates)
+already wraps this pattern with the same timeout discipline, if a
+hand-written predicate isn't needed.
+
 ### Bonus: explaining a denied decision
 
 `Decision`/`Fault`/`Trace` give you the *structured* reason for a denial;
@@ -718,73 +900,6 @@ if (!decision.IsSatisfied && decision.Faults.Count > 0)
     }
 }
 ```
-
-## Evaluation flow
-
-```mermaid
-flowchart TD
-    Start(["Evaluate(context, ct)"]) --> Visit["Visit next operand<br/>(left to right)"]
-    Visit --> IsTerm{"Term or operator?"}
-
-    IsTerm -->|"Term"| Memo{"Already evaluated<br/>this term identity<br/>in this evaluation?"}
-    Memo -->|"Yes"| Reuse["Reuse memoized TruthValue"]
-    Memo -->|"No"| Invoke["Invoke predicate"]
-
-    Invoke -->|"success"| Record["Memoize TruthValue"]
-    Invoke -->|"throws"| Fault["Record Fault →<br/>treat as Unknown"]
-
-    Reuse --> Combine
-    Record --> Combine
-    Fault --> Combine["Combine via operator's<br/>Kleene truth table"]
-
-    IsTerm -->|"Operator"| Combine
-
-    Combine --> ShortCircuit{"Result already<br/>determinate?<br/>(short-circuit)"}
-    ShortCircuit -->|"Yes"| SkipRest["Mark remaining operands<br/>NotEvaluated in trace"]
-    ShortCircuit -->|"No, more operands"| Visit
-
-    SkipRest --> Done
-    ShortCircuit -->|"No operands remain"| Done(["Decision<br/>(TruthValue + Faults + Trace)"])
-```
-
-Short-circuit is real (an `AND` stops at the first `False`, an `OR` stops at
-the first `True`) but the trace still records what was skipped, rather than
-omitting it — the point of a trace is to explain a decision, and a hole
-where an unevaluated branch should be defeats that. Faults don't abort
-evaluation; they become `Unknown` and are absorbed wherever the operator's
-truth table allows. Full reasoning: [ADR-0001](docs/adr/0001-kleene-failure-model.md)
-and [ADR-0002](docs/adr/0002-evaluation-semantics.md).
-
-## Compilation pipeline
-
-Rule text — DSL, JSON, or YAML — all funnel through the same
-Parse → Validate → Analyze → Build pipeline, which is why
-`parse(print(x))` round-trips structurally regardless of which surface a
-rule came from:
-
-```mermaid
-flowchart TD
-    Source["Rule text<br/>(DSL, JSON, or YAML)"] --> Parse[Parse]
-    Parse -->|"syntax error"| Diag1[["Diagnostics<br/>(Error)"]]
-    Parse -->|"raw tree"| Validate["Validate<br/>(known predicates, argument schema,<br/>depth/node limits, CompilerOptions)"]
-    Validate -->|"validation error"| Diag2[["Diagnostics<br/>(Error / Warning / Info)"]]
-    Validate -->|"valid tree"| Analyze["Analyze<br/>(BDD-based constant/contradiction detection)"]
-    Analyze --> Diag3[["Diagnostics<br/>(Warning / Info)"]]
-    Analyze --> Build["Build immutable expression tree"]
-    Build --> Result["CompilationResult&lt;TContext&gt;<br/>CompiledRule&lt;TContext&gt;? + Diagnostics"]
-
-    Diag1 --> Result
-    Diag2 --> Result
-    Diag3 --> Result
-```
-
-`Compile` never throws for an authoring error — every problem, from a
-syntax error to a structural tautology, becomes a `Diagnostic` (code,
-severity, source span) in the returned `CompilationResult<TContext>`.
-`CompiledRule<TContext>` is populated only when there are no `Error`-severity
-diagnostics, which is what makes "a bad edit is rejected, the previously
-persisted rule stays active" true by construction rather than by convention.
-Full reasoning: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
 
 ## Building rules programmatically
 
@@ -871,43 +986,96 @@ void Print(RuleDescription node, int depth = 0)
 }
 ```
 
-## Feature highlights
+### Rendering a rule as a diagram
 
-- **Kleene three-valued logic.** Every operator — `AND`/`OR`/`NOT`/`XOR`/
-  `XNOR`/`ExactlyOne`/the threshold family — follows the three-valued truth
-  tables in [ADR-0001](docs/adr/0001-kleene-failure-model.md) (full tables:
-  [Appendix](#appendix-truth-tables)) — a predicate fault becomes `Unknown`,
-  never a thrown exception or a silently-coerced `false`.
-- **Per-evaluation memoization.** A term referenced from multiple branches
-  of the same rule is invoked at most once per evaluation, keyed by
-  structural term identity (predicate name + sorted, type-normalized
-  arguments — see [CONTEXT.md](CONTEXT.md#term-identity)).
-- **A BDD-based analyzer**, not brute-force truth tables, flags structurally
-  constant or contradictory sub-expressions (e.g.
-  `hasRole(role: "Y") AND NOT hasRole(role: "Y")`) as compile diagnostics.
-- **Resource limits and `CompilationMode.Lenient`.** `CompilerOptions`
-  bounds tree depth, node count, and the analyzer's term cap so an
-  admin-authored rule can't hang a request thread; `Lenient` mode compiles
-  an unregistered predicate to a permanent `Unknown` term instead of an
-  error, for services that share one rule store with different predicate
-  sets registered.
-- **`EvaluationOptions`**: an opt-in `FaultBudget` for fail-fast behavior
-  during a known outage, an `Exhaustive` mode that runs every reachable term
-  without changing the result (for "why was this denied" diagnostics), and
-  an overall evaluation timeout linked into the caller's
-  `CancellationToken`.
-- **Scoped DI resolution.** Class-based predicates resolve fresh from the
-  `IServiceProvider` supplied to each evaluation call, so a predicate with a
-  scoped dependency works correctly even though a `CompiledRule<TContext>`
-  is long-lived and shared.
-- **Structured logging.** Faults, compile diagnostics, and rule-swap
-  notifications log as structured events through `ILogger<T>` — never a
-  concrete provider.
-- **`System.Diagnostics.Metrics` instrumentation.** A `"TruthWeaver"`
-  `Meter` exposes counters for evaluations performed, faults recorded, and
-  compile diagnostics raised (tagged by severity) — observable through any
-  `MeterListener`-based collector, including OpenTelemetry's `AddMeter`, with
-  no new dependency.
+`RuleDescription` also feeds
+[`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs),
+which renders it as a Mermaid `flowchart` — structure only, or colored by
+one evaluation's result and short-circuit path:
+
+```csharp
+CompiledRule<User> rule = compiler.Compile("isManager AND hasRole(role: \"Y\")").CompiledRule!;
+RuleDescription description = rule.Describe();
+
+// Structure only:
+string mermaid = MermaidTreePrinter.Print(description);
+
+// Colored by one evaluation (green = contributed True, red = contributed False, gray = short-circuited):
+Decision decision = await rule.EvaluateAsync(user, serviceProvider, cancellationToken: ct);
+string coloredMermaid = MermaidTreePrinter.Print(description, decision.EvaluatedTree);
+```
+
+The result is plain Mermaid text — paste it into any Mermaid renderer, or
+hand it to a UI that already embeds one, to see the rule's structure (and
+optionally, why one particular evaluation came out the way it did) as a
+diagram instead of a nested expression.
+
+## Evaluation flow
+
+```mermaid
+flowchart TD
+    Start(["Evaluate(context, ct)"]) --> Visit["Visit next operand<br/>(left to right)"]
+    Visit --> IsTerm{"Term or operator?"}
+
+    IsTerm -->|"Term"| Memo{"Already evaluated<br/>this term identity<br/>in this evaluation?"}
+    Memo -->|"Yes"| Reuse["Reuse memoized TruthValue"]
+    Memo -->|"No"| Invoke["Invoke predicate"]
+
+    Invoke -->|"success"| Record["Memoize TruthValue"]
+    Invoke -->|"throws"| Fault["Record Fault →<br/>treat as Unknown"]
+
+    Reuse --> Combine
+    Record --> Combine
+    Fault --> Combine["Combine via operator's<br/>Kleene truth table"]
+
+    IsTerm -->|"Operator"| Combine
+
+    Combine --> ShortCircuit{"Result already<br/>determinate?<br/>(short-circuit)"}
+    ShortCircuit -->|"Yes"| SkipRest["Mark remaining operands<br/>NotEvaluated in trace"]
+    ShortCircuit -->|"No, more operands"| Visit
+
+    SkipRest --> Done
+    ShortCircuit -->|"No operands remain"| Done(["Decision<br/>(TruthValue + Faults + Trace)"])
+```
+
+Short-circuit is real (an `AND` stops at the first `False`, an `OR` stops at
+the first `True`) but the trace still records what was skipped, rather than
+omitting it — the point of a trace is to explain a decision, and a hole
+where an unevaluated branch should be defeats that. Faults don't abort
+evaluation; they become `Unknown` and are absorbed wherever the operator's
+truth table allows. Full reasoning: [ADR-0001](docs/adr/0001-kleene-failure-model.md)
+and [ADR-0002](docs/adr/0002-evaluation-semantics.md).
+
+## Compilation pipeline
+
+Rule text — DSL, JSON, or YAML — all funnel through the same
+Parse → Validate → Analyze → Build pipeline, which is why
+`parse(print(x))` round-trips structurally regardless of which surface a
+rule came from:
+
+```mermaid
+flowchart TD
+    Source["Rule text<br/>(DSL, JSON, or YAML)"] --> Parse[Parse]
+    Parse -->|"syntax error"| Diag1[["Diagnostics<br/>(Error)"]]
+    Parse -->|"raw tree"| Validate["Validate<br/>(known predicates, argument schema,<br/>depth/node limits, CompilerOptions)"]
+    Validate -->|"validation error"| Diag2[["Diagnostics<br/>(Error / Warning / Info)"]]
+    Validate -->|"valid tree"| Analyze["Analyze<br/>(BDD-based constant/contradiction detection)"]
+    Analyze --> Diag3[["Diagnostics<br/>(Warning / Info)"]]
+    Analyze --> Build["Build immutable expression tree"]
+    Build --> Result["CompilationResult&lt;TContext&gt;<br/>CompiledRule&lt;TContext&gt;? + Diagnostics"]
+
+    Diag1 --> Result
+    Diag2 --> Result
+    Diag3 --> Result
+```
+
+`Compile` never throws for an authoring error — every problem, from a
+syntax error to a structural tautology, becomes a `Diagnostic` (code,
+severity, source span) in the returned `CompilationResult<TContext>`.
+`CompiledRule<TContext>` is populated only when there are no `Error`-severity
+diagnostics, which is what makes "a bad edit is rejected, the previously
+persisted rule stays active" true by construction rather than by convention.
+Full reasoning: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
 
 ## Glossary
 
@@ -929,7 +1097,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `ExactlyOne(...)` | N-ary operator: true iff exactly one operand is true. The explicit name for "exactly one," so it's never confused with `XOR`'s binary-only meaning. |
 | Expression | The boolean tree itself — operators over terms and sub-expressions. What a `CompiledRule<TContext>` wraps. |
 | `Fault` | A record of one predicate failing to produce an answer during one evaluation: the faulting term's identity plus the exception. Faults are absorbed as `Unknown`, never rethrown. |
-| Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently-coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
+| Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
 | Operator | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, the threshold family, and the `true`/`false` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
 | `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`TruthWeaver.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
@@ -939,6 +1107,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `PredicateSchema` | A predicate's registered name, a required read-only `Label` and `Description`, and its named-argument declarations (each also carrying a required `Description`), validated against a term's arguments at compile time. |
 | `RuleBuilder` | A fluent API (`TruthWeaver.Building`) for assembling a rule tree from application logic without hand-writing DSL/JSON/YAML text; renders to the same JSON tree shape and compiles through the same `CompileJson` pipeline. See [Building rules programmatically](#building-rules-programmatically). |
 | `RuleDescription` | The recursive result of `CompiledRule<TContext>.Describe()`: a node's `Label`, `Description`, and its `Operands` described the same way — the "what does this rule mean" view of a compiled tree, without exposing the AST types themselves. See [Describing a compiled rule](#describing-a-compiled-rule). |
+| `RuleDiff` | Computes a structural diff between two compiled rules — which operator, term, or constant nodes were added, removed, or changed, located by operand-index path. See [Features](#features). |
 | Rule | A named unit of persistence: metadata plus one expression. What gets compiled into a `CompiledRule<TContext>`. |
 | Short-circuit | `AND` stops evaluating operands at the first `False`; `OR` stops at the first `True`. Skipped operands are recorded as `NotEvaluated` in the trace, not omitted. |
 | Term | A predicate bound to concrete, literal arguments (e.g. `hasRole(role: "Y")`) — the tree's leaf node, and the unit of memoization. |
@@ -1080,16 +1249,9 @@ dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- 
   why the library ships as three packages and how predicates and operators
   are extended.
 
-## Repository layout
+## License
 
-- `src/TruthWeaver.Abstractions` — the zero-dependency kernel
-- `src/TruthWeaver` — parser, compiler, analyzer, evaluator, JSON, DI
-- `src/TruthWeaver.Yaml` — YAML tree support
-- `tests/TruthWeaver.Tests` — unit tests for all three packages
-- `benchmarks/TruthWeaver.Benchmarks` — BenchmarkDotNet suite (dev-only, see
-  [Benchmarks](#benchmarks))
-- `docs/adr/` — architecture decision records
-- `CONTEXT.md` — domain vocabulary and model
+Apache License 2.0 — see [LICENSE](LICENSE).
 
 See [CLAUDE.md](CLAUDE.md) for development rules, required validation
 commands, and formatting/testing conventions.
