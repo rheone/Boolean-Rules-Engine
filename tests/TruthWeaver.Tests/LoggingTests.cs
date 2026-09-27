@@ -104,6 +104,22 @@ public sealed class LoggingTests
         Assert.NotEqual(0, call.EventId.Id);
     }
 
+    [Fact]
+    public void Rule_swap_notification_without_an_identifier_falls_back_to_unnamed()
+    {
+        ILogger<RuleCompiler<RuleTestContext>> logger = CreateEnabledLogger();
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().Build(),
+            logger: logger
+        );
+
+        compiler.NotifyRuleSwapped();
+
+        LoggerTestExtensions.LoggedCall call = Assert.Single(logger.GetLoggedCalls());
+        Assert.Equal(LogLevel.Information, call.Level);
+        Assert.Equal("(unnamed)", call.Field("RuleIdentifier"));
+    }
+
     private static ILogger<RuleCompiler<RuleTestContext>> CreateEnabledLogger()
     {
         ILogger<RuleCompiler<RuleTestContext>> logger = Substitute.For<ILogger<RuleCompiler<RuleTestContext>>>();
