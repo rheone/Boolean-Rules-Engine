@@ -16,12 +16,12 @@ under the new namespace.
 
 **Blocked by:** 02, 06
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `README.md` contains no `BooleanRulesEngine` string; all code samples compile
+- [x] `README.md` contains no `BooleanRulesEngine` string; all code samples compile
       conceptually against the renamed namespaces (spot-check by pasting one sample into a
       scratch file and building)
-- [ ] README's CI badge URL points at the renamed repository
-- [ ] `CONTEXT.md` refers to the project as TruthWeaver throughout
-- [ ] Both touched ADRs refer to the project as TruthWeaver, with no change to their
+- [x] README's CI badge URL points at the renamed repository
+- [x] `CONTEXT.md` refers to the project as TruthWeaver throughout
+- [x] Both touched ADRs refer to the project as TruthWeaver, with no change to their
       recorded decisions

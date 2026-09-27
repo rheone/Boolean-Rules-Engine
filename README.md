@@ -1,6 +1,6 @@
-# BooleanRulesEngine
+# TruthWeaver
 
-[![CI](https://github.com/rheone/Boolean-Rules-Engine/actions/workflows/ci.yml/badge.svg)](https://github.com/rheone/Boolean-Rules-Engine/actions/workflows/ci.yml)
+[![CI](https://github.com/rheone/TruthWeaver/actions/workflows/ci.yml/badge.svg)](https://github.com/rheone/TruthWeaver/actions/workflows/ci.yml)
 ![Status](https://img.shields.io/badge/status-proof%20of%20concept-orange)
 [![.NET](https://img.shields.io/badge/.NET-11.0-512BD4)](global.json)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -47,13 +47,13 @@ anything else.
 ## Getting started
 
 1. **Reference the packages you need.** A service that only *implements*
-   predicates references `BooleanRulesEngine.Abstractions`; a host that
-   authors and evaluates rules references `BooleanRulesEngine` (and
-   `BooleanRulesEngine.Yaml` if it wants YAML too). See
+   predicates references `TruthWeaver.Abstractions`; a host that
+   authors and evaluates rules references `TruthWeaver` (and
+   `TruthWeaver.Yaml` if it wants YAML too). See
    [Packages](#packages) below.
 
    ```xml
-   <ProjectReference Include="..\BooleanRulesEngine\BooleanRulesEngine.csproj" />
+   <ProjectReference Include="..\TruthWeaver\TruthWeaver.csproj" />
    ```
 
 2. **Implement a predicate.** A zero-argument predicate is the simplest
@@ -102,7 +102,7 @@ in DSL, JSON, and YAML.
 
 ## What it is (and isn't)
 
-`BooleanRulesEngine` answers one question: *is this expression true right
+`TruthWeaver` answers one question: *is this expression true right
 now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `XNOR`,
 `ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
 `LessThan`/`Exactly`), terms, and evaluation. It does not know about
@@ -182,19 +182,19 @@ Every operator above follows the three-valued Kleene truth tables in
 
 | Package | Depends on | Ships |
 | --- | --- | --- |
-| `BooleanRulesEngine.Abstractions` | *(nothing third-party)* | `IPredicate<TContext>`, `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault` — everything a predicate-implementing service needs. |
-| `BooleanRulesEngine` | `Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions` | The DSL parser, `RuleCompiler<TContext>`, `CompiledRule<TContext>`, the BDD-based analyzer, the evaluator, `System.Text.Json` tree support, and DI registration extensions. |
-| `BooleanRulesEngine.Yaml` | `BooleanRulesEngine`, YamlDotNet | YAML tree support (`CompileYaml`/`PrintYaml`), isolated so a consumer with no interest in YAML never pulls in YamlDotNet. |
+| `TruthWeaver.Abstractions` | *(nothing third-party)* | `IPredicate<TContext>`, `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault` — everything a predicate-implementing service needs. |
+| `TruthWeaver` | `Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions` | The DSL parser, `RuleCompiler<TContext>`, `CompiledRule<TContext>`, the BDD-based analyzer, the evaluator, `System.Text.Json` tree support, and DI registration extensions. |
+| `TruthWeaver.Yaml` | `TruthWeaver`, YamlDotNet | YAML tree support (`CompileYaml`/`PrintYaml`), isolated so a consumer with no interest in YAML never pulls in YamlDotNet. |
 
 ```mermaid
 flowchart LR
-    subgraph Abstractions["BooleanRulesEngine.Abstractions<br/>(zero third-party dependencies)"]
+    subgraph Abstractions["TruthWeaver.Abstractions<br/>(zero third-party dependencies)"]
         IPredicate["IPredicate&lt;TContext&gt;"]
         Schema["PredicateSchema / PredicateArguments"]
         Truth["TruthValue / Decision / Fault"]
     end
 
-    subgraph Core["BooleanRulesEngine"]
+    subgraph Core["TruthWeaver"]
         Parser["DSL parser"]
         Compiler["RuleCompiler&lt;TContext&gt;"]
         Analyzer["Analyzer (BDD)"]
@@ -203,7 +203,7 @@ flowchart LR
         DI["DI registration extensions"]
     end
 
-    subgraph YamlPkg["BooleanRulesEngine.Yaml"]
+    subgraph YamlPkg["TruthWeaver.Yaml"]
         Yaml["YAML tree support"]
     end
 
@@ -231,7 +231,7 @@ write and read each one:
 | --- | --- | --- | --- |
 | **Canonical / persisted form?** | Yes — this is what a `CompiledRule<TContext>` prints back to. | No — an interchange format. | No — an interchange format. |
 | **Best for** | A human author or reviewer typing/reading a rule directly (a database column, a code review, a log line). | A UI rule builder generating or consuming a tree without writing a parser. | The same as JSON, when the host's tooling already prefers YAML (config files, GitOps). |
-| **Package** | `BooleanRulesEngine` | `BooleanRulesEngine` | `BooleanRulesEngine.Yaml` |
+| **Package** | `TruthWeaver` | `TruthWeaver` | `TruthWeaver.Yaml` |
 | **Compile with** | `compiler.Compile(text)` | `compiler.CompileJson(json)` | `compiler.CompileYaml(yaml)` |
 | **Print with** | `rule.CanonicalText` | `rule.PrintJson()` | `rule.PrintYaml()` |
 | **Round-trips losslessly?** | Yes, by definition. | Yes — `parse(print(x))` is structurally equal to `x` (ticket 07). | Yes — same guarantee (ticket 08). |
@@ -330,7 +330,7 @@ Used in a rule as `hasEnoughRecentApprovals(minCount: 2, withinHours: 24)`.
 evaluation because the predicate itself is resolved fresh from
 `IServiceProvider`, not constructed once at registration.
 
-Wiring it up: **`AddBooleanRulesEngine` registers the registry and compiler,
+Wiring it up: **`AddTruthWeaver` registers the registry and compiler,
 not the predicate types themselves** — a class-based predicate (and its own
 dependencies) must be registered in the host's container separately, same
 as any other DI service:
@@ -341,7 +341,7 @@ services.AddSingleton(TimeProvider.System);
 services.AddScoped<HasEnoughRecentApprovals>();      // the predicate type itself
 services.AddScoped<IsManager>();
 
-services.AddBooleanRulesEngine<Resource>(builder => builder
+services.AddTruthWeaver<Resource>(builder => builder
     .Add<IsManager>()
     .Add<HasEnoughRecentApprovals>());
 ```
@@ -475,7 +475,7 @@ The same rule as JSON:
 }
 ```
 
-...and in YAML (`BooleanRulesEngine.Yaml`):
+...and in YAML (`TruthWeaver.Yaml`):
 
 ```yaml
 op: and
@@ -548,7 +548,7 @@ predicate with a scoped dependency such as a `DbContext`. `hasRole`/
 Wiring into a host's DI container instead of constructing things by hand:
 
 ```csharp
-services.AddBooleanRulesEngine<User>(builder => builder
+services.AddTruthWeaver<User>(builder => builder
     .Add<IsManager>()
     .Add<IsDepartmentHead>());
 ```
@@ -562,7 +562,7 @@ from application logic (e.g. a dynamically assembled list of conditions)
 rather than an author typing it directly:
 
 ```csharp
-using BooleanRulesEngine.Building;
+using TruthWeaver.Building;
 
 RuleBuilder rule = RuleBuilder.And(
     RuleBuilder.Predicate("hasRole", ("role", "Y")),
@@ -660,7 +660,7 @@ single-argument predicates already shown). Whether the constant(s) come
 from a `LiteralKind.String`, `Int64`, `Decimal`, `Boolean`, `DateTimeOffset`,
 or `Guid` argument (scalar or array) is purely a schema choice — the
 compiler validates and converts each one identically (see
-[Guid literal tests](tests/BooleanRulesEngine.Tests/GuidLiteralTests.cs)
+[Guid literal tests](tests/TruthWeaver.Tests/GuidLiteralTests.cs)
 for a worked `Guid` example).
 
 **"Matches a pattern" instead of "matches a fixed set"** is the same idea
@@ -798,7 +798,7 @@ tree itself is format-specific:
 CompiledRule<User> rule = compiler.Compile(dslText).CompiledRule!;
 
 string json = rule.PrintJson();                       // DSL -> JSON
-string yaml = rule.PrintYaml();                        // DSL -> YAML (BooleanRulesEngine.Yaml)
+string yaml = rule.PrintYaml();                        // DSL -> YAML (TruthWeaver.Yaml)
 
 CompiledRule<User> fromJson = compiler.CompileJson(json).CompiledRule!;
 string backToDsl = fromJson.CanonicalText;              // JSON -> DSL
@@ -816,7 +816,7 @@ anything but the format it's currently editing.
 
 [Example 6](#6-the-same-rule-assembled-with-rulebuilder-instead-of-text)
 shows `RuleBuilder` end to end. Every operator has a matching static factory
-on `BooleanRulesEngine.Building.RuleBuilder`:
+on `TruthWeaver.Building.RuleBuilder`:
 
 | Operator | Factory method |
 | --- | --- |
@@ -842,7 +842,7 @@ compiling it immediately.
 Every predicate carries a required `Label`/`Description` on its
 `PredicateSchema` ([Predicate types](#predicate-types)); every operator has
 the equivalent, exposed via `OperatorInfo.Describe` in
-`BooleanRulesEngine.Ast`. `CompiledRule<TContext>.Describe()` combines both
+`TruthWeaver.Ast`. `CompiledRule<TContext>.Describe()` combines both
 into one recursive, walkable description of an entire compiled rule —
 useful for a rule-authoring UI or a generated "what does this rule mean"
 report, without needing access to the closed-set AST types themselves:
@@ -903,7 +903,7 @@ void Print(RuleDescription node, int depth = 0)
 - **Structured logging.** Faults, compile diagnostics, and rule-swap
   notifications log as structured events through `ILogger<T>` — never a
   concrete provider.
-- **`System.Diagnostics.Metrics` instrumentation.** A `"BooleanRulesEngine"`
+- **`System.Diagnostics.Metrics` instrumentation.** A `"TruthWeaver"`
   `Meter` exposes counters for evaluations performed, faults recorded, and
   compile diagnostics raised (tagged by severity) — observable through any
   `MeterListener`-based collector, including OpenTelemetry's `AddMeter`, with
@@ -932,12 +932,12 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently-coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
 | Operator | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, the threshold family, and the `true`/`false` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
-| `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`BooleanRulesEngine.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
+| `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`TruthWeaver.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
 | Predicate | A registered, reusable implementation (e.g. `hasRole`, `isManager`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Label` and `Description`; see [Predicate types](#predicate-types). |
 | `PredicateArguments` | The non-generic accessor (`GetString`, `GetInt64`, ...) a predicate uses to read its own term's arguments inside `EvaluateAsync`. |
 | `PredicateRegistry<TContext>` | Where predicates are registered under a name, with their `PredicateSchema`. Built once via `PredicateRegistryBuilder<TContext>`; no attribute or assembly scanning. `TryGetSchema` looks one up by name. |
 | `PredicateSchema` | A predicate's registered name, a required read-only `Label` and `Description`, and its named-argument declarations (each also carrying a required `Description`), validated against a term's arguments at compile time. |
-| `RuleBuilder` | A fluent API (`BooleanRulesEngine.Building`) for assembling a rule tree from application logic without hand-writing DSL/JSON/YAML text; renders to the same JSON tree shape and compiles through the same `CompileJson` pipeline. See [Building rules programmatically](#building-rules-programmatically). |
+| `RuleBuilder` | A fluent API (`TruthWeaver.Building`) for assembling a rule tree from application logic without hand-writing DSL/JSON/YAML text; renders to the same JSON tree shape and compiles through the same `CompileJson` pipeline. See [Building rules programmatically](#building-rules-programmatically). |
 | `RuleDescription` | The recursive result of `CompiledRule<TContext>.Describe()`: a node's `Label`, `Description`, and its `Operands` described the same way — the "what does this rule mean" view of a compiled tree, without exposing the AST types themselves. See [Describing a compiled rule](#describing-a-compiled-rule). |
 | Rule | A named unit of persistence: metadata plus one expression. What gets compiled into a `CompiledRule<TContext>`. |
 | Short-circuit | `AND` stops evaluating operands at the first `False`; `OR` stops at the first `True`. Skipped operands are recorded as `NotEvaluated` in the trace, not omitted. |
@@ -1030,7 +1030,7 @@ are covered by the evaluator's behavior described in
 
 ## Benchmarks
 
-`benchmarks/BooleanRulesEngine.Benchmarks` is a [BenchmarkDotNet](https://benchmarkdotnet.org/)
+`benchmarks/TruthWeaver.Benchmarks` is a [BenchmarkDotNet](https://benchmarkdotnet.org/)
 console project (dev-only — never packed, never referenced by `src/`) measuring:
 
 - **Compile-time cost** (`CompileBenchmarks.Compile`) — `RuleCompiler.CompileJson`'s full
@@ -1041,28 +1041,28 @@ console project (dev-only — never packed, never referenced by `src/`) measurin
   per-evaluation term memoization ADR-0002 describes.
 
 A committed baseline (captured with `--job Short`) lives at
-[`benchmarks/BooleanRulesEngine.Benchmarks/results/baseline-results.md`](benchmarks/BooleanRulesEngine.Benchmarks/results/baseline-results.md).
+[`benchmarks/TruthWeaver.Benchmarks/results/baseline-results.md`](benchmarks/TruthWeaver.Benchmarks/results/baseline-results.md).
 
 Run the full suite (this repo's `net11.0` preview target isn't yet recognized by BenchmarkDotNet's
 default toolchain, so `--inProcess` is required — see the code comment on `CompileBenchmarks`/
 `EvaluationBenchmarks`' host project for why):
 
 ```powershell
-dotnet build benchmarks/BooleanRulesEngine.Benchmarks -c Release
-dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --filter "*" --inProcess
+dotnet build benchmarks/TruthWeaver.Benchmarks -c Release
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --inProcess
 ```
 
 Useful variations:
 
 ```powershell
 # Discover benchmark names without running them
-dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --list flat
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --list flat
 
 # Fast smoke test (one iteration per case, no meaningful measurement)
-dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --filter "*" --job Dry --inProcess
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --job Dry --inProcess
 
 # Regenerate the committed baseline
-dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --filter "*" --job Short --inProcess --exporters github --artifacts ./benchmarks/BooleanRulesEngine.Benchmarks/results
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --job Short --inProcess --exporters github --artifacts ./benchmarks/TruthWeaver.Benchmarks/results
 ```
 
 ## Design documents
@@ -1082,11 +1082,11 @@ dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchma
 
 ## Repository layout
 
-- `src/BooleanRulesEngine.Abstractions` — the zero-dependency kernel
-- `src/BooleanRulesEngine` — parser, compiler, analyzer, evaluator, JSON, DI
-- `src/BooleanRulesEngine.Yaml` — YAML tree support
-- `tests/BooleanRulesEngine.Tests` — unit tests for all three packages
-- `benchmarks/BooleanRulesEngine.Benchmarks` — BenchmarkDotNet suite (dev-only, see
+- `src/TruthWeaver.Abstractions` — the zero-dependency kernel
+- `src/TruthWeaver` — parser, compiler, analyzer, evaluator, JSON, DI
+- `src/TruthWeaver.Yaml` — YAML tree support
+- `tests/TruthWeaver.Tests` — unit tests for all three packages
+- `benchmarks/TruthWeaver.Benchmarks` — BenchmarkDotNet suite (dev-only, see
   [Benchmarks](#benchmarks))
 - `docs/adr/` — architecture decision records
 - `CONTEXT.md` — domain vocabulary and model

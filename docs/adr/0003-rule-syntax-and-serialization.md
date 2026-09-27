@@ -134,8 +134,8 @@ rather than by an extra wrapper object, halving the nesting depth for the
 same information. YAML uses the identical shape under YamlDotNet.
 
 This shape is published as a JSON Schema document,
-[`rule-tree.schema.json`](../../src/BooleanRulesEngine/Json/rule-tree.schema.json),
-shipped as a content asset in the `BooleanRulesEngine` NuGet package so a
+[`rule-tree.schema.json`](../../src/TruthWeaver/Json/rule-tree.schema.json),
+shipped as a content asset in the `TruthWeaver` NuGet package so a
 rule-authoring UI or other external tooling can validate a generated tree
 structurally without hand-copying this shape. The schema covers structural
 JSON shape only — the same level `JsonTreeParser` enforces before
@@ -299,7 +299,7 @@ Predicates carry `Label`/`Description` on their schema; the closed set of
 the constants) needed the equivalent, so a rule-authoring UI or a generated
 "what does this rule mean" report can describe every node of a compiled
 expression tree, not just its predicate leaves. `OperatorInfo.Describe`
-(`BooleanRulesEngine.Ast`) returns an `OperatorDescriptor` (`Label`,
+(`TruthWeaver.Ast`) returns an `OperatorDescriptor` (`Label`,
 `Description`) for any operator node; `CompiledRule<TContext>.Describe()`
 walks the whole tree and returns a `RuleDescription` (`Label`, `Description`,
 `Operands`) recursively, resolving each term's `Label`/`Description` from its
@@ -329,7 +329,7 @@ reparse to.
 
 ### Programmatic construction: `RuleBuilder`
 
-A fluent `RuleBuilder` (in `BooleanRulesEngine.Building`) lets a host
+A fluent `RuleBuilder` (in `TruthWeaver.Building`) lets a host
 assemble a rule tree from application logic — e.g. a dynamically built list
 of conditions — without hand-writing or string-concatenating DSL/JSON/YAML
 text. It is deliberately *not* a fourth parallel front end into the AST:

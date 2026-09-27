@@ -1,7 +1,7 @@
-# CONTEXT.md — BooleanRulesEngine
+# CONTEXT.md — TruthWeaver
 
 This document is the shared vocabulary and domain model for the
-`BooleanRulesEngine` library. Read it before making structural changes to the
+`TruthWeaver` library. Read it before making structural changes to the
 engine, and update it when the vocabulary or the deferred list changes. See
 `docs/adr/` for the reasoning behind individual decisions.
 
@@ -164,20 +164,20 @@ never mixed with `AND`/`OR` or with each other without parentheses) is
 canonical and is what gets persisted. JSON and YAML are interchange/tooling
 formats that compile to the same AST and round-trip losslessly with the DSL.
 A rule can also be assembled programmatically via `RuleBuilder`
-(`BooleanRulesEngine.Building`), which renders to the same JSON tree shape
+(`TruthWeaver.Building`), which renders to the same JSON tree shape
 and compiles through the identical pipeline. The JSON tree shape is also
 published as a JSON Schema document,
-[`rule-tree.schema.json`](src/BooleanRulesEngine/Json/rule-tree.schema.json),
-shipped as a content asset in the `BooleanRulesEngine` package. Full grammar
+[`rule-tree.schema.json`](src/TruthWeaver/Json/rule-tree.schema.json),
+shipped as a content asset in the `TruthWeaver` package. Full grammar
 and schema: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
 
 ## Package boundaries (summary)
 
-`BooleanRulesEngine.Abstractions` (the kernel: `IPredicate<TContext>`,
+`TruthWeaver.Abstractions` (the kernel: `IPredicate<TContext>`,
 argument schema, `TruthValue`, `Decision` — zero dependencies, shared across
-projects that only *implement* predicates), `BooleanRulesEngine` (AST,
+projects that only *implement* predicates), `TruthWeaver` (AST,
 parser, compiler, analyzer, evaluator, System.Text.Json support, DI
-extensions), `BooleanRulesEngine.Yaml` (YamlDotNet only). Full reasoning:
+extensions), `TruthWeaver.Yaml` (YamlDotNet only). Full reasoning:
 [ADR-0004](docs/adr/0004-package-boundaries-and-extensibility.md).
 
 ## Deferred
@@ -203,31 +203,31 @@ designed so each remains addable without a breaking rework.
 
 The deferred item above treats trimming/AOT as a design constraint rather than an
 afterthought, so it's verified rather than assumed. `src/Directory.Build.props` sets
-`IsAotCompatible` for every shipping package (`BooleanRulesEngine.Abstractions`,
-`BooleanRulesEngine`, `BooleanRulesEngine.Predicates`, `BooleanRulesEngine.Testing`,
-`BooleanRulesEngine.Yaml`), enabling both the trim analyzer (`IL2xxx`) and the NativeAOT
+`IsAotCompatible` for every shipping package (`TruthWeaver.Abstractions`,
+`TruthWeaver`, `TruthWeaver.Predicates`, `TruthWeaver.Testing`,
+`TruthWeaver.Yaml`), enabling both the trim analyzer (`IL2xxx`) and the NativeAOT
 analyzer (`IL3xxx`), and CI (`.github/workflows/ci.yml`) promotes their warnings to build
 errors. As of this writing that analysis is clean: zero trim/AOT warnings across all five
 packages.
 
 This holds by construction, not by suppression:
 
-- The rule tree's JSON support (`BooleanRulesEngine/Json`) reads and writes `JsonElement`/
+- The rule tree's JSON support (`TruthWeaver/Json`) reads and writes `JsonElement`/
   `JsonNode`/`JsonObject`/`JsonArray` directly — never `JsonSerializer.Deserialize<T>` — so
   there is no reflection-based (de)serialization to source-generate around.
-- The DI registration extension (`AddBooleanRulesEngine<TContext>`) registers a
+- The DI registration extension (`AddTruthWeaver<TContext>`) registers a
   closed-generic instance and a factory delegate, not an open-generic or reflection-driven
   registration.
 - No production code path uses `Activator.CreateInstance`, `MakeGenericMethod`, assembly
   scanning, or runtime code generation (`System.Reflection.Emit`, `Expression.Compile`, etc.).
 
-**Known limitation — YamlDotNet:** `BooleanRulesEngine.Yaml` only depends on YamlDotNet's
+**Known limitation — YamlDotNet:** `TruthWeaver.Yaml` only depends on YamlDotNet's
 low-level `RepresentationModel` DOM (`YamlStream`/`YamlNode`), not its reflection-based
 object-graph (de)serializer, so nothing in this package's own code triggers a trim/AOT
 warning today. However, YamlDotNet 18.1.0 does not itself ship `IsTrimmable`/AOT annotations
 (no `ILLink` metadata in its NuGet package), so the trim/AOT analyzer can't see into it and
 verify its internals — a real incompatibility inside YamlDotNet's own reflection paths would
-not surface as a build warning here. `BooleanRulesEngine.Yaml` is trim/AOT-*analyzed* clean,
+not surface as a build warning here. `TruthWeaver.Yaml` is trim/AOT-*analyzed* clean,
 not independently *proven* safe end-to-end; a consumer publishing with `PublishAot`/
 `PublishTrimmed` who reaches this package should smoke-test that specific scenario.
 

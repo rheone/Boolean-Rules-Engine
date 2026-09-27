@@ -26,44 +26,44 @@ observability is deferred, not v1).
 
 ### Four packages
 
-- **`BooleanRulesEngine.Abstractions`** — `IPredicate<TContext>`,
+- **`TruthWeaver.Abstractions`** — `IPredicate<TContext>`,
   `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault`.
   Zero third-party dependencies. This is the "common kernel" a project that
   only *implements* predicates references — it does not need the parser, the
   compiler, the analyzer, or any serialization support.
-- **`BooleanRulesEngine`** — the AST, DSL parser, `RuleCompiler`,
+- **`TruthWeaver`** — the AST, DSL parser, `RuleCompiler`,
   `CompiledRule`, the analyzer (BDD-based constant/contradiction/redundancy
   detection), the evaluator, `System.Text.Json` support for the JSON tree
   form, and dependency-injection registration extensions. Depends on
   `Microsoft.Extensions.DependencyInjection.Abstractions` and
   `Microsoft.Extensions.Logging.Abstractions` (see below) — nothing else.
-- **`BooleanRulesEngine.Yaml`** — YAML tree support, isolated here because
+- **`TruthWeaver.Yaml`** — YAML tree support, isolated here because
   it is the one place YamlDotNet is needed, and a consumer with no interest
   in YAML should not acquire that dependency transitively.
-- **`BooleanRulesEngine.Predicates`** — a convenience library of ready-made,
+- **`TruthWeaver.Predicates`** — a convenience library of ready-made,
   generic `IPredicate<TContext>`-shaped implementations (string comparison,
   null/empty, set equality, regex matching), each parameterized by a
   selector delegate supplied at registration. Depends on
-  `BooleanRulesEngine.Abstractions` alone — not `BooleanRulesEngine` — so a
+  `TruthWeaver.Abstractions` alone — not `TruthWeaver` — so a
   service that wants these common predicates still doesn't acquire the
   parser, compiler, or analyzer. It is deliberately its own package rather
-  than folded into `BooleanRulesEngine.Abstractions` itself: `Abstractions`
+  than folded into `TruthWeaver.Abstractions` itself: `Abstractions`
   is a zero-opinion kernel (the contract every predicate author, including
   this package, implements against), while `Predicates` is one opinionated,
   optional convenience layer built on top of that contract — a host is free
   to implement every predicate itself and never reference this package at
-  all. Any host project may opt into it; nothing in `BooleanRulesEngine`
+  all. Any host project may opt into it; nothing in `TruthWeaver`
   itself depends on it.
 
 ```mermaid
 flowchart LR
-    subgraph Abstractions["BooleanRulesEngine.Abstractions<br/>(zero dependencies)"]
+    subgraph Abstractions["TruthWeaver.Abstractions<br/>(zero dependencies)"]
         IPredicate["IPredicate&lt;TContext&gt;"]
         Schema["PredicateSchema"]
         Truth["TruthValue / Decision / Fault"]
     end
 
-    subgraph Core["BooleanRulesEngine"]
+    subgraph Core["TruthWeaver"]
         Parser["DSL parser"]
         Compiler["RuleCompiler"]
         Analyzer["Analyzer (BDD)"]
@@ -72,11 +72,11 @@ flowchart LR
         DI["DI registration extensions"]
     end
 
-    subgraph YamlPkg["BooleanRulesEngine.Yaml"]
+    subgraph YamlPkg["TruthWeaver.Yaml"]
         Yaml["YAML tree support"]
     end
 
-    subgraph PredicatesPkg["BooleanRulesEngine.Predicates"]
+    subgraph PredicatesPkg["TruthWeaver.Predicates"]
         Predicates["String/null-or-empty/set-equality/regex predicates"]
     end
 
@@ -119,7 +119,7 @@ scoped dependencies work correctly per
 [ADR-0002](0002-evaluation-semantics.md#predicate-registration-and-dependency-lifetimes)),
 or registering a stateless lambda directly. There is no attribute-scanning
 or assembly-scanning discovery mechanism. New *operators* are added inside
-`BooleanRulesEngine` itself (parser, compiler, evaluator, analyzer each
+`TruthWeaver` itself (parser, compiler, evaluator, analyzer each
 need to know about a new operator) rather than through an operator plugin
 model — the operator set is small and closed by design
 ([ADR-0003](0003-rule-syntax-and-serialization.md)), so an extensibility
@@ -128,9 +128,9 @@ consumer.
 
 ### Amendment: `RuleBuilder` is not a fourth front end
 
-`RuleBuilder` (`BooleanRulesEngine.Building`, added after this ADR was first
+`RuleBuilder` (`TruthWeaver.Building`, added after this ADR was first
 accepted) lets a host assemble a rule tree fluently in C#. It lives inside
-`BooleanRulesEngine` itself rather than as a separate package or an
+`TruthWeaver` itself rather than as a separate package or an
 extension point some other assembly could plug into: it renders to the same
 JSON tree shape [ADR-0003](0003-rule-syntax-and-serialization.md) already
 defines and compiles through the existing `CompileJson`, so it's a
@@ -141,7 +141,7 @@ that would need to independently track every operator this package adds.
 
 The "operator set is closed... adding a new operator is a versioned change" language above scoped
 the cost of a new operator to four subsystems (parser, compiler, evaluator, analyzer). In practice,
-by the time `BooleanRulesEngine.Yaml` and the JSON/canonical-text printers existed, adding a new
+by the time `TruthWeaver.Yaml` and the JSON/canonical-text printers existed, adding a new
 operator touched **six** independent switches over `Expression` that each re-derived the same
 structural fact — a node's op-name, its threshold `K` (when applicable), and its operand list:
 `OperatorInfo`, `CanonicalPrinter`, `JsonTreePrinter`, `YamlTreePrinter`, `Evaluator` (its trace/skip
@@ -150,7 +150,7 @@ were the four subsystems this ADR originally scoped (parser, compiler, evaluator
 dispatch, analyzer) — they were rendering/description call sites layered on afterward, each
 re-implementing the same structural lookup independently.
 
-`BooleanRulesEngine.Ast.ExpressionShape.Of` (internal, `src/BooleanRulesEngine/Ast/NodeShape.cs`) now
+`TruthWeaver.Ast.ExpressionShape.Of` (internal, `src/TruthWeaver/Ast/NodeShape.cs`) now
 supplies that one structural fact from a single switch. Adding a new operator variant to the closed
 set still means editing several places, but the count is smaller and each remaining edit is now
 irreducibly format- or behavior-specific rather than a duplicate of the same structural
@@ -182,7 +182,7 @@ re-derived six times.
 - Swapping the logging provider (Serilog, or anything else) is entirely the
   host application's concern and requires no change to this library.
 - Because the operator set is closed and lives inside the core package,
-  adding a new operator is a versioned change to `BooleanRulesEngine` itself,
+  adding a new operator is a versioned change to `TruthWeaver` itself,
   not a third-party extension point — consistent with "do not introduce
   unnecessary abstractions."
 
