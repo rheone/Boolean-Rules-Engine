@@ -28,7 +28,8 @@ anything else.
    ```csharp
    public sealed class IsManager : IPredicate<User>
    {
-       public static PredicateSchema Schema => PredicateSchema.NoArguments("isManager");
+       public static PredicateSchema Schema =>
+           PredicateSchema.NoArguments("isManager", "Does the current user hold the manager role?");
 
        public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct) =>
            ValueTask.FromResult(user.IsManager);
@@ -62,14 +63,15 @@ anything else.
 
 That's the whole lifecycle: implement → register → compile once → evaluate
 many times. The [Examples](#examples) section below builds up from here to
-named arguments, `AND`/`OR`/`XOR`/`AtLeast`, and the full ADR-0003 worked
-example in DSL, JSON, and YAML.
+named arguments, the full operator set, and the full ADR-0003 worked example
+in DSL, JSON, and YAML.
 
 ## What it is (and isn't)
 
 `BooleanRulesEngine` answers one question: *is this expression true right
-now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`,
-`ExactlyOne`, `AtLeast(k)`, terms, and evaluation. It does not know about
+now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `XNOR`,
+`ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
+`LessThan`/`Exactly`), terms, and evaluation. It does not know about
 permissions, workflows, or policies — those are things you build *on top* of
 it. A permission check ("can the current user do X") is one consumer of this
 engine, not what the engine itself is.
@@ -80,10 +82,67 @@ engine, not what the engine itself is.
 | **Expression** | The boolean tree — operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation, e.g. `hasRole`, `isManager`. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasRole(role: "Y")` — the tree's leaf node. |
-| **Operator** | `AND` `OR` `NOT` `XOR` `ExactlyOne` `AtLeast(k)`, plus `true`/`false`. |
+| **Operator** | `AND` `OR` `NOT` `XOR` `XNOR` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
 | **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
 
 Full vocabulary and the predicate-author contract: [CONTEXT.md](CONTEXT.md).
+
+## Operators
+
+### Order of operations
+
+Precedence governs *parsing* the DSL only — the canonical printer always
+disambiguates explicitly (see [below](#choosing-a-rule-format)), so a
+persisted or printed rule never depends on a reader holding this table in
+their head.
+
+1. **Parentheses** (`(...)`) — always evaluated first, exactly as written.
+2. **`NOT`** — binds tightest of the operators; right-associative (`NOT NOT
+   a` is valid, if odd).
+3. **`AND`** — binds tighter than `OR`.
+4. **`OR`** — binds loosest of the infix operators.
+
+`isManager AND NOT isSuspended OR isAdmin` therefore parses as
+`(isManager AND (NOT isSuspended)) OR isAdmin`.
+
+`XOR` and `XNOR` are **not** part of this precedence chain: mixing either of
+them with `AND`/`OR`, or mixing `XOR` with `XNOR`, at the same syntactic
+level without explicit parentheses is a **compile error**
+(`AmbiguousOperatorMixing`) rather than resolved by an implicit precedence
+guess — see [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md) for
+why. Function-call-style operators (`ExactlyOne(...)` and the threshold
+family) are self-delimiting — their parentheses are part of the call syntax,
+not grouping, so they never participate in precedence at all.
+
+### Binary vs. unary operators
+
+| Arity | Operators | Notes |
+| --- | --- | --- |
+| **Unary** | `NOT` | Takes exactly one operand. |
+| **Binary only** | `XOR`, `XNOR` | Always exactly two operands — a compile error otherwise (`XorArityViolation`). Deliberately not generalized to n-ary parity; see [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md). |
+| **N-ary (≥ 2)** | `AND`, `OR`, `ExactlyOne`, `AtLeast`, `AtMost`, `GreaterThan`, `LessThan`, `Exactly` | Take two or more operands. `AND`/`OR` are commonly thought of as "binary" from C-family languages, but this engine treats them as flat n-ary chains (`AND(a, b, c)`, not `AND(AND(a, b), c)`). |
+| **0-ary** | `true`, `false` | Constants, not operators over operands. |
+
+### All operators
+
+| Operator | Arity | Description |
+| --- | --- | --- |
+| `AND` | n-ary | True iff every operand is true. Short-circuits at the first `False`. |
+| `OR` | n-ary | True iff at least one operand is true. Short-circuits at the first `True`. |
+| `NOT` | unary | Logical negation. `Unknown` stays `Unknown`. |
+| `XOR(a, b)` | binary | True iff exactly one of the two operands is true. `Unknown` if either operand is `Unknown`. |
+| `XNOR(a, b)` | binary | Logical biconditional (`IFF`) — true iff both operands agree (both true or both false). The negation of `XOR`. |
+| `ExactlyOne(...)` | n-ary | True iff exactly one operand is true — the unambiguous name for what `XOR` only means at exactly two operands. |
+| `AtLeast(k, ...)` | n-ary | True iff at least `k` operands are true. |
+| `AtMost(k, ...)` | n-ary | True iff at most `k` operands are true. |
+| `GreaterThan(k, ...)` | n-ary | True iff more than `k` operands are true. |
+| `LessThan(k, ...)` | n-ary | True iff fewer than `k` operands are true. |
+| `Exactly(k, ...)` | n-ary | True iff exactly `k` operands are true. |
+| `true` / `false` | constant | Fixed truth value, useful for stubbing out incomplete logic. |
+
+Every operator above follows the three-valued Kleene truth tables in
+[ADR-0001](docs/adr/0001-kleene-failure-model.md) — see the
+[truth table appendix](#appendix-truth-tables) for the full tables.
 
 ## Packages
 
@@ -142,18 +201,28 @@ write and read each one:
 | **Compile with** | `compiler.Compile(text)` | `compiler.CompileJson(json)` | `compiler.CompileYaml(yaml)` |
 | **Print with** | `rule.CanonicalText` | `rule.PrintJson()` | `rule.PrintYaml()` |
 | **Round-trips losslessly?** | Yes, by definition. | Yes — `parse(print(x))` is structurally equal to `x` (ticket 07). | Yes — same guarantee (ticket 08). |
-| **Nesting for `AND`/`OR`/`XOR`** | Infix with precedence (`NOT` > `AND` > `OR`); `XOR` mixed with `AND`/`OR` needs explicit parens. | Explicit `{"op": "...", "operands": [...]}` nodes — no precedence to get wrong. | Same explicit `op`/`operands` shape as JSON. |
+| **Nesting for `AND`/`OR`/`XOR`/`XNOR`** | Infix with precedence (see [Operators](#operators)); `XOR`/`XNOR` mixed with `AND`/`OR`, or with each other, needs explicit parens. | Explicit `{"op": "...", "operands": [...]}` nodes — no precedence to get wrong. | Same explicit `op`/`operands` shape as JSON. |
 | **Comments** | No | No (JSON has none) | Yes (`#`) — a practical reason to prefer YAML for hand-maintained rule files. |
 
 See [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md) for the full
-grammar and tree schema.
+grammar and tree schema. There's also a fourth way to produce a rule without
+writing text in any of these formats by hand — see
+[Building rules programmatically](#building-rules-programmatically) below.
+
+A fifth format, of sorts: `CanonicalText` isn't merely "minimal" — it
+parenthesizes an operand whenever it's a different operator than the one
+it's nested under (e.g. `a AND b OR c` prints as `(a AND b) OR c`), even
+where precedence alone already makes the parse unambiguous. The goal is a
+rule that reads clearly at a glance without the reader reconstructing
+precedence mentally, not merely one that reparses correctly.
 
 ## Examples
 
-Five examples, each adding one more piece — a single predicate, combining
-predicates, named arguments, the threshold operators, then the full worked
-example in all three formats plus a bonus on turning a denial into a
-human-readable sentence.
+Six examples, each adding one more piece — a single predicate, combining
+predicates, named arguments, `XOR`/`XNOR`/`ExactlyOne`/the threshold family,
+the full worked example in all three formats, then assembling that same rule
+with `RuleBuilder` instead of writing text — plus a bonus on turning a
+denial into a human-readable sentence.
 
 ### 1. A single predicate
 
@@ -187,7 +256,10 @@ hasRole(role: "Y")
 ```csharp
 PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder()
     .Add(
-        new PredicateSchema("hasRole", [new PredicateArgumentSchema("role", LiteralKind.String)]),
+        new PredicateSchema(
+            "hasRole",
+            "Does the current user hold the given role?",
+            [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]),
         (user, args, ct) => ValueTask.FromResult(user.Roles.Contains(args.GetString("role"))))
     .Build();
 ```
@@ -196,18 +268,36 @@ Argument order in the source text never matters (`hasRole(role: "Y")` and a
 predicate with several arguments written in any order compile to the same
 term identity); argument *values* are case-sensitive (`"Y"` and `"y"` are
 different terms — see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
+`Description` is required on both `PredicateSchema` and
+`PredicateArgumentSchema` so a rule-authoring UI or generated documentation
+always has something to show for every predicate and argument.
 
-### 4. `XOR`, `ExactlyOne`, and `AtLeast`
+### 4. `XOR`, `XNOR`, `ExactlyOne`, and the threshold family
 
 ```text
 AtLeast(2, approvedByAlice, approvedByBob, approvedByCarol)
 ```
 
-"At least two of these three approvals." `ExactlyOne(a, b, c)` is the n-ary
-"exactly one of these" operator; `XOR` is deliberately binary-only — use
-`ExactlyOne` once you need more than two operands, rather than relying on
-`XOR`'s parity-generalization (which is almost never what an author means
-past two operands — see [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)).
+"At least two of these three approvals." Its siblings read the same way:
+`AtMost(1, ...)`, `GreaterThan(1, ...)`, `LessThan(2, ...)`, and
+`Exactly(2, ...)` all compile to one shared `ThresholdExpression` node,
+differing only in which comparison against the true-operand count they
+apply (see [Operators](#operators) for the full table).
+
+`ExactlyOne(a, b, c)` is the n-ary "exactly one of these" operator; `XOR` is
+deliberately binary-only — use `ExactlyOne` once you need more than two
+operands, rather than relying on `XOR`'s parity-generalization (which is
+almost never what an author means past two operands — see
+[ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)).
+
+`XNOR` is `XOR`'s counterpart — "these two must agree":
+
+```text
+isPrimaryReviewer XNOR isBackupReviewer
+```
+
+reads as "exactly one of primary/backup reviewer status, or neither" — true
+when both are reviewers or neither is, false when exactly one is.
 
 ### 5. The full worked example, in all three formats
 
@@ -271,10 +361,16 @@ PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder()
     .Add<IsManager>()
     .Add<IsDepartmentHead>()
     .Add(
-        new PredicateSchema("hasRole", [new PredicateArgumentSchema("role", LiteralKind.String)]),
+        new PredicateSchema(
+            "hasRole",
+            "Does the current user hold the given role?",
+            [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]),
         (user, args, ct) => ValueTask.FromResult(user.Roles.Contains(args.GetString("role"))))
     .Add(
-        new PredicateSchema("hasTraining", [new PredicateArgumentSchema("training", LiteralKind.String)]),
+        new PredicateSchema(
+            "hasTraining",
+            "Has the current user completed the given training course?",
+            [new PredicateArgumentSchema("training", "The training course code to check for.", LiteralKind.String)]),
         (user, args, ct) => ValueTask.FromResult(user.Training.Contains(args.GetString("training"))))
     .Build();
 
@@ -311,6 +407,38 @@ services.AddBooleanRulesEngine<User>(builder => builder
     .Add<IsManager>()
     .Add<IsDepartmentHead>());
 ```
+
+### 6. The same rule, assembled with `RuleBuilder` instead of text
+
+Same tree as example 5's `hasRole(role: "Y") AND (hasTraining(...) OR
+hasTraining(...) OR (isManager XOR isDepartmentHead))`, built without
+writing DSL, JSON, or YAML text by hand — useful when a rule's shape comes
+from application logic (e.g. a dynamically assembled list of conditions)
+rather than an author typing it directly:
+
+```csharp
+using BooleanRulesEngine.Building;
+
+RuleBuilder rule = RuleBuilder.And(
+    RuleBuilder.Predicate("hasRole", ("role", "Y")),
+    RuleBuilder.Or(
+        RuleBuilder.Predicate("hasTraining", ("training", "Q")),
+        RuleBuilder.Predicate("hasTraining", ("training", "Z")),
+        RuleBuilder.Xor(RuleBuilder.Predicate("isManager"), RuleBuilder.Predicate("isDepartmentHead"))));
+
+CompilationResult<User> result = rule.Compile(compiler);
+```
+
+`RuleBuilder` is not a fourth parallel parser into the AST — every builder
+method renders to the exact same flat JSON tree shape [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)
+defines, and `Compile` hands that JSON to the same `CompileJson` any other
+JSON-producing tool would use. A builder-assembled rule therefore gets every
+diagnostic a hand-written one would — an unknown predicate, a bad argument,
+an out-of-range threshold, `XOR`/`XNOR` arity, resource limits, structural
+tautology/contradiction — nothing here bypasses the Validate/Analyze stages
+of the [compilation pipeline](#compilation-pipeline). See
+[Building rules programmatically](#building-rules-programmatically) below
+for the full API.
 
 ### Bonus: explaining a denied decision
 
@@ -403,12 +531,121 @@ diagnostics, which is what makes "a bad edit is rejected, the previously
 persisted rule stays active" true by construction rather than by convention.
 Full reasoning: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
 
+## Predicate types
+
+Four registration shapes cover every predicate this engine supports, and mix
+freely within one `PredicateRegistryBuilder<TContext>.Build()`:
+
+| Shape | Arguments? | Implementation | When to use |
+| --- | --- | --- | --- |
+| Class-based, zero-argument | No | `IPredicate<TContext>` | Needs a scoped dependency (`DbContext`, per-request service) but no rule-authored parameter. |
+| Class-based, parameterized | Yes | `IPredicate<TContext>` with a non-empty schema | Needs both a scoped dependency *and* rule-authored parameters. |
+| Lambda, zero-argument | No | stateless delegate | A simple stateless check with no rule-authored parameter. |
+| Lambda, parameterized | Yes | stateless delegate with a non-empty schema | The common case — a stateless check parameterized by the rule text, e.g. `hasRole(role: "Y")`. |
+
+**Class-based, zero-argument** — see [Example 1](#1-a-single-predicate)'s
+`IsManager`, resolved fresh from `IServiceProvider` on every evaluation.
+
+**Class-based, parameterized** — same resolution story, plus a schema:
+
+```csharp
+public sealed class HasMinimumTenure : IPredicate<User>
+{
+    public static PredicateSchema Schema =>
+        new(
+            "hasMinimumTenure",
+            "Has the current user been employed at least the given number of days?",
+            [new PredicateArgumentSchema("days", "The minimum tenure, in days.", LiteralKind.Int64)]);
+
+    public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct)
+    {
+        long minimumDays = args.GetInt64("days");
+        bool result = (DateTimeOffset.UtcNow - user.HireDate).TotalDays >= minimumDays;
+        return ValueTask.FromResult(result);
+    }
+}
+```
+
+Reach for this shape when a parameterized check also needs a scoped
+dependency — e.g. querying a `DbContext` for the value to compare `days`
+against, rather than reading it straight off `user`.
+
+**Lambda, zero-argument**:
+
+```csharp
+.Add(
+    PredicateSchema.NoArguments("isSuspended", "Is the current user's account suspended?"),
+    (user, args, ct) => ValueTask.FromResult(user.IsSuspended))
+```
+
+**Lambda, parameterized** — see [Example 3](#3-named-arguments)'s `hasRole`.
+
+Both class-based and lambda predicates register against the same
+`PredicateRegistryBuilder<TContext>.Add(...)` overloads — the difference is
+purely dependency lifetime (class-based predicates resolve fresh from
+`IServiceProvider` per evaluation; lambdas are stateless), never a
+difference in rule text, schema shape, or how the compiler validates a
+term. See
+[ADR-0002](docs/adr/0002-evaluation-semantics.md#predicate-registration-and-dependency-lifetimes).
+
+## Building rules programmatically
+
+### Converting between DSL, JSON, and YAML
+
+Any compiled rule converts losslessly to any of the three surfaces by
+printing from one and compiling from the other — nothing about the compiled
+tree itself is format-specific:
+
+```csharp
+CompiledRule<User> rule = compiler.Compile(dslText).CompiledRule!;
+
+string json = rule.PrintJson();                       // DSL -> JSON
+string yaml = rule.PrintYaml();                        // DSL -> YAML (BooleanRulesEngine.Yaml)
+
+CompiledRule<User> fromJson = compiler.CompileJson(json).CompiledRule!;
+string backToDsl = fromJson.CanonicalText;              // JSON -> DSL
+
+// backToDsl == rule.CanonicalText always: parse(print(x)) is structurally
+// equal to x in every direction (ADR-0003), so converting formats never
+// silently changes a rule's meaning.
+```
+
+This is exactly how a rule-authoring UI would offer "export as JSON/YAML" or
+"paste JSON, get back DSL to review" without needing its own parser for
+anything but the format it's currently editing.
+
+### `RuleBuilder` reference
+
+[Example 6](#6-the-same-rule-assembled-with-rulebuilder-instead-of-text)
+shows `RuleBuilder` end to end. Every operator has a matching static factory
+on `BooleanRulesEngine.Building.RuleBuilder`:
+
+| Operator | Factory method |
+| --- | --- |
+| `true` / `false` | `RuleBuilder.Constant(bool value)` |
+| A term | `RuleBuilder.Predicate(string name)` / `RuleBuilder.Predicate(string name, params (string Name, object Value)[] arguments)` |
+| `AND` | `RuleBuilder.And(params RuleBuilder[] operands)` |
+| `OR` | `RuleBuilder.Or(params RuleBuilder[] operands)` |
+| `NOT` | `RuleBuilder.Not(RuleBuilder operand)` |
+| `XOR` | `RuleBuilder.Xor(RuleBuilder left, RuleBuilder right)` |
+| `XNOR` | `RuleBuilder.Xnor(RuleBuilder left, RuleBuilder right)` |
+| `ExactlyOne` | `RuleBuilder.ExactlyOne(params RuleBuilder[] operands)` |
+| `AtLeast(k)` / `AtMost(k)` / `GreaterThan(k)` / `LessThan(k)` / `Exactly(k)` | `RuleBuilder.AtLeast(int k, params RuleBuilder[] operands)` (and the four siblings, same shape) |
+
+`RuleBuilder.Compile(compiler)` is a thin wrapper around
+`compiler.CompileJson(builder.ToJson())` — nothing bypasses the
+Validate/Analyze pipeline described in
+[Compilation pipeline](#compilation-pipeline). `ToJson()` alone is useful
+too, e.g. for logging or persisting the tree a builder assembled without
+compiling it immediately.
+
 ## Feature highlights
 
-- **Kleene three-valued logic.** `AND`/`OR`/`NOT`/`XOR`/`ExactlyOne`/
-  `AtLeast(k)` all follow the three-valued truth tables in
-  [ADR-0001](docs/adr/0001-kleene-failure-model.md) — a predicate fault
-  becomes `Unknown`, never a thrown exception or a silently-coerced `false`.
+- **Kleene three-valued logic.** Every operator — `AND`/`OR`/`NOT`/`XOR`/
+  `XNOR`/`ExactlyOne`/the threshold family — follows the three-valued truth
+  tables in [ADR-0001](docs/adr/0001-kleene-failure-model.md) (full tables:
+  [Appendix](#appendix-truth-tables)) — a predicate fault becomes `Unknown`,
+  never a thrown exception or a silently-coerced `false`.
 - **Per-evaluation memoization.** A term referenced from multiple branches
   of the same rule is invoked at most once per evaluation, keyed by
   structural term identity (predicate name + sorted, type-normalized
@@ -443,7 +680,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 
 | Term | Meaning |
 | --- | --- |
-| `AtLeast(k, ...)` | N-ary threshold operator: true iff at least `k` of the operands are true (e.g. "any two of these three approvals"). |
+| `AtLeast(k, ...)` / `AtMost(k, ...)` / `GreaterThan(k, ...)` / `LessThan(k, ...)` / `Exactly(k, ...)` | The threshold operator family: n-ary comparisons against the true-operand count, all compiling to one shared `ThresholdExpression` node — see [Operators](#operators). |
 | BDD analyzer | The compiler's constant/contradiction-detection pass, backed by a real binary decision diagram rather than brute-force truth tables — see [Compilation pipeline](#compilation-pipeline). |
 | `CompilationMode` | `Strict` (default — an unregistered predicate is a compile error) or `Lenient` (an unregistered predicate compiles to a permanent `Unknown` term, for services sharing a rule store with different predicate sets). |
 | `CompilationResult<TContext>` | What `Compile`/`CompileJson`/`CompileYaml` return: a nullable `CompiledRule<TContext>` plus every `Diagnostic` raised. |
@@ -457,18 +694,100 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `Fault` | A record of one predicate failing to produce an answer during one evaluation: the faulting term's identity plus the exception. Faults are absorbed as `Unknown`, never rethrown. |
 | Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently-coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
-| Operator | `AND`, `OR`, `NOT`, `XOR`, `ExactlyOne`, `AtLeast(k)`, and the `true`/`false` constants — the closed set of ways to combine terms and sub-expressions. |
-| Predicate | A registered, reusable implementation (e.g. `hasRole`, `isManager`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. |
+| Operator | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, the threshold family, and the `true`/`false` constants — the closed set of ways to combine terms and sub-expressions. See [Operators](#operators). |
+| Predicate | A registered, reusable implementation (e.g. `hasRole`, `isManager`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Description`; see [Predicate types](#predicate-types). |
 | `PredicateArguments` | The non-generic accessor (`GetString`, `GetInt64`, ...) a predicate uses to read its own term's arguments inside `EvaluateAsync`. |
 | `PredicateRegistry<TContext>` | Where predicates are registered under a name, with their `PredicateSchema`. Built once via `PredicateRegistryBuilder<TContext>`; no attribute or assembly scanning. |
-| `PredicateSchema` | A predicate's registered name and its named-argument declarations, validated against a term's arguments at compile time. |
+| `PredicateSchema` | A predicate's registered name, a required read-only `Description`, and its named-argument declarations (each also carrying a required `Description`), validated against a term's arguments at compile time. |
+| `RuleBuilder` | A fluent API (`BooleanRulesEngine.Building`) for assembling a rule tree from application logic without hand-writing DSL/JSON/YAML text; renders to the same JSON tree shape and compiles through the same `CompileJson` pipeline. See [Building rules programmatically](#building-rules-programmatically). |
 | Rule | A named unit of persistence: metadata plus one expression. What gets compiled into a `CompiledRule<TContext>`. |
 | Short-circuit | `AND` stops evaluating operands at the first `False`; `OR` stops at the first `True`. Skipped operands are recorded as `NotEvaluated` in the trace, not omitted. |
 | Term | A predicate bound to concrete, literal arguments (e.g. `hasRole(role: "Y")`) — the tree's leaf node, and the unit of memoization. |
 | Term identity | What makes two term references "the same variable": predicate name (normalized to registered casing) plus arguments sorted by name and compared by exact, case-sensitive value. Argument order in source text never matters; array-valued arguments are order-sensitive. |
 | `Trace` | An ordered, literal record of every node an evaluation visited or explicitly skipped — the "why was this denied" explanation. |
 | `TruthValue` | The three-valued result type: `True`, `False`, or `Unknown`. Never `bool?`. |
-| `XOR(a, b)` | Binary exclusive-or, deliberately not generalized to n-ary parity. Mixing `XOR` with `AND`/`OR` at the same level without parentheses is a compile error — see [Examples #4](#4-xor-exactlyone-and-atleast). |
+| `XNOR(a, b)` | Binary exclusive-nor (logical biconditional / `IFF`) — the negation of `XOR`, deliberately not generalized to n-ary parity for the same reason `XOR` isn't. Mixing `XNOR` with `AND`/`OR`, or with `XOR`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-xnor-exactlyone-and-the-threshold-family). |
+| `XOR(a, b)` | Binary exclusive-or, deliberately not generalized to n-ary parity. Mixing `XOR` with `AND`/`OR`, or with `XNOR`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-xnor-exactlyone-and-the-threshold-family). |
+
+## Appendix: Truth tables
+
+Kleene three-valued truth tables for every binary/unary operator, in both
+logical-name and boolean-algebra notation. `T` = `TruthValue.True`, `F` =
+`TruthValue.False`, `?` = `TruthValue.Unknown`. Algebra notation: `∧` = AND,
+`∨` = OR, `¬` = NOT, `⊕` = XOR, `↔` = XNOR (biconditional / IFF), `1` = true,
+`0` = false. Full reasoning: [ADR-0001](docs/adr/0001-kleene-failure-model.md).
+
+### Unary: `NOT`
+
+| a | `NOT a` | ¬a |
+| :-: | :-: | :-: |
+| T | F | ¬1 = 0 |
+| F | T | ¬0 = 1 |
+| ? | ? | ¬? = ? |
+
+### Binary: `AND`
+
+| a | b | `a AND b` | a∧b |
+| :-: | :-: | :-: | :-: |
+| T | T | T | 1∧1 = 1 |
+| T | F | F | 1∧0 = 0 |
+| T | ? | ? | 1∧? = ? |
+| F | T | F | 0∧1 = 0 |
+| F | F | F | 0∧0 = 0 |
+| F | ? | F | 0∧? = 0 |
+| ? | T | ? | ?∧1 = ? |
+| ? | F | F | ?∧0 = 0 |
+| ? | ? | ? | ?∧? = ? |
+
+### Binary: `OR`
+
+| a | b | `a OR b` | a∨b |
+| :-: | :-: | :-: | :-: |
+| T | T | T | 1∨1 = 1 |
+| T | F | T | 1∨0 = 1 |
+| T | ? | T | 1∨? = 1 |
+| F | T | T | 0∨1 = 1 |
+| F | F | F | 0∨0 = 0 |
+| F | ? | ? | 0∨? = ? |
+| ? | T | T | ?∨1 = 1 |
+| ? | F | ? | ?∨0 = ? |
+| ? | ? | ? | ?∨? = ? |
+
+### Binary: `XOR`
+
+| a | b | `a XOR b` | a⊕b |
+| :-: | :-: | :-: | :-: |
+| T | T | F | 1⊕1 = 0 |
+| T | F | T | 1⊕0 = 1 |
+| T | ? | ? | 1⊕? = ? |
+| F | T | T | 0⊕1 = 1 |
+| F | F | F | 0⊕0 = 0 |
+| F | ? | ? | 0⊕? = ? |
+| ? | T | ? | ?⊕1 = ? |
+| ? | F | ? | ?⊕0 = ? |
+| ? | ? | ? | ?⊕? = ? |
+
+### Binary: `XNOR` (`NOT (a XOR b)`)
+
+| a | b | `a XNOR b` | a↔b |
+| :-: | :-: | :-: | :-: |
+| T | T | T | 1↔1 = 1 |
+| T | F | F | 1↔0 = 0 |
+| T | ? | ? | 1↔? = ? |
+| F | T | F | 0↔1 = 0 |
+| F | F | T | 0↔0 = 1 |
+| F | ? | ? | 0↔? = ? |
+| ? | T | ? | ?↔1 = ? |
+| ? | F | ? | ?↔0 = ? |
+| ? | ? | ? | ?↔? = ? |
+
+`ExactlyOne(...)` and the threshold family don't get their own table here —
+they're n-ary counting operators over the *number* of `True` operands, not
+fixed two-input truth tables; their exact Kleene semantics (what counts as
+"certain" vs. "still possibly reachable" when some operands are `Unknown`)
+are covered by the evaluator's behavior described in
+[Evaluation flow](#evaluation-flow) and tested directly in
+`XorExactlyOneThresholdTests`.
 
 ## Design documents
 
