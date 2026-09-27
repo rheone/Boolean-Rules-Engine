@@ -201,14 +201,9 @@ public abstract class RuleBuilder
         return array;
     }
 
-    private sealed class ConstantBuilder : RuleBuilder
+    private sealed class ConstantBuilder(bool value) : RuleBuilder
     {
-        private readonly bool value;
-
-        public ConstantBuilder(bool value)
-        {
-            this.value = value;
-        }
+        private readonly bool value = value;
 
         private protected override JsonNode ToNode()
         {
@@ -216,16 +211,10 @@ public abstract class RuleBuilder
         }
     }
 
-    private sealed class PredicateBuilder : RuleBuilder
+    private sealed class PredicateBuilder(string name, (string Name, object Value)[] arguments) : RuleBuilder
     {
-        private readonly string name;
-        private readonly (string Name, object Value)[] arguments;
-
-        public PredicateBuilder(string name, (string Name, object Value)[] arguments)
-        {
-            this.name = name;
-            this.arguments = arguments;
-        }
+        private readonly string name = name;
+        private readonly (string Name, object Value)[] arguments = arguments;
 
         private protected override JsonNode ToNode()
         {
@@ -245,16 +234,10 @@ public abstract class RuleBuilder
         }
     }
 
-    private sealed class OperatorBuilder : RuleBuilder
+    private sealed class OperatorBuilder(string op, IReadOnlyList<RuleBuilder> operands) : RuleBuilder
     {
-        private readonly string op;
-        private readonly IReadOnlyList<RuleBuilder> operands;
-
-        public OperatorBuilder(string op, IReadOnlyList<RuleBuilder> operands)
-        {
-            this.op = op;
-            this.operands = operands;
-        }
+        private readonly string op = op;
+        private readonly IReadOnlyList<RuleBuilder> operands = operands;
 
         private protected override JsonNode ToNode()
         {
@@ -262,18 +245,11 @@ public abstract class RuleBuilder
         }
     }
 
-    private sealed class ThresholdBuilder : RuleBuilder
+    private sealed class ThresholdBuilder(string op, int k, IReadOnlyList<RuleBuilder> operands) : RuleBuilder
     {
-        private readonly string op;
-        private readonly int k;
-        private readonly IReadOnlyList<RuleBuilder> operands;
-
-        public ThresholdBuilder(string op, int k, IReadOnlyList<RuleBuilder> operands)
-        {
-            this.op = op;
-            this.k = k;
-            this.operands = operands;
-        }
+        private readonly string op = op;
+        private readonly int k = k;
+        private readonly IReadOnlyList<RuleBuilder> operands = operands;
 
         private protected override JsonNode ToNode()
         {
