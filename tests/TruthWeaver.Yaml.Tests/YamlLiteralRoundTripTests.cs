@@ -87,4 +87,82 @@ public sealed class YamlLiteralRoundTripTests
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
         Assert.Equal("hasAnyRole(roles: [\"A\", \"B\", \"C\"])", original.CanonicalText);
     }
+
+    [Fact]
+    public void A_decimal_argument_round_trips_through_yaml_as_a_plain_scalar()
+    {
+        RuleCompiler<YamlTestContext> compiler = new(
+            PredicateRegistry<YamlTestContext>
+                .CreateBuilder()
+                .Add(
+                    new PredicateSchema(
+                        "exceedsThreshold",
+                        "Exceeds Threshold",
+                        "True iff 'threshold' equals the expected value.",
+                        [new PredicateArgumentSchema("threshold", "The threshold to compare against.", LiteralKind.Decimal)]
+                    ),
+                    (_, args, _) => ValueTask.FromResult(args.GetDecimal("threshold") == 12.5m)
+                )
+                .Build()
+        );
+        CompiledRule<YamlTestContext> original = compiler.Compile("exceedsThreshold(threshold: 12.5)").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<YamlTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Equal("exceedsThreshold(threshold: 12.5)", original.CanonicalText);
+    }
+
+    [Fact]
+    public void An_int64_array_argument_round_trips_through_yaml_preserving_order()
+    {
+        RuleCompiler<YamlTestContext> compiler = new(
+            PredicateRegistry<YamlTestContext>
+                .CreateBuilder()
+                .Add(
+                    new PredicateSchema(
+                        "hasAnyCode",
+                        "Has Any Code",
+                        "True iff any of 'codes' matches.",
+                        [new PredicateArgumentSchema("codes", "The codes to check for.", LiteralKind.Int64Array)]
+                    ),
+                    (_, args, _) => ValueTask.FromResult(args.GetInt64Array("codes").Count > 0)
+                )
+                .Build()
+        );
+        CompiledRule<YamlTestContext> original = compiler.Compile("hasAnyCode(codes: [1, 2, 3])").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<YamlTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Equal("hasAnyCode(codes: [1, 2, 3])", original.CanonicalText);
+    }
+
+    [Fact]
+    public void A_boolean_array_argument_round_trips_through_yaml_preserving_order()
+    {
+        RuleCompiler<YamlTestContext> compiler = new(
+            PredicateRegistry<YamlTestContext>
+                .CreateBuilder()
+                .Add(
+                    new PredicateSchema(
+                        "hasAnyFlag",
+                        "Has Any Flag",
+                        "True iff any of 'flags' matches.",
+                        [new PredicateArgumentSchema("flags", "The flags to check for.", LiteralKind.BooleanArray)]
+                    ),
+                    (_, args, _) => ValueTask.FromResult(args.GetBoolArray("flags").Count > 0)
+                )
+                .Build()
+        );
+        CompiledRule<YamlTestContext> original = compiler.Compile("hasAnyFlag(flags: [true, false])").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<YamlTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Equal("hasAnyFlag(flags: [true, false])", original.CanonicalText);
+    }
 }
