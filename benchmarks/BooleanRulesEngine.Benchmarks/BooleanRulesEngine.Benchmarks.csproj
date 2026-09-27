@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>9a2f7b6c-2f4e-4c1a-8d3e-6b5a1f0c2e7d</ProjectGuid>
+    <RootNamespace>BooleanRulesEngine.Benchmarks</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Not a shipping library: never packed, never a NuGet dependency of anything. -->
+    <Description>
+      BenchmarkDotNet suite measuring RuleCompiler compile-time cost (including BDD tautology/contradiction
+      analysis) and CompiledRule eval-time memoized term-lookup cost. Throwaway/dev-only project - not
+      packed, not referenced by src/ or any shipping package.
+    </Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/BooleanRulesEngine.Abstractions/BooleanRulesEngine.Abstractions.csproj" />
+    <ProjectReference Include="../../src/BooleanRulesEngine/BooleanRulesEngine.csproj" />
+    <ProjectReference Include="../../src/BooleanRulesEngine.Testing/BooleanRulesEngine.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+</Project>

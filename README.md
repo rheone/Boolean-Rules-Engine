@@ -38,6 +38,7 @@ anything else.
 - [Feature highlights](#feature-highlights)
 - [Glossary](#glossary)
 - [Appendix: Truth tables](#appendix-truth-tables)
+- [Benchmarks](#benchmarks)
 - [Design documents](#design-documents)
 - [Repository layout](#repository-layout)
 
@@ -1027,6 +1028,43 @@ are covered by the evaluator's behavior described in
 [Evaluation flow](#evaluation-flow) and tested directly in
 `XorExactlyOneThresholdTests`.
 
+## Benchmarks
+
+`benchmarks/BooleanRulesEngine.Benchmarks` is a [BenchmarkDotNet](https://benchmarkdotnet.org/)
+console project (dev-only — never packed, never referenced by `src/`) measuring:
+
+- **Compile-time cost** (`CompileBenchmarks.Compile`) — `RuleCompiler.CompileJson`'s full
+  Parse → Validate → Analyze → Build pipeline, including the BDD-based tautology/contradiction
+  analyzer, across a small (10-term) and a large (200-term) representative rule.
+- **Eval-time memoized term lookup** (`EvaluationBenchmarks.EvaluateAsync`) — `CompiledRule.EvaluateAsync`
+  against a rule whose branches all share one term, at increasing branch fan-out, exercising the
+  per-evaluation term memoization ADR-0002 describes.
+
+A committed baseline (captured with `--job Short`) lives at
+[`benchmarks/BooleanRulesEngine.Benchmarks/results/baseline-results.md`](benchmarks/BooleanRulesEngine.Benchmarks/results/baseline-results.md).
+
+Run the full suite (this repo's `net11.0` preview target isn't yet recognized by BenchmarkDotNet's
+default toolchain, so `--inProcess` is required — see the code comment on `CompileBenchmarks`/
+`EvaluationBenchmarks`' host project for why):
+
+```powershell
+dotnet build benchmarks/BooleanRulesEngine.Benchmarks -c Release
+dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --filter "*" --inProcess
+```
+
+Useful variations:
+
+```powershell
+# Discover benchmark names without running them
+dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --list flat
+
+# Fast smoke test (one iteration per case, no meaningful measurement)
+dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --filter "*" --job Dry --inProcess
+
+# Regenerate the committed baseline
+dotnet run -c Release --no-build --project benchmarks/BooleanRulesEngine.Benchmarks -- --filter "*" --job Short --inProcess --exporters github --artifacts ./benchmarks/BooleanRulesEngine.Benchmarks/results
+```
+
 ## Design documents
 
 - [CONTEXT.md](CONTEXT.md) — vocabulary, conceptual model, predicate-author
@@ -1048,6 +1086,8 @@ are covered by the evaluator's behavior described in
 - `src/BooleanRulesEngine` — parser, compiler, analyzer, evaluator, JSON, DI
 - `src/BooleanRulesEngine.Yaml` — YAML tree support
 - `tests/BooleanRulesEngine.Tests` — unit tests for all three packages
+- `benchmarks/BooleanRulesEngine.Benchmarks` — BenchmarkDotNet suite (dev-only, see
+  [Benchmarks](#benchmarks))
 - `docs/adr/` — architecture decision records
 - `CONTEXT.md` — domain vocabulary and model
 

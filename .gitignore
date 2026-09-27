@@ -28,6 +28,9 @@ coverage/
 *.coverage
 *.coveragexml
 
+# BenchmarkDotNet run output (not the committed baseline under benchmarks/*/results/)
+BenchmarkDotNet.Artifacts/
+
 # NuGet
 *.nupkg
 *.snupkg

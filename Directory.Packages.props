@@ -72,4 +72,11 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="11.0.100-rc.1.26425.128" />
   </ItemGroup>
+  <!-- BenchmarkDotNet - benchmarks-project-only (ticket: BenchmarkDotNet suite for compile and eval
+       performance). Never referenced by src/ or shipped in any package; the benchmarks project is a
+       throwaway console app that measures RuleCompiler/CompiledRule performance from outside the
+       library. -->
+  <ItemGroup>
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
 </Project>
