@@ -90,9 +90,9 @@ public sealed class MetricsTests
             this.listener.Start();
         }
 
-        public List<long> Measurements { get; } = [];
+        public ConcurrentBag<long> Measurements { get; } = [];
 
-        public List<Dictionary<string, string?>> Tags { get; } = [];
+        public ConcurrentBag<Dictionary<string, string?>> Tags { get; } = [];
 
         public void Dispose()
         {

@@ -1,6 +1,5 @@
 namespace TruthWeaver.Printing;
 
-using System.Diagnostics;
 using TruthWeaver.Abstractions;
 using TruthWeaver.Evaluation;
 
@@ -114,11 +113,9 @@ internal static class RuleRenderTree
     /// and <see cref="Evaluation.Evaluator{TContext}"/> respectively — see <c>evaluated-node-rule-description-alignment</c>
     /// ticket 02 for making that structurally impossible to violate instead of merely conventional), so
     /// nothing stops them from disagreeing on operand count if either traversal is edited carelessly.
-    /// Compiled out of Release builds (<see cref="ConditionalAttribute"/>) — this is an internal-consistency
-    /// guard for library development, not a production-path validation the two trees are always
-    /// constructed to satisfy.
+    /// Runs in every build: without it, a mismatch surfaces later as an <see cref="IndexOutOfRangeException"/>
+    /// from the positional zip below, which is far harder to diagnose than this guard's explicit message.
     /// </summary>
-    [Conditional("DEBUG")]
     private static void AssertOperandCountsAligned(RuleDescription description, EvaluatedNode? evaluated)
     {
         if (evaluated is { NotEvaluated: false } && evaluated.Children.Count != description.Operands.Count)

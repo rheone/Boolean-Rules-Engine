@@ -20,6 +20,11 @@ csharp_using_directive_placement = inside_namespace:warning
 csharp_prefer_simple_using_statement = true:suggestion
 csharp_prefer_system_threading_lock = true:suggestion
 
+# CSharpier does not indent a braced case-block body past its `case` label; the default here is
+# true, which disagreed with CSharpier and made `dotnet format --verify-no-changes` reformat
+# every braced switch case CSharpier had just formatted.
+csharp_indent_case_contents_when_block = false
+
 # Prefer explicit types by default; use var intentionally.
 csharp_style_var_for_built_in_types = false:suggestion
 csharp_style_var_when_type_is_apparent = false:suggestion

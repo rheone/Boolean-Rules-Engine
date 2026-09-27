@@ -150,8 +150,7 @@ public sealed class CompiledRule<TContext>
         }
 
         OperatorDescriptor descriptor = OperatorInfo.Describe(node);
-        IReadOnlyList<Expression> operands =
-            node is ConstantExpression ? Array.Empty<Expression>() : ExpressionShape.Of(node).Operands;
+        IReadOnlyList<Expression> operands = (node is ConstantExpression) ? [] : ExpressionShape.Of(node).Operands;
 
         return new RuleDescription(
             descriptor.Label,
