@@ -106,6 +106,17 @@ model — the operator set is small and closed by design
 point for operators would be speculative surface area with no current
 consumer.
 
+### Amendment: `RuleBuilder` is not a fourth front end
+
+`RuleBuilder` (`BooleanRulesEngine.Building`, added after this ADR was first
+accepted) lets a host assemble a rule tree fluently in C#. It lives inside
+`BooleanRulesEngine` itself rather than as a separate package or an
+extension point some other assembly could plug into: it renders to the same
+JSON tree shape [ADR-0003](0003-rule-syntax-and-serialization.md) already
+defines and compiles through the existing `CompileJson`, so it's a
+convenience wrapper over the closed operator set above, not a new surface
+that would need to independently track every operator this package adds.
+
 ## Consequences
 
 - A service that only implements domain predicates (e.g. a shared

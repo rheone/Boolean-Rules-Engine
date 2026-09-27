@@ -1,5 +1,10 @@
 # BooleanRulesEngine
 
+[![CI](https://github.com/rheone/Boolean-Rules-Engine/actions/workflows/ci.yml/badge.svg)](https://github.com/rheone/Boolean-Rules-Engine/actions/workflows/ci.yml)
+![Status](https://img.shields.io/badge/status-proof%20of%20concept-orange)
+[![.NET](https://img.shields.io/badge/.NET-11.0-512BD4)](global.json)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 A general-purpose boolean expression engine for .NET. Author a rule once as
 text, compile it into an immutable tree, and evaluate it many times against
 whatever application context you supply — a user, a request, a resource, or
@@ -8,7 +13,34 @@ anything else.
 > [!NOTE]
 > This is a proof of concept. The design and rationale behind every decision
 > below live in [CONTEXT.md](CONTEXT.md) and [docs/adr/](docs/adr/) — read
-> those before making structural changes.
+> those before making structural changes. There is no published NuGet
+> package yet (`Version` is `1.0.0-dev`); build from source.
+
+<details>
+<summary><strong>Table of contents</strong></summary>
+
+- [Getting started](#getting-started)
+- [What it is (and isn't)](#what-it-is-and-isnt)
+- [Operators](#operators)
+  - [Order of operations](#order-of-operations)
+  - [Binary vs. unary operators](#binary-vs-unary-operators)
+  - [All operators](#all-operators)
+- [Packages](#packages)
+- [Choosing a rule format](#choosing-a-rule-format)
+- [Predicate types](#predicate-types)
+- [Examples](#examples)
+- [Building rules programmatically](#building-rules-programmatically)
+  - [Converting between DSL, JSON, and YAML](#converting-between-dsl-json-and-yaml)
+  - [`RuleBuilder` reference](#rulebuilder-reference)
+- [Evaluation flow](#evaluation-flow)
+- [Compilation pipeline](#compilation-pipeline)
+- [Feature highlights](#feature-highlights)
+- [Glossary](#glossary)
+- [Appendix: Truth tables](#appendix-truth-tables)
+- [Design documents](#design-documents)
+- [Repository layout](#repository-layout)
+
+</details>
 
 ## Getting started
 
@@ -215,6 +247,108 @@ it's nested under (e.g. `a AND b OR c` prints as `(a AND b) OR c`), even
 where precedence alone already makes the parse unambiguous. The goal is a
 rule that reads clearly at a glance without the reader reconstructing
 precedence mentally, not merely one that reparses correctly.
+
+## Predicate types
+
+Every predicate is one of four registration shapes, and they mix freely
+within one `PredicateRegistryBuilder<TContext>.Build()`. Two independent
+axes: **how many rule-authored arguments** it takes (zero, one, or several —
+"n"), and **where its implementation comes from** (a stateless lambda, or a
+class resolved from DI).
+
+| Shape | Arguments | Implementation | When to use |
+| --- | --- | --- | --- |
+| Lambda, 0 args | none | stateless delegate | A simple stateless check with no rule-authored parameter. |
+| Lambda, 1 arg | one | stateless delegate with a 1-argument schema | The common case — a stateless check parameterized by the rule text, e.g. `hasRole(role: "Y")`. |
+| Class-based (DI), 0 args | none | `IPredicate<TContext>` | Needs a scoped/injected dependency but no rule-authored parameter. |
+| Class-based (DI), n args | several | `IPredicate<TContext>` with a multi-argument schema | Needs both rule-authored parameters *and* one or more injected dependencies. |
+
+### 0 arguments, stateless lambda
+
+```csharp
+.Add(
+    PredicateSchema.NoArguments("isSuspended", "Is the current user's account suspended?"),
+    (user, args, ct) => ValueTask.FromResult(user.IsSuspended))
+```
+
+### 1 argument, stateless lambda
+
+See [Example 3](#3-named-arguments)'s `hasRole(role: "Y")` — a single named
+`string` argument, no injected dependency.
+
+### 0 arguments, class-based (DI)
+
+See [Example 1](#1-a-single-predicate)'s `IsManager` — a class implementing
+`IPredicate<TContext>`, resolved fresh from `IServiceProvider` on every
+evaluation (the right shape whenever a scoped dependency, e.g. a
+`DbContext`, is involved, even with no rule-authored parameter).
+
+### n arguments, class-based, multiple injected dependencies
+
+The shape that combines everything: two rule-authored arguments *and* two
+constructor-injected dependencies, resolved from DI per evaluation:
+
+```csharp
+public sealed class HasEnoughRecentApprovals : IPredicate<Resource>
+{
+    private readonly IApprovalStore approvals;
+    private readonly TimeProvider clock;
+
+    public HasEnoughRecentApprovals(IApprovalStore approvals, TimeProvider clock)
+    {
+        this.approvals = approvals;
+        this.clock = clock;
+    }
+
+    public static PredicateSchema Schema =>
+        new(
+            "hasEnoughRecentApprovals",
+            "Has the resource received at least the given number of approvals within the given time window?",
+            [
+                new PredicateArgumentSchema("minCount", "The minimum number of approvals required.", LiteralKind.Int64),
+                new PredicateArgumentSchema("withinHours", "The lookback window, in hours.", LiteralKind.Int64),
+            ]);
+
+    public async ValueTask<bool> EvaluateAsync(Resource resource, PredicateArguments args, CancellationToken ct)
+    {
+        long minCount = args.GetInt64("minCount");
+        long withinHours = args.GetInt64("withinHours");
+        DateTimeOffset cutoff = this.clock.GetUtcNow().AddHours(-withinHours);
+
+        long count = await this.approvals.CountApprovalsSinceAsync(resource.Id, cutoff, ct);
+        return count >= minCount;
+    }
+}
+```
+
+Used in a rule as `hasEnoughRecentApprovals(minCount: 2, withinHours: 24)`.
+`IApprovalStore` might be scoped (an `IDbContextFactory`-backed store) and
+`TimeProvider` is typically a singleton — both resolve correctly on every
+evaluation because the predicate itself is resolved fresh from
+`IServiceProvider`, not constructed once at registration.
+
+Wiring it up: **`AddBooleanRulesEngine` registers the registry and compiler,
+not the predicate types themselves** — a class-based predicate (and its own
+dependencies) must be registered in the host's container separately, same
+as any other DI service:
+
+```csharp
+services.AddScoped<IApprovalStore, ApprovalStore>();
+services.AddSingleton(TimeProvider.System);
+services.AddScoped<HasEnoughRecentApprovals>();      // the predicate type itself
+services.AddScoped<IsManager>();
+
+services.AddBooleanRulesEngine<Resource>(builder => builder
+    .Add<IsManager>()
+    .Add<HasEnoughRecentApprovals>());
+```
+
+Both lambda and class-based predicates register against the same
+`PredicateRegistryBuilder<TContext>.Add(...)` overloads — the difference is
+purely dependency lifetime and how many rule-authored arguments the schema
+declares, never a difference in rule text or how the compiler validates a
+term. See
+[ADR-0002](docs/adr/0002-evaluation-semantics.md#predicate-registration-and-dependency-lifetimes).
 
 ## Examples
 
@@ -530,63 +664,6 @@ severity, source span) in the returned `CompilationResult<TContext>`.
 diagnostics, which is what makes "a bad edit is rejected, the previously
 persisted rule stays active" true by construction rather than by convention.
 Full reasoning: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
-
-## Predicate types
-
-Four registration shapes cover every predicate this engine supports, and mix
-freely within one `PredicateRegistryBuilder<TContext>.Build()`:
-
-| Shape | Arguments? | Implementation | When to use |
-| --- | --- | --- | --- |
-| Class-based, zero-argument | No | `IPredicate<TContext>` | Needs a scoped dependency (`DbContext`, per-request service) but no rule-authored parameter. |
-| Class-based, parameterized | Yes | `IPredicate<TContext>` with a non-empty schema | Needs both a scoped dependency *and* rule-authored parameters. |
-| Lambda, zero-argument | No | stateless delegate | A simple stateless check with no rule-authored parameter. |
-| Lambda, parameterized | Yes | stateless delegate with a non-empty schema | The common case — a stateless check parameterized by the rule text, e.g. `hasRole(role: "Y")`. |
-
-**Class-based, zero-argument** — see [Example 1](#1-a-single-predicate)'s
-`IsManager`, resolved fresh from `IServiceProvider` on every evaluation.
-
-**Class-based, parameterized** — same resolution story, plus a schema:
-
-```csharp
-public sealed class HasMinimumTenure : IPredicate<User>
-{
-    public static PredicateSchema Schema =>
-        new(
-            "hasMinimumTenure",
-            "Has the current user been employed at least the given number of days?",
-            [new PredicateArgumentSchema("days", "The minimum tenure, in days.", LiteralKind.Int64)]);
-
-    public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct)
-    {
-        long minimumDays = args.GetInt64("days");
-        bool result = (DateTimeOffset.UtcNow - user.HireDate).TotalDays >= minimumDays;
-        return ValueTask.FromResult(result);
-    }
-}
-```
-
-Reach for this shape when a parameterized check also needs a scoped
-dependency — e.g. querying a `DbContext` for the value to compare `days`
-against, rather than reading it straight off `user`.
-
-**Lambda, zero-argument**:
-
-```csharp
-.Add(
-    PredicateSchema.NoArguments("isSuspended", "Is the current user's account suspended?"),
-    (user, args, ct) => ValueTask.FromResult(user.IsSuspended))
-```
-
-**Lambda, parameterized** — see [Example 3](#3-named-arguments)'s `hasRole`.
-
-Both class-based and lambda predicates register against the same
-`PredicateRegistryBuilder<TContext>.Add(...)` overloads — the difference is
-purely dependency lifetime (class-based predicates resolve fresh from
-`IServiceProvider` per evaluation; lambdas are stateless), never a
-difference in rule text, schema shape, or how the compiler validates a
-term. See
-[ADR-0002](docs/adr/0002-evaluation-semantics.md#predicate-registration-and-dependency-lifetimes).
 
 ## Building rules programmatically
 

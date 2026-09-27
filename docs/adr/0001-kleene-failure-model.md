@@ -77,9 +77,12 @@ traces.
 | `True` | `False` |
 | `U` | `U` |
 
-`XOR`, `ExactlyOne`, and `AtLeast(k)` follow the same principle: the result
-is determinate only when it is determinate regardless of what an `Unknown`
-operand would have resolved to; otherwise it is `Unknown`.
+`XOR`, `XNOR`, `ExactlyOne`, and the threshold family (`AtLeast(k)`/
+`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, added after this ADR
+was first accepted — see [ADR-0003's Amendments](0003-rule-syntax-and-serialization.md#amendments))
+follow the same principle: the result is determinate only when it is
+determinate regardless of what an `Unknown` operand would have resolved to;
+otherwise it is `Unknown`.
 
 **A predicate signals a fault by throwing.** The evaluator catches the
 exception at the term boundary, records a `Fault` (term identity + the
@@ -116,10 +119,10 @@ denying with no signal that anything went wrong.
 - A single unresolvable term does not necessarily fail an evaluation; only
   the terms whose values are actually load-bearing for the final result do.
   This is a direct efficiency and availability win over option 1 or 2.
-- Every operator implementation (`AND`, `OR`, `NOT`, `XOR`, `ExactlyOne`,
-  `AtLeast`) must be written against the three-valued truth tables, not
-  lifted naively from two-valued C# `&&`/`||`, which do not have `Unknown`
-  semantics to begin with.
+- Every operator implementation (`AND`, `OR`, `NOT`, `XOR`, `XNOR`,
+  `ExactlyOne`, and the threshold family) must be written against the
+  three-valued truth tables, not lifted naively from two-valued C# `&&`/`||`,
+  which do not have `Unknown` semantics to begin with.
 - Callers who need fail-fast-on-any-fault behavior (e.g. during a known
   outage) use `EvaluationOptions.FaultBudget` (see
   [ADR-0002](0002-evaluation-semantics.md)) rather than the engine changing

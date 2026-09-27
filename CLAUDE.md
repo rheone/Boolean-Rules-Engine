@@ -4,8 +4,8 @@
 
 This repository contains the **BooleanRulesEngine** C# library.
 
-Target framework: `__TARGET__`
-Pinned SDK: `__SDK__`
+Target framework: `net11.0`
+Pinned SDK: `11.0.100-rc.1.26425.128` (see `global.json`)
 
 The repository uses:
 
