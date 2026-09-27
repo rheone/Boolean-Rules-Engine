@@ -215,6 +215,33 @@ public sealed class RuleTreeRenderingTests
         Assert.Contains("&&", mermaid);
     }
 
+    [Fact]
+    public void Mermaid_output_escapes_double_quotes_in_labels()
+    {
+        RuleDescription node = Leaf("has \"quotes\" inside");
+
+        string mermaid = MermaidTreePrinter.Print(node);
+
+        Assert.Contains("#quot;", mermaid);
+        Assert.Contains("n0[\"has #quot;quotes#quot; inside\"]", mermaid);
+        Assert.DoesNotContain("[\"has \"quotes\" inside\"]", mermaid);
+    }
+
+    [Theory]
+    [InlineData("line one\r\nline two")]
+    [InlineData("line one\rline two")]
+    [InlineData("line one\nline two")]
+    public void Mermaid_output_sanitizes_carriage_returns_and_newlines_in_labels(string label)
+    {
+        RuleDescription node = Leaf(label);
+
+        string mermaid = MermaidTreePrinter.Print(node);
+
+        Assert.DoesNotContain('\r', mermaid);
+        Assert.DoesNotContain("line one\nline two", mermaid);
+        Assert.Matches(@"n0\[""line one +line two""\]", mermaid);
+    }
+
     private static RuleDescription BinaryNode(string label)
     {
         return new RuleDescription(label, "desc", [Leaf("a"), Leaf("b")]);
