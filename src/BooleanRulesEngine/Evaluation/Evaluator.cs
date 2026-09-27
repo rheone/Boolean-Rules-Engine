@@ -3,6 +3,7 @@ namespace BooleanRulesEngine.Evaluation;
 using BooleanRulesEngine.Abstractions;
 using BooleanRulesEngine.Ast;
 using BooleanRulesEngine.Logging;
+using BooleanRulesEngine.Metrics;
 using BooleanRulesEngine.Registry;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -38,6 +39,7 @@ internal sealed class Evaluator<TContext>(
     public async Task<Decision> EvaluateAsync(Expression root)
     {
         EvalResult result = await this.EvalAsync(root).ConfigureAwait(false);
+        BooleanRulesEngineMetrics.EvaluationPerformed();
         return new Decision(result.Value, this.faults, new Trace(this.trace), result.Node);
     }
 
@@ -343,6 +345,7 @@ internal sealed class Evaluator<TContext>(
         {
             this.faults.Add(new Fault(identity, ex));
             EvaluationLog.PredicateFaulted(this.logger, identity.ToString(), ex.Message, ex);
+            BooleanRulesEngineMetrics.FaultRecorded();
 
             // Ticket 11's acceptance criteria (FaultBudget = 1 tolerates the first fault and aborts
             // on the second) takes precedence over ADR-0002's own prose example (which reads as

@@ -8,6 +8,7 @@ using BooleanRulesEngine.Diagnostics;
 using BooleanRulesEngine.Evaluation;
 using BooleanRulesEngine.Json;
 using BooleanRulesEngine.Logging;
+using BooleanRulesEngine.Metrics;
 using BooleanRulesEngine.Parsing;
 using BooleanRulesEngine.Registry;
 using Microsoft.Extensions.Logging;
@@ -148,6 +149,7 @@ public sealed class RuleCompiler<TContext>(
                 diagnostic.Span.Start,
                 diagnostic.Span.Length
             );
+            BooleanRulesEngineMetrics.CompileDiagnosticRaised(diagnostic.Severity);
         }
     }
 }

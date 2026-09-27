@@ -4,9 +4,9 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A `Meter` is exposed with counters for: evaluations performed, faults recorded, compile diagnostics raised (tagged by `DiagnosticSeverity`)
-- [ ] Counters increment correctly under a test using a `MeterListener`, verified for at least one evaluation and one compile that raises a diagnostic
-- [ ] No new third-party dependency is introduced
-- [ ] Documented in the README's Feature highlights section alongside the existing structured-logging bullet
+- [x] A `Meter` is exposed with counters for: evaluations performed, faults recorded, compile diagnostics raised (tagged by `DiagnosticSeverity`)
+- [x] Counters increment correctly under a test using a `MeterListener`, verified for at least one evaluation and one compile that raises a diagnostic
+- [x] No new third-party dependency is introduced
+- [x] Documented in the README's Feature highlights section alongside the existing structured-logging bullet

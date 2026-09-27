@@ -902,6 +902,11 @@ void Print(RuleDescription node, int depth = 0)
 - **Structured logging.** Faults, compile diagnostics, and rule-swap
   notifications log as structured events through `ILogger<T>` — never a
   concrete provider.
+- **`System.Diagnostics.Metrics` instrumentation.** A `"BooleanRulesEngine"`
+  `Meter` exposes counters for evaluations performed, faults recorded, and
+  compile diagnostics raised (tagged by severity) — observable through any
+  `MeterListener`-based collector, including OpenTelemetry's `AddMeter`, with
+  no new dependency.
 
 ## Glossary
 
