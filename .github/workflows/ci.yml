@@ -20,20 +20,33 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Restore tools
+        run: dotnet tool restore
+
       - name: Restore
-        run: dotnet restore __SOLUTION__ --locked-mode
+        run: dotnet restore BooleanRulesEngine.slnx --locked-mode
 
       - name: Build
-        run: dotnet build __SOLUTION__ --configuration Release --no-restore
+        run: dotnet build BooleanRulesEngine.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test __SOLUTION__ --configuration Release --no-build
+        run: dotnet test BooleanRulesEngine.slnx --configuration Release --no-build
 
       - name: CSharpier
         run: dotnet csharpier check .
 
       - name: dotnet format
-        run: dotnet format __SOLUTION__ --no-restore --verify-no-changes --severity info
+        run: dotnet format BooleanRulesEngine.slnx --no-restore --verify-no-changes --severity info
 
       - name: Roslynator
-        run: dotnet roslynator analyze __SOLUTION__
+        # roslynator analyze doesn't support .slnx (Roslyn's MSBuildWorkspace has no language
+        # mapping for it - see error: "Cannot open project ... because the file extension '.slnx'
+        # is not associated with a language"), so each project is analyzed individually.
+        run: |
+          for project in \
+            src/BooleanRulesEngine.Abstractions/BooleanRulesEngine.Abstractions.csproj \
+            src/BooleanRulesEngine/BooleanRulesEngine.csproj \
+            src/BooleanRulesEngine.Yaml/BooleanRulesEngine.Yaml.csproj \
+            tests/BooleanRulesEngine.Tests/BooleanRulesEngine.Tests.csproj; do
+            dotnet roslynator analyze "$project"
+          done
