@@ -283,7 +283,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             LiteralKind.Int64 => this.int64Value.ToString(CultureInfo.InvariantCulture),
             LiteralKind.Decimal => this.decimalValue.ToString(CultureInfo.InvariantCulture),
             LiteralKind.Boolean => this.booleanValue ? "true" : "false",
-            LiteralKind.DateTimeOffset => this.dateTimeOffsetValue.ToString("O", CultureInfo.InvariantCulture),
+            LiteralKind.DateTimeOffset => $"\"{this.dateTimeOffsetValue.ToString("O", CultureInfo.InvariantCulture)}\"",
             LiteralKind.Guid => $"\"{this.guidValue}\"",
             _ => "[" + string.Join(", ", this.arrayValue.Select(v => v.ToString())) + "]",
         };

@@ -23,6 +23,7 @@
     <PackageReference Include="NSubstitute.Analyzers.CSharp" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="CsCheck" />
   </ItemGroup>
 
   <!-- The published JSON Schema for the ADR-0003 rule tree, linked in so schema-validation tests can

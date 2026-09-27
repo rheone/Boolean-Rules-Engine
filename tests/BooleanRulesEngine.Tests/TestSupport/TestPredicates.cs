@@ -148,4 +148,29 @@ public static class TestPredicates
             (_, args, _) => ValueTask.FromResult(args.GetGuid(argumentName) == matchValue)
         );
     }
+
+    /// <summary>Registers a single-DateTimeOffset-argument predicate whose truth is "does the argument equal <paramref name="matchValue"/>?".</summary>
+    public static PredicateRegistryBuilder<RuleTestContext> AddDateTimeOffsetArgPredicate(
+        this PredicateRegistryBuilder<RuleTestContext> builder,
+        string name,
+        string argumentName,
+        DateTimeOffset matchValue
+    )
+    {
+        return builder.Add(
+            new PredicateSchema(
+                name,
+                name,
+                $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue:O}'.",
+                [
+                    new PredicateArgumentSchema(
+                        argumentName,
+                        $"The date/time to compare against '{matchValue:O}'.",
+                        LiteralKind.DateTimeOffset
+                    ),
+                ]
+            ),
+            (_, args, _) => ValueTask.FromResult(args.GetDateTimeOffset(argumentName) == matchValue)
+        );
+    }
 }

@@ -111,6 +111,25 @@ public sealed class CanonicalPrinterTests
     }
 
     [Fact]
+    public void A_datetimeoffset_argument_prints_as_a_quoted_string_and_round_trips_to_a_structurally_equal_tree()
+    {
+        DateTimeOffset matchValue = new(2024, 3, 17, 9, 30, 0, TimeSpan.FromHours(-5));
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddDateTimeOffsetArgPredicate("startedAt", "when", matchValue)
+                .Build()
+        );
+
+        CompiledRule<RuleTestContext> original = compiler.Compile($"startedAt(when: \"{matchValue:O}\")").CompiledRule!;
+
+        Assert.Equal($"startedAt(when: \"{matchValue:O}\")", original.CanonicalText);
+
+        CompiledRule<RuleTestContext> reparsed = compiler.Compile(original.CanonicalText).CompiledRule!;
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+    }
+
+    [Fact]
     public void Printing_the_same_tree_twice_is_byte_identical()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
