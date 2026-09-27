@@ -108,6 +108,38 @@ public sealed class CompilerLimitsAndLenientModeTests
     }
 
     [Fact]
+    public void Lenient_mode_heterogeneous_array_literal_against_unregistered_predicate_compiles_without_error()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().Build(),
+            new CompilerOptions(Mode: CompilationMode.Lenient)
+        );
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("noSuchPredicate(values: [1, \"two\", 3])");
+
+        Assert.True(result.Succeeded);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task Lenient_mode_heterogeneous_array_literal_term_still_evaluates_to_unknown_at_runtime()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().Build(),
+            new CompilerOptions(Mode: CompilationMode.Lenient)
+        );
+        CompiledRule<RuleTestContext> rule = compiler.Compile("noSuchPredicate(values: [1, \"two\", 3])").CompiledRule!;
+
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(TruthValue.Unknown, decision.Result);
+    }
+
+    [Fact]
     public void Strict_mode_rejects_the_identical_rule_text_lenient_mode_accepts()
     {
         RuleCompiler<RuleTestContext> strictCompiler = new(PredicateRegistry<RuleTestContext>.CreateBuilder().Build());
