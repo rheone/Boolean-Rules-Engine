@@ -1,5 +1,6 @@
 namespace BooleanRulesEngine.Json;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using BooleanRulesEngine.Ast;
 using BooleanRulesEngine.Diagnostics;
@@ -25,9 +26,10 @@ internal static class JsonTreeParser
     /// The parsed root node (or <see langword="null"/> if the JSON itself was malformed) and the
     /// diagnostics raised while parsing.
     /// </returns>
-    public static (RuleNode? Root, IReadOnlyList<Diagnostic> Diagnostics) Parse(string json)
+    public static (RuleNode? Root, IReadOnlyList<Diagnostic> Diagnostics) Parse(
+        [StringSyntax(StringSyntaxAttribute.Json)] string json
+    )
     {
-        List<Diagnostic> diagnostics = [];
         JsonDocument document;
         try
         {
@@ -35,15 +37,30 @@ internal static class JsonTreeParser
         }
         catch (JsonException ex)
         {
-            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Malformed JSON: {ex.Message}", SourceSpan.None));
+            List<Diagnostic> diagnostics =
+            [
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Malformed JSON: {ex.Message}", SourceSpan.None),
+            ];
             return (null, diagnostics);
         }
 
         using (document)
         {
-            RuleNode? root = ParseNode(document.RootElement, diagnostics);
-            return (root, diagnostics);
+            return Parse(document.RootElement);
         }
+    }
+
+    /// <summary>Parses an already-materialized JSON tree node (e.g. a subtree of a larger document) into a raw <see cref="RuleNode"/> tree plus any diagnostics.</summary>
+    /// <param name="element">The JSON tree node.</param>
+    /// <returns>
+    /// The parsed root node (or <see langword="null"/> if the element was malformed) and the
+    /// diagnostics raised while parsing.
+    /// </returns>
+    public static (RuleNode? Root, IReadOnlyList<Diagnostic> Diagnostics) Parse(JsonElement element)
+    {
+        List<Diagnostic> diagnostics = [];
+        RuleNode? root = ParseNode(element, diagnostics);
+        return (root, diagnostics);
     }
 
     private static RuleNode? ParseNode(JsonElement element, List<Diagnostic> diagnostics)

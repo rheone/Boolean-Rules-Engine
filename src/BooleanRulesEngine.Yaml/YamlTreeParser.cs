@@ -23,7 +23,6 @@ internal static class YamlTreeParser
     /// </returns>
     public static (RuleNode? Root, IReadOnlyList<Diagnostic> Diagnostics) Parse(string yaml)
     {
-        List<Diagnostic> diagnostics = [];
         YamlStream stream = [];
         try
         {
@@ -32,17 +31,35 @@ internal static class YamlTreeParser
         }
         catch (YamlException ex)
         {
-            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Malformed YAML: {ex.Message}", SourceSpan.None));
+            List<Diagnostic> diagnostics =
+            [
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Malformed YAML: {ex.Message}", SourceSpan.None),
+            ];
             return (null, diagnostics);
         }
 
         if (stream.Documents.Count == 0)
         {
-            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, "The YAML document is empty.", SourceSpan.None));
+            List<Diagnostic> diagnostics =
+            [
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, "The YAML document is empty.", SourceSpan.None),
+            ];
             return (null, diagnostics);
         }
 
-        RuleNode? root = ParseNode(stream.Documents[0].RootNode, diagnostics);
+        return Parse(stream.Documents[0].RootNode);
+    }
+
+    /// <summary>Parses an already-materialized YAML tree node (e.g. a subtree of a larger document) into a raw <see cref="RuleNode"/> tree plus any diagnostics.</summary>
+    /// <param name="node">The YAML tree node.</param>
+    /// <returns>
+    /// The parsed root node (or <see langword="null"/> if the node was malformed) and the
+    /// diagnostics raised while parsing.
+    /// </returns>
+    public static (RuleNode? Root, IReadOnlyList<Diagnostic> Diagnostics) Parse(YamlNode node)
+    {
+        List<Diagnostic> diagnostics = [];
+        RuleNode? root = ParseNode(node, diagnostics);
         return (root, diagnostics);
     }
 

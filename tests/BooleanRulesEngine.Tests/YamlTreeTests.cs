@@ -6,6 +6,7 @@ using BooleanRulesEngine.Evaluation;
 using BooleanRulesEngine.Registry;
 using BooleanRulesEngine.Tests.TestSupport;
 using BooleanRulesEngine.Yaml;
+using YamlDotNet.RepresentationModel;
 
 /// <summary>Ticket 08: YAML tree parse/print.</summary>
 public sealed class YamlTreeTests
@@ -153,6 +154,92 @@ public sealed class YamlTreeTests
                 d.Code == DiagnosticCodes.MalformedTree
                 && d.Message.Contains(expectedMessageSubstring, StringComparison.Ordinal)
         );
+    }
+
+    [Fact]
+    public void Compiling_a_yaml_node_subtree_is_structurally_equal_to_compiling_the_same_tree_as_standalone_text()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        YamlMappingNode document = LoadYamlMappingRoot(
+            $"""
+            metadata:
+              name: example
+              version: 1
+            rule:
+            {Indent(WorkedExampleYaml)}
+            """
+        );
+        YamlNode ruleNode = document.Children[new YamlScalarNode("rule")];
+
+        CompiledRule<RuleTestContext> fromNode = compiler.CompileYaml(ruleNode).CompiledRule!;
+        CompiledRule<RuleTestContext> fromText = compiler.CompileYaml(WorkedExampleYaml).CompiledRule!;
+
+        Assert.Equal(fromText.CanonicalText, fromNode.CanonicalText);
+    }
+
+    [Fact]
+    public void Two_sibling_rule_expressions_in_one_document_compile_independently_with_no_cross_talk()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        YamlMappingNode document = LoadYamlMappingRoot(
+            """
+            first:
+              predicate: isManager
+            second:
+              op: bogus
+              operands: []
+            """
+        );
+        YamlNode firstNode = document.Children[new YamlScalarNode("first")];
+        YamlNode secondNode = document.Children[new YamlScalarNode("second")];
+
+        CompilationResult<RuleTestContext> firstResult = compiler.CompileYaml(firstNode);
+        CompilationResult<RuleTestContext> secondResult = compiler.CompileYaml(secondNode);
+
+        Assert.True(firstResult.Succeeded);
+        Assert.Empty(firstResult.Diagnostics);
+        Assert.False(secondResult.Succeeded);
+        Assert.Contains(
+            secondResult.Diagnostics,
+            d =>
+                d.Code == DiagnosticCodes.MalformedTree
+                && d.Message.Contains("Unknown operator 'bogus'.", StringComparison.Ordinal)
+        );
+    }
+
+    [Fact]
+    public void A_malformed_yaml_node_produces_the_same_diagnostic_as_the_equivalent_standalone_yaml_text()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        const string malformedYaml = "nothingRecognized: true";
+        YamlNode node = LoadYamlRoot(malformedYaml);
+
+        CompilationResult<RuleTestContext> fromNode = compiler.CompileYaml(node);
+        CompilationResult<RuleTestContext> fromText = compiler.CompileYaml(malformedYaml);
+
+        Assert.False(fromNode.Succeeded);
+        Assert.Equal(
+            fromText.Diagnostics.Select(d => (d.Code, d.Message)),
+            fromNode.Diagnostics.Select(d => (d.Code, d.Message))
+        );
+    }
+
+    private static YamlNode LoadYamlRoot(string yaml)
+    {
+        YamlStream stream = [];
+        using StringReader reader = new(yaml);
+        stream.Load(reader);
+        return stream.Documents[0].RootNode;
+    }
+
+    private static YamlMappingNode LoadYamlMappingRoot(string yaml)
+    {
+        return (YamlMappingNode)LoadYamlRoot(yaml);
+    }
+
+    private static string Indent(string yaml)
+    {
+        return string.Join('\n', yaml.Split('\n').Select(line => line.Length == 0 ? line : "  " + line));
     }
 
     private static RuleCompiler<RuleTestContext> CreateCompiler()

@@ -1,5 +1,6 @@
 namespace BooleanRulesEngine.Tests;
 
+using System.Text.Json;
 using BooleanRulesEngine.Compilation;
 using BooleanRulesEngine.Diagnostics;
 using BooleanRulesEngine.Evaluation;
@@ -150,6 +151,71 @@ public sealed class JsonTreeTests
             d =>
                 d.Code == DiagnosticCodes.MalformedTree
                 && d.Message.Contains(expectedMessageSubstring, StringComparison.Ordinal)
+        );
+    }
+
+    [Fact]
+    public void Compiling_a_json_element_subtree_is_structurally_equal_to_compiling_the_same_tree_as_standalone_text()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        using JsonDocument document = JsonDocument.Parse(
+            $$"""
+            {
+              "metadata": { "name": "example", "version": 1 },
+              "rule": {{WorkedExampleJson}}
+            }
+            """
+        );
+
+        CompiledRule<RuleTestContext> fromElement = compiler
+            .CompileJson(document.RootElement.GetProperty("rule"))
+            .CompiledRule!;
+        CompiledRule<RuleTestContext> fromText = compiler.CompileJson(WorkedExampleJson).CompiledRule!;
+
+        Assert.Equal(fromText.CanonicalText, fromElement.CanonicalText);
+    }
+
+    [Fact]
+    public void Two_sibling_rule_expressions_in_one_document_compile_independently_with_no_cross_talk()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        using JsonDocument document = JsonDocument.Parse(
+            """
+            {
+              "first": { "predicate": "isManager" },
+              "second": { "op": "bogus", "operands": [] }
+            }
+            """
+        );
+
+        CompilationResult<RuleTestContext> firstResult = compiler.CompileJson(document.RootElement.GetProperty("first"));
+        CompilationResult<RuleTestContext> secondResult = compiler.CompileJson(document.RootElement.GetProperty("second"));
+
+        Assert.True(firstResult.Succeeded);
+        Assert.Empty(firstResult.Diagnostics);
+        Assert.False(secondResult.Succeeded);
+        Assert.Contains(
+            secondResult.Diagnostics,
+            d =>
+                d.Code == DiagnosticCodes.MalformedTree
+                && d.Message.Contains("Unknown operator 'bogus'.", StringComparison.Ordinal)
+        );
+    }
+
+    [Fact]
+    public void A_malformed_json_element_produces_the_same_diagnostic_as_the_equivalent_standalone_json_text()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        const string malformedJson = """{"nothingRecognized": true}""";
+        using JsonDocument document = JsonDocument.Parse(malformedJson);
+
+        CompilationResult<RuleTestContext> fromElement = compiler.CompileJson(document.RootElement);
+        CompilationResult<RuleTestContext> fromText = compiler.CompileJson(malformedJson);
+
+        Assert.False(fromElement.Succeeded);
+        Assert.Equal(
+            fromText.Diagnostics.Select(d => (d.Code, d.Message)),
+            fromElement.Diagnostics.Select(d => (d.Code, d.Message))
         );
     }
 

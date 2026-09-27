@@ -136,6 +136,19 @@ same information. YAML uses the identical shape under YamlDotNet.
 The `true`/`false` constant (user story 11) uses the same discrimination
 principle with a third key: `{"const": true}` / `{"const": false}`.
 
+Both `RuleCompiler.CompileJson` and `CompileYaml` also accept an
+already-materialized node (`System.Text.Json.JsonElement` /
+`YamlDotNet.RepresentationModel.YamlNode`) in addition to standalone text, so
+a caller embedding a rule as one field of a larger document can compile it
+directly from the field it already parsed, without re-serializing that
+subtree back to text first. Locating that subtree is ordinary caller-side
+navigation through the JSON/YAML library's own node APIs (`GetProperty`,
+`mapping.Children[...]`, etc.) — the engine adds no path/pointer syntax of
+its own for it. This is the same rationale as the decision above against
+context-path argument values: a path-expression grammar is a real
+sub-language to design and version, and the engine stays out of that
+business at both the argument level and the document-navigation level.
+
 ### Compilation pipeline
 
 ```mermaid

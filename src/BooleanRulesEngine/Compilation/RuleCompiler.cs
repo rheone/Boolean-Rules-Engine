@@ -1,5 +1,7 @@
 namespace BooleanRulesEngine.Compilation;
 
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using BooleanRulesEngine.Analysis;
 using BooleanRulesEngine.Ast;
 using BooleanRulesEngine.Diagnostics;
@@ -45,16 +47,24 @@ public sealed class RuleCompiler<TContext>(
     /// <summary>Compiles the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
     /// <param name="json">The JSON tree text.</param>
     /// <returns>The compilation result.</returns>
-    public CompilationResult<TContext> CompileJson(string json)
+    public CompilationResult<TContext> CompileJson([StringSyntax(StringSyntaxAttribute.Json)] string json)
     {
         (RuleNode? root, IReadOnlyList<Diagnostic> parseDiagnostics) = JsonTreeParser.Parse(json);
-        if (root is null)
-        {
-            this.LogDiagnostics(parseDiagnostics);
-            return new CompilationResult<TContext>(null, parseDiagnostics);
-        }
+        return this.CompileFromParsedJson(root, parseDiagnostics);
+    }
 
-        return this.CompileNode(root, parseDiagnostics);
+    /// <summary>
+    /// Compiles the flat, key-discriminated JSON tree shape (ADR-0003) from a <see cref="JsonElement"/>
+    /// already extracted from a larger document — e.g. one field of a multi-rule document parsed with
+    /// <see cref="JsonDocument"/> — rather than requiring the caller to re-serialize it to standalone
+    /// JSON text first.
+    /// </summary>
+    /// <param name="element">The JSON tree node.</param>
+    /// <returns>The compilation result.</returns>
+    public CompilationResult<TContext> CompileJson(JsonElement element)
+    {
+        (RuleNode? root, IReadOnlyList<Diagnostic> parseDiagnostics) = JsonTreeParser.Parse(element);
+        return this.CompileFromParsedJson(root, parseDiagnostics);
     }
 
     /// <summary>
@@ -79,6 +89,17 @@ public sealed class RuleCompiler<TContext>(
     internal CompilationResult<TContext> CompileFromNode(RuleNode root, IReadOnlyList<Diagnostic> frontEndDiagnostics)
     {
         return this.CompileNode(root, frontEndDiagnostics);
+    }
+
+    private CompilationResult<TContext> CompileFromParsedJson(RuleNode? root, IReadOnlyList<Diagnostic> parseDiagnostics)
+    {
+        if (root is null)
+        {
+            this.LogDiagnostics(parseDiagnostics);
+            return new CompilationResult<TContext>(null, parseDiagnostics);
+        }
+
+        return this.CompileNode(root, parseDiagnostics);
     }
 
     private CompilationResult<TContext> CompileNode(RuleNode root, IReadOnlyList<Diagnostic> frontEndDiagnostics)
