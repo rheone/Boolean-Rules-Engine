@@ -18,10 +18,10 @@ After the rename, update the local `origin` remote URL (`git remote set-url orig
 **Blocked by:** none (this can happen any time, but tickets 03/04 are blocked on it so
 they don't guess at the new URL)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] User has explicitly confirmed the rename (repo name, casing, and timing) before it
+- [x] User has explicitly confirmed the rename (repo name, casing, and timing) before it
       happens
-- [ ] GitHub repository is renamed
-- [ ] Local `origin` remote URL updated and verified with `git fetch`
-- [ ] Old URL redirect confirmed working (GitHub does this automatically, but verify)
+- [x] GitHub repository is renamed
+- [x] Local `origin` remote URL updated and verified with `git fetch`
+- [x] Old URL redirect confirmed working (GitHub does this automatically, but verify)
