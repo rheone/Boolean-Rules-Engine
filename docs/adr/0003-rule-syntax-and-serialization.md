@@ -252,6 +252,12 @@ equivalents (`atLeast`, `atMost`, `greaterThan`, `lessThan`, `exactly`), each
 carrying its threshold as a `k` key alongside `operands`, exactly as
 `atLeast` already did.
 
+Several edge values in this family collapse to other operators in the set
+(`AtMost(0, ...)` is `NOT(OR(...))`, `GreaterThan(0, ...)` is `OR(...)`,
+`Exactly(n, ...)` at the full operand count is `AND(...)`, and so on) — see
+[CONTEXT.md's "Equivalency rules"](../../CONTEXT.md#equivalency-rules) for
+the full table and why no `All`/`None` operators exist to duplicate them.
+
 ### `XNOR` (logical biconditional / `IFF`)
 
 Added as `XOR`'s natural counterpart: binary-only for the same reason `XOR`

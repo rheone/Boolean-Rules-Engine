@@ -65,6 +65,37 @@ Every expression evaluates to exactly one `TruthValue`. At the API boundary,
 a `Decision.IsSatisfied` is `true` only when the result is `True` — `Unknown`
 fails closed.
 
+## Equivalency rules
+
+The operator set above is intentionally closed, not minimal — several
+operators (and threshold-family edge values) are semantically equivalent to
+a composition of others. These equivalences are recorded here so authors and
+reviewers can recognize them, and so the set is never accidentally widened
+with an operator that would just be a synonym for one of these:
+
+| Expression | Equivalent to |
+| --- | --- |
+| `AtMost(0, ...)` | `NOT(OR(...))` (i.e. `NOR`) |
+| `Exactly(n, ...)`, where `n` is the operand count | `AND(...)` |
+| `Exactly(1, ...)` | `ExactlyOne(...)` |
+| `XNOR(a, b)` | `NOT(XOR(a, b))` |
+| `GreaterThan(0, ...)` | `OR(...)` |
+| `LessThan(n, ...)`, where `n` is the operand count | `NOT(AND(...))` |
+
+There are no `All`/`None` operators. `All(...)` would just be `AND(...)`
+and `None(...)` would just be `NOT(OR(...))` (see `AtMost(0, ...)` above) —
+adding them would mean a second spelling for an existing operator with no
+new semantics, the same reasoning [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)
+already applied when it declined to add `IMPLIES` or symbol aliases
+(`&&`, `||`).
+
+These equivalences are documentation, not a normalization pass: the compiler
+does not rewrite one form into the other, and both sides of each row remain
+independently valid, distinct things a rule author can write. See the
+[threshold operator family amendment](docs/adr/0003-rule-syntax-and-serialization.md#threshold-operator-family-supersedes-the-single-atleastk-)
+in ADR-0003 for the full `AtLeast`/`AtMost`/`GreaterThan`/`LessThan`/`Exactly`
+design this table draws its threshold rows from.
+
 ## The predicate-author contract
 
 This is the one rule every predicate implementation must follow, and the one
