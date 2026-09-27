@@ -46,8 +46,13 @@ public sealed class JsonTreeTests
         Assert.Equal(fromDsl.CanonicalText, fromJson.CanonicalText);
     }
 
-    [Fact]
-    public void AtLeast_threshold_round_trips_through_json()
+    [Theory]
+    [InlineData("AtLeast", "atLeast")]
+    [InlineData("AtMost", "atMost")]
+    [InlineData("GreaterThan", "greaterThan")]
+    [InlineData("LessThan", "lessThan")]
+    [InlineData("Exactly", "exactly")]
+    public void Threshold_family_round_trips_through_json(string dslKeyword, string jsonOpName)
     {
         RuleCompiler<RuleTestContext> compiler = new(
             PredicateRegistry<RuleTestContext>
@@ -57,13 +62,30 @@ public sealed class JsonTreeTests
                 .AddConstant("c", true)
                 .Build()
         );
-        CompiledRule<RuleTestContext> original = compiler.Compile("AtLeast(2, a, b, c)").CompiledRule!;
+        CompiledRule<RuleTestContext> original = compiler.Compile($"{dslKeyword}(2, a, b, c)").CompiledRule!;
 
         string json = original.PrintJson();
         CompiledRule<RuleTestContext> reparsed = compiler.CompileJson(json).CompiledRule!;
 
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
-        Assert.Contains("\"k\":2", json.Replace(" ", string.Empty, StringComparison.Ordinal));
+        string compact = json.Replace(" ", string.Empty, StringComparison.Ordinal);
+        Assert.Contains("\"k\":2", compact, StringComparison.Ordinal);
+        Assert.Contains($"\"op\":\"{jsonOpName}\"", compact, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Xnor_round_trips_through_json()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("a", true).AddConstant("b", true).Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile("a XNOR b").CompiledRule!;
+
+        string json = original.PrintJson();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileJson(json).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Contains("\"op\":\"xnor\"", json.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
     }
 
     [Fact]

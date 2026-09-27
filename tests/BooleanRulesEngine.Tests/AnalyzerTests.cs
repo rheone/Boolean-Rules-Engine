@@ -51,6 +51,10 @@ public sealed class AnalyzerTests
     [InlineData("XOR")]
     [InlineData("ExactlyOne")]
     [InlineData("AtLeast")]
+    [InlineData("AtMost")]
+    [InlineData("GreaterThan")]
+    [InlineData("LessThan")]
+    [InlineData("Exactly")]
     public void Analysis_covers_every_operator_not_just_and_or_not(string variant)
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
@@ -58,13 +62,39 @@ public sealed class AnalyzerTests
         {
             "XOR" => "a XOR NOT a",
             "ExactlyOne" => "ExactlyOne(a, NOT a)",
-            _ => "AtLeast(1, a, NOT a)",
+            "AtLeast" => "AtLeast(1, a, NOT a)",
+            "AtMost" => "AtMost(1, a, NOT a)",
+            "GreaterThan" => "GreaterThan(0, a, NOT a)",
+            "LessThan" => "LessThan(2, a, NOT a)",
+            _ => "Exactly(1, a, NOT a)",
         };
 
         CompilationResult<RuleTestContext> result = compiler.Compile(rule);
 
         Assert.True(result.Succeeded);
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+    }
+
+    [Fact]
+    public void Xnor_of_the_same_term_twice_is_flagged_as_a_tautology()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("a XNOR a");
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+    }
+
+    [Fact]
+    public void Xnor_of_a_term_and_its_negation_is_flagged_as_a_contradiction()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("a XNOR NOT a");
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
     }
 
     [Fact]

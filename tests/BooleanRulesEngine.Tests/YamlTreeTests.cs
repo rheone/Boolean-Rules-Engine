@@ -56,6 +56,46 @@ public sealed class YamlTreeTests
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
     }
 
+    [Theory]
+    [InlineData("AtLeast", "atLeast")]
+    [InlineData("AtMost", "atMost")]
+    [InlineData("GreaterThan", "greaterThan")]
+    [InlineData("LessThan", "lessThan")]
+    [InlineData("Exactly", "exactly")]
+    public void Threshold_family_round_trips_through_yaml(string dslKeyword, string yamlOpName)
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddConstant("a", true)
+                .AddConstant("b", true)
+                .AddConstant("c", true)
+                .Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile($"{dslKeyword}(2, a, b, c)").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Contains($"op: {yamlOpName}", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Xnor_round_trips_through_yaml()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("a", true).AddConstant("b", true).Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile("a XNOR b").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Contains("op: xnor", yaml, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_string_argument_that_reads_like_a_boolean_stays_a_string_when_quoted()
     {
