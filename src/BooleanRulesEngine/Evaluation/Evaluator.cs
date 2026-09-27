@@ -37,8 +37,8 @@ internal sealed class Evaluator<TContext>(
 
     public async Task<Decision> EvaluateAsync(Expression root)
     {
-        TruthValue result = await this.EvalAsync(root).ConfigureAwait(false);
-        return new Decision(result, this.faults, new Trace(this.trace));
+        EvalResult result = await this.EvalAsync(root).ConfigureAwait(false);
+        return new Decision(result.Value, this.faults, new Trace(this.trace), result.Node);
     }
 
     private static string Describe(Expression node)
@@ -167,12 +167,13 @@ internal sealed class Evaluator<TContext>(
         return !satisfiesMin && !satisfiesMax ? TruthValue.False : TruthValue.Unknown;
     }
 
-    private async ValueTask<TruthValue> EvalAsync(Expression node)
+    private async ValueTask<EvalResult> EvalAsync(Expression node)
     {
         if (this.aborted)
         {
-            this.trace.Add(new TraceEntry(Describe(node), null, true));
-            return TruthValue.Unknown;
+            string skippedDescription = Describe(node);
+            this.trace.Add(new TraceEntry(skippedDescription, null, true));
+            return new EvalResult(TruthValue.Unknown, new EvaluatedNode(skippedDescription, null, true, []));
         }
 
         this.cancellationToken.ThrowIfCancellationRequested();
@@ -181,38 +182,62 @@ internal sealed class Evaluator<TContext>(
         {
             case ConstantExpression c:
                 TruthValue constantValue = c.Value ? TruthValue.True : TruthValue.False;
-                this.trace.Add(new TraceEntry(Describe(node), constantValue, false));
-                return constantValue;
+                string constantDescription = Describe(node);
+                this.trace.Add(new TraceEntry(constantDescription, constantValue, false));
+                return new EvalResult(constantValue, new EvaluatedNode(constantDescription, constantValue, false, []));
             case TermExpression t:
                 return await this.EvalTermAsync(t).ConfigureAwait(false);
             case NotExpression n:
-                return KleeneNot(await this.EvalAsync(n.Operand).ConfigureAwait(false));
+            {
+                EvalResult operand = await this.EvalAsync(n.Operand).ConfigureAwait(false);
+                TruthValue value = KleeneNot(operand.Value);
+                return new EvalResult(value, new EvaluatedNode("NOT", value, false, [operand.Node]));
+            }
+
             case AndExpression a:
-                return await this.EvalChainAsync(a.Operands, TruthValue.True, KleeneAnd, stopValue: TruthValue.False)
+                return await this.EvalChainAsync("AND", a.Operands, TruthValue.True, KleeneAnd, stopValue: TruthValue.False)
                     .ConfigureAwait(false);
             case OrExpression o:
-                return await this.EvalChainAsync(o.Operands, TruthValue.False, KleeneOr, stopValue: TruthValue.True)
+                return await this.EvalChainAsync("OR", o.Operands, TruthValue.False, KleeneOr, stopValue: TruthValue.True)
                     .ConfigureAwait(false);
             case XorExpression x:
-                return KleeneXor(
-                    await this.EvalAsync(x.Left).ConfigureAwait(false),
-                    await this.EvalAsync(x.Right).ConfigureAwait(false)
-                );
+            {
+                EvalResult left = await this.EvalAsync(x.Left).ConfigureAwait(false);
+                EvalResult right = await this.EvalAsync(x.Right).ConfigureAwait(false);
+                TruthValue value = KleeneXor(left.Value, right.Value);
+                return new EvalResult(value, new EvaluatedNode("XOR", value, false, [left.Node, right.Node]));
+            }
+
             case XnorExpression xn:
-                return KleeneXnor(
-                    await this.EvalAsync(xn.Left).ConfigureAwait(false),
-                    await this.EvalAsync(xn.Right).ConfigureAwait(false)
-                );
+            {
+                EvalResult left = await this.EvalAsync(xn.Left).ConfigureAwait(false);
+                EvalResult right = await this.EvalAsync(xn.Right).ConfigureAwait(false);
+                TruthValue value = KleeneXnor(left.Value, right.Value);
+                return new EvalResult(value, new EvaluatedNode("XNOR", value, false, [left.Node, right.Node]));
+            }
+
             case ExactlyOneExpression e:
-                return EvaluateExactlyOne(await this.EvalAllAsync(e.Operands).ConfigureAwait(false));
+            {
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(e.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateExactlyOne([.. results.Select(r => r.Value)]);
+                return new EvalResult(value, new EvaluatedNode("ExactlyOne", value, false, [.. results.Select(r => r.Node)]));
+            }
+
             case ThresholdExpression th:
-                return EvaluateThreshold(th.Comparison, th.K, await this.EvalAllAsync(th.Operands).ConfigureAwait(false));
+            {
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(th.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateThreshold(th.Comparison, th.K, [.. results.Select(r => r.Value)]);
+                string description = $"{th.Comparison}({th.K})";
+                return new EvalResult(value, new EvaluatedNode(description, value, false, [.. results.Select(r => r.Node)]));
+            }
+
             default:
                 throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'.");
         }
     }
 
-    private async ValueTask<TruthValue> EvalChainAsync(
+    private async ValueTask<EvalResult> EvalChainAsync(
+        string description,
         EquatableArray<Expression> operands,
         TruthValue identity,
         Func<TruthValue, TruthValue, TruthValue> combine,
@@ -220,30 +245,34 @@ internal sealed class Evaluator<TContext>(
     )
     {
         TruthValue accumulator = identity;
+        List<EvaluatedNode> children = new(operands.Count);
         bool exhaustive = this.options.Mode == EvaluationMode.Exhaustive;
         bool stop = false;
         foreach (Expression operand in operands)
         {
             if (stop || this.aborted)
             {
-                this.trace.Add(new TraceEntry(Describe(operand), null, true));
+                string skippedDescription = Describe(operand);
+                this.trace.Add(new TraceEntry(skippedDescription, null, true));
+                children.Add(new EvaluatedNode(skippedDescription, null, true, []));
                 continue;
             }
 
-            TruthValue value = await this.EvalAsync(operand).ConfigureAwait(false);
-            accumulator = combine(accumulator, value);
-            if (!exhaustive && value == stopValue)
+            EvalResult result = await this.EvalAsync(operand).ConfigureAwait(false);
+            children.Add(result.Node);
+            accumulator = combine(accumulator, result.Value);
+            if (!exhaustive && result.Value == stopValue)
             {
                 stop = true;
             }
         }
 
-        return accumulator;
+        return new EvalResult(accumulator, new EvaluatedNode(description, accumulator, false, children));
     }
 
-    private async ValueTask<IReadOnlyList<TruthValue>> EvalAllAsync(EquatableArray<Expression> operands)
+    private async ValueTask<IReadOnlyList<EvalResult>> EvalAllAsync(EquatableArray<Expression> operands)
     {
-        List<TruthValue> values = new(operands.Count);
+        List<EvalResult> values = new(operands.Count);
         foreach (Expression operand in operands)
         {
             values.Add(await this.EvalAsync(operand).ConfigureAwait(false));
@@ -252,24 +281,25 @@ internal sealed class Evaluator<TContext>(
         return values;
     }
 
-    private async ValueTask<TruthValue> EvalTermAsync(TermExpression term)
+    private async ValueTask<EvalResult> EvalTermAsync(TermExpression term)
     {
+        string description = term.Identity.ToString();
         if (term.IsUnknownPredicate)
         {
-            this.trace.Add(new TraceEntry(term.Identity.ToString(), TruthValue.Unknown, false));
-            return TruthValue.Unknown;
+            this.trace.Add(new TraceEntry(description, TruthValue.Unknown, false));
+            return new EvalResult(TruthValue.Unknown, new EvaluatedNode(description, TruthValue.Unknown, false, []));
         }
 
         if (this.memo.TryGetValue(term.Identity, out TruthValue cached))
         {
-            this.trace.Add(new TraceEntry(term.Identity.ToString(), cached, false));
-            return cached;
+            this.trace.Add(new TraceEntry(description, cached, false));
+            return new EvalResult(cached, new EvaluatedNode(description, cached, false, []));
         }
 
         TruthValue result = await this.InvokeAsync(term.Identity).ConfigureAwait(false);
         this.memo[term.Identity] = result;
-        this.trace.Add(new TraceEntry(term.Identity.ToString(), result, false));
-        return result;
+        this.trace.Add(new TraceEntry(description, result, false));
+        return new EvalResult(result, new EvaluatedNode(description, result, false, []));
     }
 
     private async ValueTask<TruthValue> InvokeAsync(TermIdentity identity)
@@ -318,4 +348,13 @@ internal sealed class Evaluator<TContext>(
         IPredicate<TContext> predicate = (IPredicate<TContext>)instance;
         return predicate.EvaluateAsync(this.context, args, this.cancellationToken);
     }
+
+    /// <summary>
+    /// One node's outcome, paired with a structural <see cref="EvaluatedNode"/> mirroring the shape
+    /// <see cref="Expression"/> is recursed over — every recursive evaluation step returns one of these
+    /// instead of a bare <see cref="TruthValue"/>, so the per-node annotations needed for
+    /// <see cref="Decision.EvaluatedTree"/> fall out of the existing recursion for free, with no
+    /// separate replay pass.
+    /// </summary>
+    private readonly record struct EvalResult(TruthValue Value, EvaluatedNode Node);
 }

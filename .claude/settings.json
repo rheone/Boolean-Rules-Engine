@@ -15,11 +15,24 @@
       "Bash(dotnet outdated:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "mcp__codegraph__*"
     ]
   },
   "enabledPlugins": {
     "csharp-lsp@claude-plugins-official": true,
     "microsoft-docs@claude-plugins-official": true
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "codegraph.cmd prompt-hook"
+          }
+        ]
+      }
+    ]
   }
 }
