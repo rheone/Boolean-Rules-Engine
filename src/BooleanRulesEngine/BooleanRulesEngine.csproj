@@ -17,4 +17,11 @@
        (ADR-0004's declared dependencies) ship in the net11.0 shared framework itself, so an explicit
        PackageReference is pruned/warned-about by the SDK; the dependency is still real; it's just
        satisfied by the shared framework rather than a NuGet package on this target framework. -->
+
+  <!-- ADR-0003's JSON tree shape, published as a content asset so a consuming UI/tooling project can
+       validate rule documents structurally without hand-copying the shape. Not embedded/loaded by any
+       production code path here - the package only carries the file. -->
+  <ItemGroup>
+    <None Include="Json\rule-tree.schema.json" Pack="true" PackagePath="content\rule-tree.schema.json" Visible="true" />
+  </ItemGroup>
 </Project>

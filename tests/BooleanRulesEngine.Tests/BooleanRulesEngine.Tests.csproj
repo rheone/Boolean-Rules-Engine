@@ -22,5 +22,16 @@
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="NSubstitute.Analyzers.CSharp" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+
+  <!-- The published JSON Schema for the ADR-0003 rule tree, linked in so schema-validation tests can
+       load it from the build output without a source-relative path walk. -->
+  <ItemGroup>
+    <None
+      Include="../../src/BooleanRulesEngine/Json/rule-tree.schema.json"
+      Link="TestSupport/rule-tree.schema.json"
+      CopyToOutputDirectory="PreserveNewest"
+    />
   </ItemGroup>
 </Project>

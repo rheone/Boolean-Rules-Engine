@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rheone/Boolean-Rules-Engine/main/src/BooleanRulesEngine/Json/rule-tree.schema.json",
+  "title": "BooleanRulesEngine rule tree",
+  "description": "The flat, key-discriminated JSON tree shape for a BooleanRulesEngine rule expression, as defined by ADR-0003 (docs/adr/0003-rule-syntax-and-serialization.md). A node is discriminated by which of 'const', 'predicate', or 'op' is present. This schema describes structural JSON shape only, matching what JsonTreeParser accepts before compile-time validation (e.g. XOR/XNOR binary-only, ExactlyOne/threshold k-range checks) runs; a document can be schema-valid and still fail RuleCompiler validation.",
+  "$ref": "#/$defs/node",
+  "$defs": {
+    "node": {
+      "description": "Any tree node: a constant, a predicate term, or an operator node.",
+      "oneOf": [
+        { "$ref": "#/$defs/constNode" },
+        { "$ref": "#/$defs/predicateNode" },
+        { "$ref": "#/$defs/operatorNode" }
+      ]
+    },
+    "constNode": {
+      "description": "The true/false constant leaf.",
+      "type": "object",
+      "properties": {
+        "const": { "type": "boolean" }
+      },
+      "required": ["const"],
+      "additionalProperties": false
+    },
+    "literal": {
+      "description": "An argument literal value: string, number (long or decimal), boolean, or an array of literals. Guid and DateTimeOffset values are written as strings.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/literal" }
+        }
+      ]
+    },
+    "predicateNode": {
+      "description": "A term: a predicate bound to named argument literals.",
+      "type": "object",
+      "properties": {
+        "predicate": { "type": "string" },
+        "args": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/literal" }
+        }
+      },
+      "required": ["predicate"],
+      "additionalProperties": false
+    },
+    "operatorNode": {
+      "description": "An operator node: unary NOT, an n-ary boolean operator, or an n-ary threshold operator.",
+      "oneOf": [
+        { "$ref": "#/$defs/unaryOperatorNode" },
+        { "$ref": "#/$defs/naryOperatorNode" },
+        { "$ref": "#/$defs/thresholdOperatorNode" }
+      ]
+    },
+    "unaryOperatorNode": {
+      "description": "NOT: exactly one operand.",
+      "type": "object",
+      "properties": {
+        "op": { "const": "not" },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" },
+          "minItems": 1,
+          "maxItems": 1
+        }
+      },
+      "required": ["op", "operands"],
+      "additionalProperties": false
+    },
+    "naryOperatorNode": {
+      "description": "AND, OR, XOR, XNOR, ExactlyOne: an operand list (XOR/XNOR are compile-time restricted to exactly two operands; that restriction is not expressible as JSON structure).",
+      "type": "object",
+      "properties": {
+        "op": { "enum": ["and", "or", "xor", "xnor", "exactlyOne"] },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" }
+        }
+      },
+      "required": ["op", "operands"],
+      "additionalProperties": false
+    },
+    "thresholdOperatorNode": {
+      "description": "The count-threshold family: AtLeast/AtMost/GreaterThan/LessThan/Exactly, each carrying its threshold as 'k'.",
+      "type": "object",
+      "properties": {
+        "op": { "enum": ["atLeast", "atMost", "greaterThan", "lessThan", "exactly"] },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" }
+        },
+        "k": { "type": "integer" }
+      },
+      "required": ["op", "operands", "k"],
+      "additionalProperties": false
+    }
+  }
+}

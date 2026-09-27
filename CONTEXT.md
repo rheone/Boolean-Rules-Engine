@@ -134,8 +134,11 @@ canonical and is what gets persisted. JSON and YAML are interchange/tooling
 formats that compile to the same AST and round-trip losslessly with the DSL.
 A rule can also be assembled programmatically via `RuleBuilder`
 (`BooleanRulesEngine.Building`), which renders to the same JSON tree shape
-and compiles through the identical pipeline. Full grammar and schema:
-[ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
+and compiles through the identical pipeline. The JSON tree shape is also
+published as a JSON Schema document,
+[`rule-tree.schema.json`](src/BooleanRulesEngine/Json/rule-tree.schema.json),
+shipped as a content asset in the `BooleanRulesEngine` package. Full grammar
+and schema: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
 
 ## Package boundaries (summary)
 

@@ -4,9 +4,9 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] JSON Schema document exists covering every operator's tree shape (`op`/`operands`, `predicate`/`args`, threshold `k`, every `LiteralKind`) per ADR-0003
-- [ ] A CI check validates every existing valid-rule JSON fixture against the schema, and every known-invalid fixture fails validation
-- [ ] The schema file is packaged as a content asset in the `BooleanRulesEngine` NuGet package
-- [ ] The schema is referenced from ADR-0003 and/or CONTEXT.md
+- [x] JSON Schema document exists covering every operator's tree shape (`op`/`operands`, `predicate`/`args`, threshold `k`, every `LiteralKind`) per ADR-0003
+- [x] A CI check validates every existing valid-rule JSON fixture against the schema, and every known-invalid fixture fails validation
+- [x] The schema file is packaged as a content asset in the `BooleanRulesEngine` NuGet package
+- [x] The schema is referenced from ADR-0003 and/or CONTEXT.md

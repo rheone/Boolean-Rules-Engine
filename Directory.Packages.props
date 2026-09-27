@@ -54,6 +54,12 @@
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
   </ItemGroup>
+  <!-- JsonSchema.Net - test-project-only, to validate rule-tree.schema.json against the compiler's own
+       JSON fixtures (ticket: JSON Schema for the rule tree). Not referenced by any shipping project;
+       the schema itself is packaged as a plain content file, not consumed by production code. -->
+  <ItemGroup>
+    <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
+  </ItemGroup>
   <!-- Source Link -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="11.0.100-rc.1.26425.128" />

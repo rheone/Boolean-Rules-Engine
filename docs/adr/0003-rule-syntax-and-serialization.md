@@ -133,6 +133,18 @@ A node is discriminated by which key is present (`op` vs. `predicate`)
 rather than by an extra wrapper object, halving the nesting depth for the
 same information. YAML uses the identical shape under YamlDotNet.
 
+This shape is published as a JSON Schema document,
+[`rule-tree.schema.json`](../../src/BooleanRulesEngine/Json/rule-tree.schema.json),
+shipped as a content asset in the `BooleanRulesEngine` NuGet package so a
+rule-authoring UI or other external tooling can validate a generated tree
+structurally without hand-copying this shape. The schema covers structural
+JSON shape only — the same level `JsonTreeParser` enforces before
+`RuleCompiler` validation runs — so it does not (and cannot, as JSON Schema)
+express compile-time-only constraints like `XOR`/`XNOR` being binary-only or
+a threshold's `k` being in range for its operand count; a schema-valid
+document can still fail compilation. `RuleTreeSchemaTests` validates the
+schema against the compiler's own valid and malformed JSON fixtures.
+
 The `true`/`false` constant (user story 11) uses the same discrimination
 principle with a third key: `{"const": true}` / `{"const": false}`.
 
