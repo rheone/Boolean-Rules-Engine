@@ -90,6 +90,46 @@ public sealed class LexerTests
         Assert.Empty(lexer.Diagnostics);
     }
 
+    [Theory]
+    [InlineData("\"a\\\"b\"")]
+    [InlineData("\"a\\\\b\"")]
+    [InlineData("\"a\\nb\"")]
+    [InlineData("\"a\\tb\"")]
+    public void Each_supported_escape_does_not_raise_the_invalid_escape_diagnostic(string source)
+    {
+        Lexer lexer = new(source);
+
+        lexer.Tokenize();
+
+        Assert.DoesNotContain(lexer.Diagnostics, d => d.Code == DiagnosticCodes.InvalidEscapeSequence);
+    }
+
+    [Fact]
+    public void An_unrecognized_escape_sequence_raises_a_diagnostic_covering_the_backslash_and_following_character()
+    {
+        Lexer lexer = new("\"a\\pb\"");
+
+        IReadOnlyList<Token> tokens = lexer.Tokenize();
+
+        Assert.Equal(TokenKind.StringLiteral, tokens[0].Kind);
+        Diagnostic diagnostic = Assert.Single(lexer.Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidEscapeSequence, diagnostic.Code);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(new SourceSpan(2, 2), diagnostic.Span);
+    }
+
+    [Fact]
+    public void An_unrecognized_escape_sequence_still_produces_a_string_token_so_lexing_recovers()
+    {
+        Lexer lexer = new("\"a\\pb\" (");
+
+        IReadOnlyList<Token> tokens = lexer.Tokenize();
+
+        Assert.Equal(TokenKind.StringLiteral, tokens[0].Kind);
+        Assert.Equal(TokenKind.LParen, tokens[1].Kind);
+        Assert.Equal(TokenKind.Eof, tokens[2].Kind);
+    }
+
     [Fact]
     public void An_unterminated_string_raises_a_diagnostic_and_still_returns_a_string_token()
     {

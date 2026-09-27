@@ -80,6 +80,37 @@ public sealed class CanonicalPrinterTests
     }
 
     [Fact]
+    public void A_string_argument_with_an_embedded_quote_prints_with_the_quote_escaped()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile("hasRole(role: \"a\\\"b\")").CompiledRule!;
+
+        Assert.Equal("hasRole(role: \"a\\\"b\")", rule.CanonicalText);
+    }
+
+    [Fact]
+    public void A_string_argument_with_an_embedded_backslash_prints_with_the_backslash_escaped()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile("hasRole(role: \"a\\\\b\")").CompiledRule!;
+
+        Assert.Equal("hasRole(role: \"a\\\\b\")", rule.CanonicalText);
+    }
+
+    [Fact]
+    public void A_string_argument_with_both_a_quote_and_a_backslash_round_trips_to_a_structurally_equal_tree()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> original = compiler.Compile("hasRole(role: \"a\\\"\\\\b\")").CompiledRule!;
+        CompiledRule<RuleTestContext> reparsed = compiler.Compile(original.CanonicalText).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+    }
+
+    [Fact]
     public void Printing_the_same_tree_twice_is_byte_identical()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();

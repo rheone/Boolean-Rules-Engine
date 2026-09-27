@@ -50,4 +50,7 @@ public static class DiagnosticCodes
 
     /// <summary>The tree/JSON/YAML source is malformed independently of DSL syntax (e.g. unknown <c>op</c>, missing discriminator key).</summary>
     public const string MalformedTree = "BRE0014";
+
+    /// <summary>A string literal in DSL rule text contains a <c>\</c> not followed by one of the supported escapes (<c>\"</c>, <c>\\</c>, <c>\n</c>, <c>\t</c>).</summary>
+    public const string InvalidEscapeSequence = "BRE0015";
 }

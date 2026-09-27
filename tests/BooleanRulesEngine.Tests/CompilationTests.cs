@@ -67,6 +67,23 @@ public sealed class CompilationTests
         Assert.Equal(new SourceSpan(0, "noSuchPredicate".Length), diagnostic.Span);
     }
 
+    [Fact]
+    public void Unrecognized_escape_sequence_in_a_string_literal_produces_error_diagnostic_and_null_compiled_rule()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "Y").Build()
+        );
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"a\\pb\")");
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.CompiledRule);
+        Assert.Contains(
+            result.Diagnostics,
+            d => d.Code == DiagnosticCodes.InvalidEscapeSequence && d.Severity == DiagnosticSeverity.Error
+        );
+    }
+
     [Theory]
     [InlineData("true", TruthValue.True)]
     [InlineData("false", TruthValue.False)]

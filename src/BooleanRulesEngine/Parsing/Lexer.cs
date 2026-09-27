@@ -152,16 +152,32 @@ internal sealed class Lexer(string source)
             if (c == '\\' && this.position + 1 < this.source.Length)
             {
                 char next = this.source[this.position + 1];
-                builder.Append(
-                    next switch
-                    {
-                        '"' => '"',
-                        '\\' => '\\',
-                        'n' => '\n',
-                        't' => '\t',
-                        _ => next,
-                    }
-                );
+                switch (next)
+                {
+                    case '"':
+                        builder.Append('"');
+                        break;
+                    case '\\':
+                        builder.Append('\\');
+                        break;
+                    case 'n':
+                        builder.Append('\n');
+                        break;
+                    case 't':
+                        builder.Append('\t');
+                        break;
+                    default:
+                        this.Diagnostics.Add(
+                            Diagnostic.Error(
+                                DiagnosticCodes.InvalidEscapeSequence,
+                                $"Unrecognized escape sequence '\\{next}' in string literal.",
+                                new SourceSpan(this.position, 2)
+                            )
+                        );
+                        builder.Append(next);
+                        break;
+                }
+
                 this.position += 2;
             }
             else

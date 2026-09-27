@@ -4,11 +4,11 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A string literal containing `"` prints as `\"` inside the quoted DSL text
-- [ ] A string literal containing `\` prints as `\\` inside the quoted DSL text
-- [ ] A string literal containing both, in combination, round-trips: printing a compiled rule with such a term and reparsing the output produces a structurally equal tree
-- [ ] Existing plain string literals (no special characters) print unchanged — no regression to existing round-trip tests
-- [ ] JSON and YAML printers are unaffected (they do not go through this code path) — confirm with existing JSON/YAML round-trip tests still passing
-- [ ] New test alongside the existing canonical-printer round-trip tests (ticket 06 in `engine-v1`) covering a string argument with an embedded quote and an embedded backslash
+- [x] A string literal containing `"` prints as `\"` inside the quoted DSL text
+- [x] A string literal containing `\` prints as `\\` inside the quoted DSL text
+- [x] A string literal containing both, in combination, round-trips: printing a compiled rule with such a term and reparsing the output produces a structurally equal tree
+- [x] Existing plain string literals (no special characters) print unchanged — no regression to existing round-trip tests
+- [x] JSON and YAML printers are unaffected (they do not go through this code path) — confirm with existing JSON/YAML round-trip tests still passing
+- [x] New test alongside the existing canonical-printer round-trip tests (ticket 06 in `engine-v1`) covering a string argument with an embedded quote and an embedded backslash

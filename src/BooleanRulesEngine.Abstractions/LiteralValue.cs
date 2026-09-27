@@ -279,7 +279,7 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
     {
         return this.Kind switch
         {
-            LiteralKind.String => $"\"{this.stringValue}\"",
+            LiteralKind.String => $"\"{EscapeForDsl(this.stringValue!)}\"",
             LiteralKind.Int64 => this.int64Value.ToString(CultureInfo.InvariantCulture),
             LiteralKind.Decimal => this.decimalValue.ToString(CultureInfo.InvariantCulture),
             LiteralKind.Boolean => this.booleanValue ? "true" : "false",
@@ -287,6 +287,14 @@ public readonly struct LiteralValue : IEquatable<LiteralValue>
             LiteralKind.Guid => $"\"{this.guidValue}\"",
             _ => "[" + string.Join(", ", this.arrayValue.Select(v => v.ToString())) + "]",
         };
+    }
+
+    /// <summary>Escapes <c>\</c> and <c>"</c> so the result is valid inside a DSL quoted-string literal.</summary>
+    /// <param name="value">The raw string value.</param>
+    /// <returns>The escaped text, unquoted.</returns>
+    private static string EscapeForDsl(string value)
+    {
+        return value.Contains('\\') || value.Contains('"') ? value.Replace("\\", "\\\\").Replace("\"", "\\\"") : value;
     }
 
     private static InvalidOperationException WrongKind(LiteralKind expected, LiteralKind actual)
