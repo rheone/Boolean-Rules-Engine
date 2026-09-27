@@ -10,6 +10,14 @@ using TruthWeaver.Tests.TestSupport;
 public sealed class RuleDiffPrinterTests
 {
     [Fact]
+    public void A_null_diff_throws_argument_null_exception_naming_the_diff_parameter()
+    {
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() => RuleDiffPrinter.Print(null!));
+
+        Assert.Equal("diff", exception.ParamName);
+    }
+
+    [Fact]
     public void An_empty_diff_renders_as_no_changes()
     {
         RuleDiffResult diff = new([]);
