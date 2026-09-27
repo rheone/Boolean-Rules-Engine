@@ -4,9 +4,9 @@
 
 **Blocked by:** `expression-node-shape-seam` #01 (shared node-shape seam for Expression)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `Evaluator`'s `EvaluatedNode` construction and `CompiledRule.DescribeNode`'s `RuleDescription` construction both consume the shared node-shape seam's operand ordering
-- [ ] The debug-only assertion guard from ticket 01 becomes unreachable under normal operation (left in place as insurance, not removed)
-- [ ] No behavior change: existing `RuleTreeRenderingTests`, `EvaluatedTreeTests`, and evaluation tests pass unchanged
-- [ ] A test demonstrates that reordering operands in one traversal without the seam is no longer possible — i.e. both trees structurally cannot diverge in operand order
+- [x] `Evaluator`'s `EvaluatedNode` construction and `CompiledRule.DescribeNode`'s `RuleDescription` construction both consume the shared node-shape seam's operand ordering
+- [x] The debug-only assertion guard from ticket 01 becomes unreachable under normal operation (left in place as insurance, not removed)
+- [x] No behavior change: existing `RuleTreeRenderingTests`, `EvaluatedTreeTests`, and evaluation tests pass unchanged
+- [x] A test demonstrates that reordering operands in one traversal without the seam is no longer possible — i.e. both trees structurally cannot diverge in operand order

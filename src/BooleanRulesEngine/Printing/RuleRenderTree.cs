@@ -1,18 +1,22 @@
 namespace BooleanRulesEngine.Printing;
 
+using System.Diagnostics;
 using BooleanRulesEngine.Abstractions;
 using BooleanRulesEngine.Evaluation;
 
 /// <summary>
+/// <para>
 /// Zips a rule's <see cref="RuleDescription"/> (what to say — labels, always the full static shape)
 /// against an optional <see cref="EvaluatedNode"/> (what happened — results and skips, only as deep as
-/// evaluation actually went) into one <see cref="RenderNode"/> tree. Both source trees are built by
-/// recursing over the same <c>Expression.Operands</c> lists in the same order — <c>CompiledRule.Describe()</c>
-/// and <c>Evaluator</c> respectively — so they align positionally with no need to match by text or
-/// replay any short-circuit logic here.
-///
+/// evaluation actually went) into one <see cref="RenderNode"/> tree. Both source trees are built from
+/// the same shared node-shape seam (<c>ExpressionShape.Of</c>) — <c>CompiledRule.DescribeNode</c> and
+/// <c>Evaluator</c> respectively — so they align positionally with no need to match by text or replay
+/// any short-circuit logic here.
+/// </para>
+/// <para>
 /// Every format-specific printer (<see cref="MermaidTreePrinter"/>, <see cref="PlainTextTreePrinter"/>)
 /// renders this one shared tree, so "what a skipped subtree looks like" is decided once, not per format.
+/// </para>
 /// </summary>
 internal static class RuleRenderTree
 {
@@ -35,6 +39,8 @@ internal static class RuleRenderTree
 
     private static RenderNode Build(RuleDescription description, EvaluatedNode? evaluated, bool ancestorSkipped)
     {
+        AssertOperandCountsAligned(description, evaluated);
+
         bool skipped = ancestorSkipped || evaluated is { NotEvaluated: true };
         RenderState state = skipped ? RenderState.Skipped : StateFor(evaluated?.Result);
 
@@ -50,6 +56,30 @@ internal static class RuleRenderTree
         }
 
         return new RenderNode(description.Label, state, renderedChildren);
+    }
+
+    /// <summary>
+    /// Guards the positional-zip invariant this method depends on: <see cref="RuleDescription"/> and
+    /// <see cref="EvaluatedNode"/> are built by two independent recursive traversals (<c>CompiledRule.DescribeNode</c>
+    /// and <see cref="Evaluation.Evaluator{TContext}"/> respectively — see <c>evaluated-node-rule-description-alignment</c>
+    /// ticket 02 for making that structurally impossible to violate instead of merely conventional), so
+    /// nothing stops them from disagreeing on operand count if either traversal is edited carelessly.
+    /// Compiled out of Release builds (<see cref="ConditionalAttribute"/>) — this is an internal-consistency
+    /// guard for library development, not a production-path validation the two trees are always
+    /// constructed to satisfy.
+    /// </summary>
+    [Conditional("DEBUG")]
+    private static void AssertOperandCountsAligned(RuleDescription description, EvaluatedNode? evaluated)
+    {
+        if (evaluated is { NotEvaluated: false } && evaluated.Children.Count != description.Operands.Count)
+        {
+            throw new InvalidOperationException(
+                $"RuleDescription/EvaluatedNode operand-count mismatch at node '{description.Label}': "
+                    + $"the description has {description.Operands.Count} operand(s) but the evaluated "
+                    + $"tree has {evaluated.Children.Count}. RuleRenderTree.Build zips these two trees "
+                    + "positionally, assuming both were built from the same operand order."
+            );
+        }
     }
 
     private static RenderState StateFor(TruthValue? result)

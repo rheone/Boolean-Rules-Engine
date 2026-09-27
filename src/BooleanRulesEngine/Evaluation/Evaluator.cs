@@ -195,47 +195,58 @@ internal sealed class Evaluator<TContext>(
                 return new EvalResult(constantValue, new EvaluatedNode(constantDescription, constantValue, false, []));
             case TermExpression t:
                 return await this.EvalTermAsync(t).ConfigureAwait(false);
-            case NotExpression n:
+            case NotExpression:
             {
-                EvalResult operand = await this.EvalAsync(n.Operand).ConfigureAwait(false);
+                NodeShape shape = ExpressionShape.Of(node);
+                EvalResult operand = await this.EvalAsync(shape.Operands[0]).ConfigureAwait(false);
                 TruthValue value = KleeneNot(operand.Value);
                 return new EvalResult(value, new EvaluatedNode("NOT", value, false, [operand.Node]));
             }
 
-            case AndExpression a:
-                return await this.EvalChainAsync("AND", a.Operands, TruthValue.True, KleeneAnd, stopValue: TruthValue.False)
-                    .ConfigureAwait(false);
-            case OrExpression o:
-                return await this.EvalChainAsync("OR", o.Operands, TruthValue.False, KleeneOr, stopValue: TruthValue.True)
-                    .ConfigureAwait(false);
-            case XorExpression x:
+            case AndExpression:
             {
-                EvalResult left = await this.EvalAsync(x.Left).ConfigureAwait(false);
-                EvalResult right = await this.EvalAsync(x.Right).ConfigureAwait(false);
-                TruthValue value = KleeneXor(left.Value, right.Value);
-                return new EvalResult(value, new EvaluatedNode("XOR", value, false, [left.Node, right.Node]));
+                NodeShape shape = ExpressionShape.Of(node);
+                return await this.EvalChainAsync("AND", shape.Operands, TruthValue.True, KleeneAnd, stopValue: TruthValue.False)
+                    .ConfigureAwait(false);
             }
 
-            case XnorExpression xn:
+            case OrExpression:
             {
-                EvalResult left = await this.EvalAsync(xn.Left).ConfigureAwait(false);
-                EvalResult right = await this.EvalAsync(xn.Right).ConfigureAwait(false);
-                TruthValue value = KleeneXnor(left.Value, right.Value);
-                return new EvalResult(value, new EvaluatedNode("XNOR", value, false, [left.Node, right.Node]));
+                NodeShape shape = ExpressionShape.Of(node);
+                return await this.EvalChainAsync("OR", shape.Operands, TruthValue.False, KleeneOr, stopValue: TruthValue.True)
+                    .ConfigureAwait(false);
             }
 
-            case ExactlyOneExpression e:
+            case XorExpression:
             {
-                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(e.Operands).ConfigureAwait(false);
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneXor(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("XOR", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case XnorExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneXnor(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("XNOR", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case ExactlyOneExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
                 TruthValue value = EvaluateExactlyOne([.. results.Select(r => r.Value)]);
                 return new EvalResult(value, new EvaluatedNode("ExactlyOne", value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ThresholdExpression th:
             {
-                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(th.Operands).ConfigureAwait(false);
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
                 TruthValue value = EvaluateThreshold(th.Comparison, th.K, [.. results.Select(r => r.Value)]);
-                string description = $"{th.Comparison}({th.K})";
+                string description = $"{shape.OpName}({shape.K})";
                 return new EvalResult(value, new EvaluatedNode(description, value, false, [.. results.Select(r => r.Node)]));
             }
 
@@ -246,7 +257,7 @@ internal sealed class Evaluator<TContext>(
 
     private async ValueTask<EvalResult> EvalChainAsync(
         string description,
-        EquatableArray<Expression> operands,
+        IReadOnlyList<Expression> operands,
         TruthValue identity,
         Func<TruthValue, TruthValue, TruthValue> combine,
         TruthValue stopValue
@@ -278,7 +289,7 @@ internal sealed class Evaluator<TContext>(
         return new EvalResult(accumulator, new EvaluatedNode(description, accumulator, false, children));
     }
 
-    private async ValueTask<IReadOnlyList<EvalResult>> EvalAllAsync(EquatableArray<Expression> operands)
+    private async ValueTask<IReadOnlyList<EvalResult>> EvalAllAsync(IReadOnlyList<Expression> operands)
     {
         List<EvalResult> values = new(operands.Count);
         foreach (Expression operand in operands)
