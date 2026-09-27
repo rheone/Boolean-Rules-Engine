@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rheone/Boolean-Rules-Engine/main/src/BooleanRulesEngine/Json/rule-tree.schema.json",
-  "title": "BooleanRulesEngine rule tree",
-  "description": "The flat, key-discriminated JSON tree shape for a BooleanRulesEngine rule expression, as defined by ADR-0003 (docs/adr/0003-rule-syntax-and-serialization.md). A node is discriminated by which of 'const', 'predicate', or 'op' is present. This schema describes structural JSON shape only, matching what JsonTreeParser accepts before compile-time validation (e.g. XOR/XNOR binary-only, ExactlyOne/threshold k-range checks) runs; a document can be schema-valid and still fail RuleCompiler validation.",
+  "$id": "https://raw.githubusercontent.com/rheone/TruthWeaver/main/src/TruthWeaver/Json/rule-tree.schema.json",
+  "title": "TruthWeaver rule tree",
+  "description": "The flat, key-discriminated JSON tree shape for a TruthWeaver rule expression, as defined by ADR-0003 (docs/adr/0003-rule-syntax-and-serialization.md). A node is discriminated by which of 'const', 'predicate', or 'op' is present. This schema describes structural JSON shape only, matching what JsonTreeParser accepts before compile-time validation (e.g. XOR/XNOR binary-only, ExactlyOne/threshold k-range checks) runs; a document can be schema-valid and still fail RuleCompiler validation.",
   "$ref": "#/$defs/node",
   "$defs": {
     "node": {

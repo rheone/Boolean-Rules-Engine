@@ -18,12 +18,12 @@ repository URL in build/CI configuration:
 
 **Blocked by:** 02, 06
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `.github/workflows/ci.yml` references only `TruthWeaver*` paths; a CI run (or local
+- [x] `.github/workflows/ci.yml` references only `TruthWeaver*` paths; a CI run (or local
       dry run of the same commands) succeeds
-- [ ] `Directory.Build.props` `<RepositoryUrl>`/`<PackageProjectUrl>` point at the renamed
+- [x] `Directory.Build.props` `<RepositoryUrl>`/`<PackageProjectUrl>` point at the renamed
       GitHub repository
-- [ ] `dotnet restore --locked-mode`, `dotnet build`, `dotnet test`,
+- [x] `dotnet restore --locked-mode`, `dotnet build`, `dotnet test`,
       `dotnet csharpier check .`, `dotnet format --verify-no-changes --severity info`, and
       `dotnet roslynator analyze` all succeed using the commands as CI would invoke them

@@ -14,12 +14,12 @@
     <Copyright>Copyright 2024-2025 Robert H. Engelhardt</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <RepositoryUrl>https://github.com/rheone/Boolean-Rules-Engine</RepositoryUrl>
+    <RepositoryUrl>https://github.com/rheone/TruthWeaver</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/rheone/Boolean-Rules-Engine</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/rheone/TruthWeaver</PackageProjectUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <PackageTags>rules engine;boolean;kleene;dsl</PackageTags>
+    <PackageTags>rules engine;boolean;kleene;dsl;truthweaver</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- No PackageIcon yet: no icon asset exists in the repo, and a placeholder image is worse than none -
          add one and set PackageIcon when real branding exists, rather than shipping a fabricated stand-in. -->

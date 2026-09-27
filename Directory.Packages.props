@@ -28,7 +28,7 @@
   <ItemGroup>
     <PackageVersion Include="IDisposableAnalyzers" Version="4.0.8" />
   </ItemGroup>
-  <!-- Microsoft extensions (ship with .NET 11). Abstractions packages are what BooleanRulesEngine
+  <!-- Microsoft extensions (ship with .NET 11). Abstractions packages are what TruthWeaver
        itself depends on (ADR-0004); the non-Abstractions packages are test-only, wiring a real DI
        container/logger in the DI-registration-extension tests (ticket 12). -->
   <ItemGroup>
@@ -37,7 +37,7 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0-rc.1.26425.128" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="11.0.0-rc.1.26425.128" />
   </ItemGroup>
-  <!-- YamlDotNet - BooleanRulesEngine.Yaml's sole dependency beyond BooleanRulesEngine itself. -->
+  <!-- YamlDotNet - TruthWeaver.Yaml's sole dependency beyond TruthWeaver itself. -->
   <ItemGroup>
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>

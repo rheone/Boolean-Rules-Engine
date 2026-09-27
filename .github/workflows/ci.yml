@@ -24,7 +24,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Restore
-        run: dotnet restore BooleanRulesEngine.slnx --locked-mode
+        run: dotnet restore TruthWeaver.slnx --locked-mode
 
       - name: Build
         # This step doubles as the AOT/trim compatibility gate: every project under src/
@@ -34,16 +34,16 @@ jobs:
         # standard $CI=true environment variable that GitHub Actions sets is present - so a
         # newly introduced reflection/dynamic-code pattern in a shipping package fails this
         # step on any PR. Test and benchmark projects are outside src/ and are unaffected.
-        run: dotnet build BooleanRulesEngine.slnx --configuration Release --no-restore
+        run: dotnet build TruthWeaver.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test BooleanRulesEngine.slnx --configuration Release --no-build
+        run: dotnet test TruthWeaver.slnx --configuration Release --no-build
 
       - name: CSharpier
         run: dotnet csharpier check .
 
       - name: dotnet format
-        run: dotnet format BooleanRulesEngine.slnx --no-restore --verify-no-changes --severity info
+        run: dotnet format TruthWeaver.slnx --no-restore --verify-no-changes --severity info
 
       - name: Roslynator
         # roslynator analyze doesn't support .slnx (Roslyn's MSBuildWorkspace has no language
@@ -51,9 +51,9 @@ jobs:
         # is not associated with a language"), so each project is analyzed individually.
         run: |
           for project in \
-            src/BooleanRulesEngine.Abstractions/BooleanRulesEngine.Abstractions.csproj \
-            src/BooleanRulesEngine/BooleanRulesEngine.csproj \
-            src/BooleanRulesEngine.Yaml/BooleanRulesEngine.Yaml.csproj \
-            tests/BooleanRulesEngine.Tests/BooleanRulesEngine.Tests.csproj; do
+            src/TruthWeaver.Abstractions/TruthWeaver.Abstractions.csproj \
+            src/TruthWeaver/TruthWeaver.csproj \
+            src/TruthWeaver.Yaml/TruthWeaver.Yaml.csproj \
+            tests/TruthWeaver.Tests/TruthWeaver.Tests.csproj; do
             dotnet roslynator analyze "$project"
           done
