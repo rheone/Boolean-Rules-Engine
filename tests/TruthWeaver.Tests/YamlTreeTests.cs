@@ -95,6 +95,19 @@ public sealed class YamlTreeTests
     }
 
     [Fact]
+    public void Constant_false_node_round_trips_through_yaml()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> original = compiler.Compile("false").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Contains("const: false", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Xnor_round_trips_through_yaml()
     {
         RuleCompiler<RuleTestContext> compiler = new(
