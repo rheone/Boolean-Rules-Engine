@@ -1,7 +1,9 @@
 namespace TruthWeaver.Tests;
 
 using TruthWeaver.Abstractions;
+using TruthWeaver.Building;
 using TruthWeaver.Compilation;
+using TruthWeaver.Evaluation;
 using TruthWeaver.Registry;
 using TruthWeaver.Tests.TestSupport;
 
@@ -165,5 +167,130 @@ public sealed class EvaluatedTreeTests
         EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
         Assert.True(skippedSubtree.NotEvaluated);
         Assert.Equal("NOT", skippedSubtree.NodeDescription);
+    }
+
+    [Fact]
+    public async Task Skipped_xor_subtree_is_described_as_XOR()
+    {
+        // "a AND (b XOR c)" with a = false short-circuits before the (b XOR c) XorExpression is
+        // evaluated, so its skipped EvaluatedNode is labelled from the node's static shape alone.
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddConstant("a", false)
+                .AddConstant("b", true)
+                .AddConstant("c", true)
+                .Build()
+        );
+
+        CompiledRule<RuleTestContext> rule = RuleBuilder
+            .And(RuleBuilder.Predicate("a"), RuleBuilder.Xor(RuleBuilder.Predicate("b"), RuleBuilder.Predicate("c")))
+            .Compile(compiler)
+            .CompiledRule!;
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
+        Assert.True(skippedSubtree.NotEvaluated);
+        Assert.Equal("XOR", skippedSubtree.NodeDescription);
+    }
+
+    [Fact]
+    public async Task Skipped_xnor_subtree_is_described_as_XNOR()
+    {
+        // "a AND (b XNOR c)" with a = false short-circuits before the (b XNOR c) XnorExpression is
+        // evaluated, so its skipped EvaluatedNode is labelled from the node's static shape alone.
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddConstant("a", false)
+                .AddConstant("b", true)
+                .AddConstant("c", true)
+                .Build()
+        );
+
+        CompiledRule<RuleTestContext> rule = RuleBuilder
+            .And(RuleBuilder.Predicate("a"), RuleBuilder.Xnor(RuleBuilder.Predicate("b"), RuleBuilder.Predicate("c")))
+            .Compile(compiler)
+            .CompiledRule!;
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
+        Assert.True(skippedSubtree.NotEvaluated);
+        Assert.Equal("XNOR", skippedSubtree.NodeDescription);
+    }
+
+    [Fact]
+    public async Task Skipped_exactlyone_subtree_is_described_as_ExactlyOne()
+    {
+        // "a AND ExactlyOne(b, c, d)" with a = false short-circuits before the ExactlyOneExpression
+        // is evaluated, so its skipped EvaluatedNode is labelled from the node's static shape alone.
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddConstant("a", false)
+                .AddConstant("b", true)
+                .AddConstant("c", true)
+                .AddConstant("d", true)
+                .Build()
+        );
+
+        CompiledRule<RuleTestContext> rule = RuleBuilder
+            .And(
+                RuleBuilder.Predicate("a"),
+                RuleBuilder.ExactlyOne(RuleBuilder.Predicate("b"), RuleBuilder.Predicate("c"), RuleBuilder.Predicate("d"))
+            )
+            .Compile(compiler)
+            .CompiledRule!;
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
+        Assert.True(skippedSubtree.NotEvaluated);
+        Assert.Equal("ExactlyOne", skippedSubtree.NodeDescription);
+    }
+
+    [Fact]
+    public async Task Skipped_threshold_subtree_is_described_using_the_default_OpName_K_format()
+    {
+        // "a AND AtLeast(2, b, c, d)" with a = false short-circuits before the ThresholdExpression is
+        // evaluated, so its skipped EvaluatedNode falls through to the default arm's
+        // "OpName(K)" formatting rather than one of the named arms.
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddConstant("a", false)
+                .AddConstant("b", true)
+                .AddConstant("c", true)
+                .AddConstant("d", true)
+                .Build()
+        );
+
+        CompiledRule<RuleTestContext> rule = RuleBuilder
+            .And(
+                RuleBuilder.Predicate("a"),
+                RuleBuilder.AtLeast(2, RuleBuilder.Predicate("b"), RuleBuilder.Predicate("c"), RuleBuilder.Predicate("d"))
+            )
+            .Compile(compiler)
+            .CompiledRule!;
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
+        Assert.True(skippedSubtree.NotEvaluated);
+        Assert.Equal("AtLeast(2)", skippedSubtree.NodeDescription);
     }
 }
