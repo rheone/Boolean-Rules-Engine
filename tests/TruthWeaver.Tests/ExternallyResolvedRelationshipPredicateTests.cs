@@ -88,6 +88,58 @@ public sealed class ExternallyResolvedRelationshipPredicateTests
         Assert.NotSame(resolvedInstances[0], resolvedInstances[1]);
     }
 
+    // Deliberately the same shape as the two-sided IsManagedByCandidate tests above (context anchor +
+    // literal key + injected live resolution + comparison) — just with a String key rather than a
+    // Guid, and a non-identity Decimal comparison value read straight off the context rather than a
+    // second resolved side. The point is the pattern's generality, not a different pattern.
+    [Fact]
+    public async Task Context_amount_within_the_resolved_limit_evaluates_true()
+    {
+        IServiceProvider services = ServicesResolvingLimitAs(500m);
+        CompiledRule<PurchaseRequestContext> rule = CompileIsWithinBudget();
+
+        Decision decision = await rule.EvaluateAsync(
+            new PurchaseRequestContext(Amount: 500m),
+            services,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public async Task Context_amount_exceeding_the_resolved_limit_evaluates_false()
+    {
+        IServiceProvider services = ServicesResolvingLimitAs(500m);
+        CompiledRule<PurchaseRequestContext> rule = CompileIsWithinBudget();
+
+        Decision decision = await rule.EvaluateAsync(
+            new PurchaseRequestContext(Amount: 500.01m),
+            services,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(TruthValue.False, decision.Result);
+    }
+
+    private static IServiceProvider ServicesResolvingLimitAs(decimal resolvedLimit)
+    {
+        IBudgetLookupService lookup = Substitute.For<IBudgetLookupService>();
+        lookup.ResolveLimitAsync("CC-100", Arg.Any<CancellationToken>()).Returns(resolvedLimit);
+
+        IServiceProvider services = Substitute.For<IServiceProvider>();
+        services.GetService(typeof(IsWithinBudget)).Returns(new IsWithinBudget(lookup));
+        return services;
+    }
+
+    private static CompiledRule<PurchaseRequestContext> CompileIsWithinBudget()
+    {
+        RuleCompiler<PurchaseRequestContext> compiler = new(
+            PredicateRegistry<PurchaseRequestContext>.CreateBuilder().Add<IsWithinBudget>().Build()
+        );
+        return compiler.Compile("isWithinBudget(costCenterCode: \"CC-100\")").CompiledRule!;
+    }
+
     private static IServiceProvider ServicesResolvingManagerAs(Guid resolvedManagerId)
     {
         IManagerLookupService lookup = Substitute.For<IManagerLookupService>();
