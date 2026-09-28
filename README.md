@@ -531,6 +531,128 @@ declares, never a difference in rule text or how the compiler validates a
 term. See
 [ADR-0002](docs/adr/0002-evaluation-semantics.md#predicate-registration-and-dependency-lifetimes).
 
+### n arguments, class-based, externally-resolved value
+
+`HasEnoughRecentApprovals` above injects a dependency to read a value it
+already knows how to interpret (`minCount`, `withinHours` are values, used
+directly). A related but distinct shape: a rule-text literal argument and/or
+a `TContext`-supplied value is a **key to be resolved** — not a value
+already ready to use — and a constructor-injected service performs that
+live resolution before the predicate can answer anything. There is no
+single canonical shape here; it covers three distinct cases, none more
+central than the others:
+
+1. **Single-value, no comparison target.** The literal key resolves
+   directly to the boolean answer — there's no "other side" to compare
+   against, and `TContext` may not be read at all. A feature-flag check is
+   the classic instance:
+
+   ```csharp
+   public sealed class IsFeatureEnabled(IFeatureFlagService flags) : IPredicate<object?>
+   {
+       public static PredicateSchema Schema =>
+           new(
+               "isFeatureEnabled",
+               "Is Feature Enabled",
+               "Is the given feature flag currently enabled, resolved live from the flag service?",
+               [new PredicateArgumentSchema("flagKey", "The feature flag key to look up.", LiteralKind.String)]);
+
+       public ValueTask<bool> EvaluateAsync(object? context, PredicateArguments args, CancellationToken ct) =>
+           flags.IsEnabledAsync(args.GetString("flagKey"), ct);
+   }
+   ```
+
+   Used in a rule as `isFeatureEnabled(flagKey: "new-checkout")`.
+
+2. **Single-sided value check.** One side — the argument or a context
+   value — is resolved live; the other side is a plain value already
+   sitting on `TContext`, needing no resolution of its own. Note that
+   `TContext` here has no user field at all — this pattern isn't about "the
+   current user," it's about a key that needs a live lookup:
+
+   ```csharp
+   public sealed class IsWithinBudget(IBudgetLookupService budget) : IPredicate<PurchaseRequest>
+   {
+       public static PredicateSchema Schema =>
+           new(
+               "isWithinBudget",
+               "Is Within Budget",
+               "Is the request's amount within the live spending limit resolved for the given cost center code?",
+               [new PredicateArgumentSchema("costCenterCode", "The cost center code to look up a live limit for.", LiteralKind.String)]);
+
+       public async ValueTask<bool> EvaluateAsync(PurchaseRequest request, PredicateArguments args, CancellationToken ct)
+       {
+           string costCenterCode = args.GetString("costCenterCode");
+           decimal limit = await budget.ResolveLimitAsync(costCenterCode, ct);
+           return request.Amount <= limit;
+       }
+   }
+   ```
+
+   Used in a rule as `isWithinBudget(costCenterCode: "CC-100")`. Only
+   `costCenterCode` is resolved; `request.Amount` is read straight off
+   `TContext`, no lookup needed.
+
+3. **Two-sided comparison.** Both a `TContext`-supplied anchor and the
+   rule-text argument are independently resolved through the injected
+   service, and the two *resolved* results are compared — the original
+   motivating case (a relationship check), but only one instance of this
+   family, not the pattern itself:
+
+   ```csharp
+   public sealed class IsManagedByCandidate(IManagerLookupService managers) : IPredicate<Resource>
+   {
+       public static PredicateSchema Schema =>
+           new(
+               "isManagedByCandidate",
+               "Is Managed By Candidate",
+               "Does the resource's actual manager, resolved live, match the given candidate?",
+               [new PredicateArgumentSchema("candidateManagerId", "The candidate manager to validate.", LiteralKind.Guid)]);
+
+       public async ValueTask<bool> EvaluateAsync(Resource resource, PredicateArguments args, CancellationToken ct)
+       {
+           Guid candidateManagerId = args.GetGuid("candidateManagerId");
+           Guid actualManagerId = await managers.ResolveManagerIdAsync(resource.ResourceId, ct);
+           return actualManagerId == candidateManagerId;
+       }
+   }
+   ```
+
+   Used in a rule as
+   `isManagedByCandidate(candidateManagerId: "3fa85f64-5717-4562-b3fc-2c963f66afa6")`.
+   `resource` (the context) is a resource id, not "the current user" — it
+   needs its own resolution just as much as the argument does. Neither side
+   of a two-sided comparison is privileged as "the identity one."
+
+A few things stay true across all three shapes:
+
+- The rule-text argument is a **key**, not necessarily an identity — a
+  `String` cost-center code is exactly as valid a key as a `Guid`. Whatever
+  it resolves to plays no role in the DSL, JSON, or YAML surface; it exists
+  only inside `EvaluateAsync`.
+- `TContext` participation is optional. Shape 1 above never reads it at
+  all; shapes 2 and 3 read it, but nothing about this pattern requires that.
+- Term identity ([CONTEXT.md#term-identity](CONTEXT.md#term-identity)) is
+  unaffected: the literal argument is still compared as an ordinary literal
+  for memoization purposes. What it resolves to on any given evaluation
+  never enters term identity. The predicate-author contract
+  ([CONTEXT.md#the-predicate-author-contract](CONTEXT.md#the-predicate-author-contract))
+  still applies — the same argument plus the same context within *one*
+  evaluation must yield the same answer, so a resolution service that's
+  internally consistent within a single evaluation (even if the underlying
+  data could change between evaluations) is what the contract expects.
+- Because the live call happens inside `EvaluateAsync`, a lookup failure
+  (timeout, connection error) is absorbed the same way any other predicate
+  fault is — as a `Fault` and `TruthValue.Unknown` (ADR-0001), never an
+  unhandled exception. No special handling is needed in the predicate
+  itself; see [`IPredicate<TContext>`](src/TruthWeaver.Abstractions/IPredicate.cs).
+
+This is the documented, tested alternative to the deferred
+"[context-bound term arguments](CONTEXT.md#deferred)" feature (a
+path-expression mini-language like `IsManagerOf({{resource.ownerId}})`) —
+every shape above is expressible today, with no engine changes, by letting
+the predicate itself resolve whatever it needs.
+
 ## Examples
 
 Seven examples, each adding one more piece — a single predicate, combining
