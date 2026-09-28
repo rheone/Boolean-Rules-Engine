@@ -155,6 +155,54 @@ public sealed class JsonTreeTests
     }
 
     [Fact]
+    public void A_string_argument_containing_a_quote_round_trips_through_json()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "V\"IP").Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile("hasRole(role: \"V\\\"IP\")").CompiledRule!;
+
+        string json = original.PrintJson();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileJson(json).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        using JsonDocument document = JsonDocument.Parse(json);
+        Assert.Equal("V\"IP", document.RootElement.GetProperty("args").GetProperty("role").GetString());
+    }
+
+    [Fact]
+    public void A_string_argument_containing_a_backslash_round_trips_through_json()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "C:\\Temp").Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile("hasRole(role: \"C:\\\\Temp\")").CompiledRule!;
+
+        string json = original.PrintJson();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileJson(json).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        using JsonDocument document = JsonDocument.Parse(json);
+        Assert.Equal("C:\\Temp", document.RootElement.GetProperty("args").GetProperty("role").GetString());
+    }
+
+    [Fact]
+    public void A_string_argument_containing_both_a_quote_and_a_backslash_round_trips_through_json()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "V\"\\IP").Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile("hasRole(role: \"V\\\"\\\\IP\")").CompiledRule!;
+
+        string json = original.PrintJson();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileJson(json).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        using JsonDocument document = JsonDocument.Parse(json);
+        Assert.Equal("V\"\\IP", document.RootElement.GetProperty("args").GetProperty("role").GetString());
+    }
+
+    [Fact]
     public void Compiling_a_json_element_subtree_is_structurally_equal_to_compiling_the_same_tree_as_standalone_text()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();

@@ -6,6 +6,7 @@ using TruthWeaver.Evaluation;
 using TruthWeaver.Registry;
 using TruthWeaver.Yaml;
 using TruthWeaver.Yaml.Tests.TestSupport;
+using YamlDotNet.RepresentationModel;
 
 public sealed class YamlLiteralRoundTripTests
 {
@@ -89,6 +90,51 @@ public sealed class YamlLiteralRoundTripTests
     }
 
     [Fact]
+    public void A_string_argument_containing_a_quote_round_trips_through_yaml()
+    {
+        RuleCompiler<YamlTestContext> compiler = new(
+            PredicateRegistry<YamlTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "V\"IP").Build()
+        );
+        CompiledRule<YamlTestContext> original = compiler.Compile("hasRole(role: \"V\\\"IP\")").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<YamlTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Equal("V\"IP", ReadRoleScalar(yaml));
+    }
+
+    [Fact]
+    public void A_string_argument_containing_a_backslash_round_trips_through_yaml()
+    {
+        RuleCompiler<YamlTestContext> compiler = new(
+            PredicateRegistry<YamlTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "C:\\Temp").Build()
+        );
+        CompiledRule<YamlTestContext> original = compiler.Compile("hasRole(role: \"C:\\\\Temp\")").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<YamlTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Equal("C:\\Temp", ReadRoleScalar(yaml));
+    }
+
+    [Fact]
+    public void A_string_argument_containing_both_a_quote_and_a_backslash_round_trips_through_yaml()
+    {
+        RuleCompiler<YamlTestContext> compiler = new(
+            PredicateRegistry<YamlTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "V\"\\IP").Build()
+        );
+        CompiledRule<YamlTestContext> original = compiler.Compile("hasRole(role: \"V\\\"\\\\IP\")").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<YamlTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Equal("V\"\\IP", ReadRoleScalar(yaml));
+    }
+
+    [Fact]
     public void A_decimal_argument_round_trips_through_yaml_as_a_plain_scalar()
     {
         RuleCompiler<YamlTestContext> compiler = new(
@@ -164,5 +210,16 @@ public sealed class YamlLiteralRoundTripTests
 
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
         Assert.Equal("hasAnyFlag(flags: [true, false])", original.CanonicalText);
+    }
+
+    /// <summary>Parses <paramref name="yaml"/> with YamlDotNet and reads back the 'role' argument's scalar value, proving the emitted YAML is valid, correctly-escaped double-quoted YAML rather than just structurally round-tripping through the DSL.</summary>
+    private static string ReadRoleScalar(string yaml)
+    {
+        using StringReader reader = new(yaml);
+        YamlStream stream = new();
+        stream.Load(reader);
+        YamlMappingNode root = (YamlMappingNode)stream.Documents[0].RootNode;
+        YamlMappingNode args = (YamlMappingNode)root.Children[new YamlScalarNode("args")];
+        return ((YamlScalarNode)args.Children[new YamlScalarNode("role")]).Value!;
     }
 }

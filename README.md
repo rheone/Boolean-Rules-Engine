@@ -593,6 +593,19 @@ generated documentation always has something to show for every predicate and
 argument. See [Describing a compiled rule](#describing-a-compiled-rule)
 below for how this pairs with operators' own label/description.
 
+A DSL string-literal argument supports four escape sequences: `\"` for a
+literal quote, `\\` for a literal backslash, `\n` for a newline, and `\t` for
+a tab. For example, `hasRole(role: "V\"IP")` compiles to a string argument
+whose value is `V"IP`, and printing that compiled rule back to DSL text
+reproduces `hasRole(role: "V\"IP")` unchanged. Any other backslash sequence
+(e.g. `\p`) is a compile-time `InvalidEscapeSequence` diagnostic, not a
+silently-corrupted literal value — the compilation fails rather than
+guessing what you meant. This escaping rule is specific to the DSL text
+format: the JSON and YAML forms (see
+[Converting between DSL, JSON, and YAML](#converting-between-dsl-json-and-yaml))
+use their own format's native string escaping (`System.Text.Json` and
+YamlDotNet respectively), not this rule.
+
 ### 4. `XOR`, `XNOR`, `ExactlyOne`, and the threshold family
 
 ```text
