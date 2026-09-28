@@ -4,6 +4,19 @@ using TruthWeaver.Abstractions;
 
 public sealed class LiteralValueTests
 {
+    public static TheoryData<LiteralKind> AllKinds()
+    {
+        return new(
+            LiteralKind.String,
+            LiteralKind.Int64,
+            LiteralKind.Decimal,
+            LiteralKind.Boolean,
+            LiteralKind.DateTimeOffset,
+            LiteralKind.Guid,
+            LiteralKind.Int64Array
+        );
+    }
+
     [Fact]
     public void Scalar_factories_round_trip_through_their_matching_accessor()
     {
@@ -138,5 +151,58 @@ public sealed class LiteralValueTests
         LiteralValue array = LiteralValue.OfArray(LiteralKind.Int64, [LiteralValue.OfInt64(1), LiteralValue.OfInt64(2)]);
 
         Assert.Equal("[1, 2]", array.ToString());
+    }
+
+    [Theory]
+    [MemberData(nameof(AllKinds))]
+    public void GetHashCode_does_not_throw_and_is_equal_for_equal_literals_of_every_kind(LiteralKind kind)
+    {
+        LiteralValue left = MakeSample(kind);
+        LiteralValue right = MakeSample(kind);
+
+        Assert.True(left.Equals(right));
+
+        int leftHash = left.GetHashCode();
+        int rightHash = right.GetHashCode();
+
+        Assert.Equal(leftHash, rightHash);
+    }
+
+    [Fact]
+    public void GetHashCode_supports_using_literal_values_as_hash_set_members_across_kinds()
+    {
+        LiteralValue arrayValue = LiteralValue.OfArray(LiteralKind.String, [LiteralValue.OfString("a")]);
+
+        HashSet<LiteralValue> set =
+        [
+            LiteralValue.OfString("Y"),
+            LiteralValue.OfInt64(42),
+            LiteralValue.OfDecimal(1.5m),
+            LiteralValue.OfBoolean(true),
+            LiteralValue.OfDateTimeOffset(DateTimeOffset.UtcNow),
+            LiteralValue.OfGuid(Guid.NewGuid()),
+            arrayValue,
+        ];
+
+        Assert.Contains(arrayValue, set);
+        Assert.DoesNotContain(LiteralValue.OfString("N"), set);
+    }
+
+    private static LiteralValue MakeSample(LiteralKind kind)
+    {
+        return kind switch
+        {
+            LiteralKind.String => LiteralValue.OfString("Y"),
+            LiteralKind.Int64 => LiteralValue.OfInt64(42),
+            LiteralKind.Decimal => LiteralValue.OfDecimal(1.5m),
+            LiteralKind.Boolean => LiteralValue.OfBoolean(true),
+            LiteralKind.DateTimeOffset => LiteralValue.OfDateTimeOffset(new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)),
+            LiteralKind.Guid => LiteralValue.OfGuid(new Guid("11111111-1111-1111-1111-111111111111")),
+            LiteralKind.Int64Array => LiteralValue.OfArray(
+                LiteralKind.Int64,
+                [LiteralValue.OfInt64(1), LiteralValue.OfInt64(2)]
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported kind for this test."),
+        };
     }
 }
