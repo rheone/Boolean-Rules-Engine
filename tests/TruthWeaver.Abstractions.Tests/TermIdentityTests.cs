@@ -78,4 +78,54 @@ public sealed class TermIdentityTests
         Assert.False(term == nullTerm);
         Assert.False(nullTerm == term);
     }
+
+    [Fact]
+    public void Equals_returns_true_for_the_same_reference()
+    {
+        TermIdentity term = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+
+        Assert.True(term.Equals(term));
+    }
+
+    [Fact]
+    public void Equality_operator_returns_true_for_equal_identities()
+    {
+        TermIdentity first = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+        TermIdentity second = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+
+        Assert.True(first == second);
+        Assert.False(first != second);
+    }
+
+    [Fact]
+    public void Equality_operator_returns_false_for_a_different_predicate_name()
+    {
+        TermIdentity role = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+        TermIdentity isManager = new("isManager", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+
+        Assert.False(role == isManager);
+        Assert.True(role != isManager);
+    }
+
+    [Fact]
+    public void Equality_operator_returns_false_for_a_different_argument_value()
+    {
+        TermIdentity role1 = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+        TermIdentity role2 = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Z"))]);
+
+        Assert.False(role1 == role2);
+        Assert.True(role1 != role2);
+    }
+
+    [Fact]
+    public void Equality_operator_returns_false_when_only_one_side_is_null()
+    {
+        TermIdentity term = new("isManager", []);
+        TermIdentity? nullTerm = null;
+
+        Assert.False(term == nullTerm);
+        Assert.False(nullTerm == term);
+        Assert.True(term != nullTerm);
+        Assert.True(nullTerm != term);
+    }
 }
