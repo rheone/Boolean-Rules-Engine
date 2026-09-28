@@ -343,7 +343,7 @@ Every operator above follows the three-valued Kleene truth tables in
 | `TruthWeaver.Abstractions` | *(nothing third-party)* | `IPredicate<TContext>`, `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault` — everything a predicate-implementing service needs. |
 | `TruthWeaver` | `Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions` | The DSL parser, `RuleCompiler<TContext>`, `CompiledRule<TContext>`, the BDD-based analyzer, the evaluator, `System.Text.Json` tree support, printing/diffing, and DI registration extensions. |
 | `TruthWeaver.Yaml` | `TruthWeaver`, YamlDotNet | YAML tree support (`CompileYaml`/`PrintYaml`), isolated so a consumer with no interest in YAML never pulls in YamlDotNet. |
-| `TruthWeaver.Predicates` | `TruthWeaver.Abstractions` | Ready-made generic `IPredicate<TContext>` factories — string comparison, null/empty, set equality, regex matching — for a consumer that wants common checks without writing a class, and without acquiring the parser, compiler, or analyzer. |
+| `TruthWeaver.Predicates` | `TruthWeaver.Abstractions` | Ready-made generic `IPredicate<TContext>` factories — string comparison, null/empty, set equality, regex matching, and externally-resolved-value predicates for a safe-to-share resolving client — for a consumer that wants common checks without writing a class, and without acquiring the parser, compiler, or analyzer. |
 | `TruthWeaver.Testing` | `TruthWeaver.Abstractions` | Fluent `Decision` assertions and fake/scripted predicate factories for tests, without a hand-written `IPredicate<TContext>` per test. |
 
 ```mermaid
@@ -441,7 +441,9 @@ Before writing one by hand, check whether
 [`TruthWeaver.Predicates`](src/TruthWeaver.Predicates) already has it —
 `StringPredicates`, `CollectionPredicates`, and `RegexPredicates` cover
 string comparison, null/empty checks, set equality, and regex matching as
-generic factories parameterized by a value selector.
+generic factories parameterized by a value selector, and
+`ResolvedValuePredicates` covers the externally-resolved-value pattern
+(below) for a safe-to-share resolving client.
 
 ### 0 arguments, stateless lambda
 
@@ -652,6 +654,33 @@ This is the documented, tested alternative to the deferred
 path-expression mini-language like `IsManagerOf({{resource.ownerId}})`) —
 every shape above is expressible today, with no engine changes, by letting
 the predicate itself resolve whatever it needs.
+
+**All three examples above are class-based**, which is the right choice
+whenever the thing doing the resolving is a scoped dependency (a
+`DbContext`, a per-request `HttpClient`) that must be re-resolved fresh on
+every evaluation. When the resolving client is instead safe to capture once
+— a long-lived, thread-safe instance such as a cached feature-flag reader or
+an `HttpClient`-backed lookup wrapper already held by the host —
+`ResolvedValuePredicates` in [`TruthWeaver.Predicates`](src/TruthWeaver.Predicates)
+covers the same pattern as a lighter-weight lambda factory, with no one-off
+class needed. The single-value convenience overload matches shape 1 above:
+
+```csharp
+(PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+    ResolvedValuePredicates.Create<object?>(
+        "isFeatureEnabled",
+        "Is Feature Enabled",
+        "Is the given feature flag currently enabled, resolved live from the flag service?",
+        (_, args, ct) => flags.IsEnabledAsync(args.GetString("flagKey"), ct),
+        new PredicateArgumentSchema("flagKey", "The feature flag key to look up.", LiteralKind.String));
+```
+
+A second overload takes a separate `test` delegate for shapes 2 and 3 above,
+when it reads more clearly to keep "resolve" and "turn the resolved value
+into an answer" apart. Both paths solve the same conceptual pattern; neither
+replaces the other — reach for `ResolvedValuePredicates` when the resolving
+client is safe to share, and a hand-written `IPredicate<TContext>` (as shown
+above) when it isn't.
 
 ## Examples
 
