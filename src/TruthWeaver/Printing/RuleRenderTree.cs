@@ -22,31 +22,39 @@ internal static class RuleRenderTree
     /// <summary>Builds a purely structural render tree, with no evaluation coloring.</summary>
     /// <param name="description">The rule's described tree.</param>
     /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels.</param>
+    /// <param name="showArgumentValues">Whether to include a term's <see cref="RuleDescription.ArgumentText"/> in its rendered label.</param>
     /// <returns>The render tree.</returns>
-    public static RenderNode Build(RuleDescription description, OperatorStyle style = OperatorStyle.Word)
+    public static RenderNode Build(
+        RuleDescription description,
+        OperatorStyle style = OperatorStyle.Word,
+        bool showArgumentValues = true
+    )
     {
-        return Build(description, evaluated: null, ancestorSkipped: false, style);
+        return Build(description, evaluated: null, ancestorSkipped: false, style, showArgumentValues);
     }
 
     /// <summary>Builds a render tree colored by one evaluation's result tree.</summary>
     /// <param name="description">The rule's described tree.</param>
     /// <param name="evaluated">The root of the matching <see cref="Decision.EvaluatedTree"/>.</param>
     /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels.</param>
+    /// <param name="showArgumentValues">Whether to include a term's <see cref="RuleDescription.ArgumentText"/> in its rendered label.</param>
     /// <returns>The render tree.</returns>
     public static RenderNode Build(
         RuleDescription description,
         EvaluatedNode evaluated,
-        OperatorStyle style = OperatorStyle.Word
+        OperatorStyle style = OperatorStyle.Word,
+        bool showArgumentValues = true
     )
     {
-        return Build(description, evaluated, ancestorSkipped: false, style);
+        return Build(description, evaluated, ancestorSkipped: false, style, showArgumentValues);
     }
 
     private static RenderNode Build(
         RuleDescription description,
         EvaluatedNode? evaluated,
         bool ancestorSkipped,
-        OperatorStyle style
+        OperatorStyle style,
+        bool showArgumentValues
     )
     {
         AssertOperandCountsAligned(description, evaluated);
@@ -62,21 +70,29 @@ internal static class RuleRenderTree
         for (int i = 0; i < description.Operands.Count; i++)
         {
             EvaluatedNode? childEvaluated = children is { Count: > 0 } ? children[i] : null;
-            renderedChildren.Add(Build(description.Operands[i], childEvaluated, skipped, style));
+            renderedChildren.Add(Build(description.Operands[i], childEvaluated, skipped, style, showArgumentValues));
         }
 
-        return new RenderNode(StyledLabel(description, style), state, renderedChildren);
+        return new RenderNode(StyledLabel(description, style, showArgumentValues), state, renderedChildren);
     }
 
     /// <summary>
-    /// Renders <paramref name="description"/>'s label in <paramref name="style"/>. Only an operator
-    /// node's exact word-form label (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>XNOR</c>) with
-    /// at least one operand is eligible — a term or constant leaf (always zero operands) is never
-    /// restyled even if a predicate's authored label happens to collide with one of those words, and
+    /// Renders <paramref name="description"/>'s label in <paramref name="style"/>, with its
+    /// <see cref="RuleDescription.ArgumentText"/> appended when <paramref name="showArgumentValues"/>
+    /// is <see langword="true"/> and the term has any. Only an operator node's exact word-form label
+    /// (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>XNOR</c>) with at least one operand is
+    /// eligible for restyling — a term or constant leaf (always zero operands) is never restyled even
+    /// if a predicate's authored label happens to collide with one of those words, and
     /// <c>ExactlyOne</c>/threshold labels (e.g. <c>AtLeast(3)</c>) fall through unchanged in every
     /// style, since they have no symbolic or C-style spelling.
     /// </summary>
-    private static string StyledLabel(RuleDescription description, OperatorStyle style)
+    private static string StyledLabel(RuleDescription description, OperatorStyle style, bool showArgumentValues)
+    {
+        string label = BaseLabel(description, style);
+        return showArgumentValues && description.ArgumentText is { } argumentText ? $"{label} ({argumentText})" : label;
+    }
+
+    private static string BaseLabel(RuleDescription description, OperatorStyle style)
     {
         if (style == OperatorStyle.Word || description.Operands.Count == 0)
         {

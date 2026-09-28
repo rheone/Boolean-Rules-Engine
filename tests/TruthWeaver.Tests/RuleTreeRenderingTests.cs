@@ -8,7 +8,7 @@ using TruthWeaver.Registry;
 using TruthWeaver.Tests.TestSupport;
 
 /// <summary>
-/// <see cref="CompiledRule{TContext}.PrintMermaid()"/>/<see cref="CompiledRule{TContext}.PrintPlainText()"/>
+/// <see cref="CompiledRule{TContext}.PrintMermaid(bool)"/>/<see cref="CompiledRule{TContext}.PrintPlainText(bool)"/>
 /// — structure-only and evaluation-colored tree rendering, for delivery to a diagram UI or a log.
 /// </summary>
 public sealed class RuleTreeRenderingTests
@@ -27,6 +27,83 @@ public sealed class RuleTreeRenderingTests
         Assert.Contains("AND", mermaid);
         Assert.Contains("-->", mermaid);
         Assert.DoesNotContain("classDef", mermaid);
+    }
+
+    [Fact]
+    public void Mermaid_output_always_includes_a_start_marker_pointing_at_the_root()
+    {
+        CompiledRule<RuleTestContext> rule = Compile(
+            "a AND b",
+            registry => registry.AddConstant("a", true).AddConstant("b", true)
+        );
+
+        string mermaid = rule.PrintMermaid();
+
+        Assert.Contains("Start([\"Start\"]) --> n0", mermaid);
+    }
+
+    [Fact]
+    public void Mermaid_output_includes_a_terms_argument_values_by_default()
+    {
+        CompiledRule<RuleTestContext> rule = Compile(
+            "hasCrust(crust: \"thin\")",
+            registry => registry.AddStringArgPredicate("hasCrust", "crust", "thin")
+        );
+
+        string mermaid = rule.PrintMermaid();
+
+        Assert.Contains("crust: #quot;thin#quot;", mermaid);
+    }
+
+    [Fact]
+    public void Mermaid_output_omits_argument_values_when_disabled()
+    {
+        CompiledRule<RuleTestContext> rule = Compile(
+            "hasCrust(crust: \"thin\")",
+            registry => registry.AddStringArgPredicate("hasCrust", "crust", "thin")
+        );
+
+        string mermaid = rule.PrintMermaid(showArgumentValues: false);
+
+        Assert.DoesNotContain("crust", mermaid);
+    }
+
+    [Fact]
+    public void PlainText_output_includes_a_terms_argument_values_by_default()
+    {
+        CompiledRule<RuleTestContext> rule = Compile(
+            "hasCrust(crust: \"thin\")",
+            registry => registry.AddStringArgPredicate("hasCrust", "crust", "thin")
+        );
+
+        string text = rule.PrintPlainText();
+
+        Assert.Contains("crust: \"thin\"", text);
+    }
+
+    [Fact]
+    public void PlainText_output_omits_argument_values_when_disabled()
+    {
+        CompiledRule<RuleTestContext> rule = Compile(
+            "hasCrust(crust: \"thin\")",
+            registry => registry.AddStringArgPredicate("hasCrust", "crust", "thin")
+        );
+
+        string text = rule.PrintPlainText(showArgumentValues: false);
+
+        Assert.DoesNotContain("crust: \"thin\"", text);
+    }
+
+    [Fact]
+    public void Argument_values_are_absent_for_zero_argument_terms()
+    {
+        CompiledRule<RuleTestContext> rule = Compile("a", registry => registry.AddConstant("a", true));
+
+        string mermaid = rule.PrintMermaid();
+        string text = rule.PrintPlainText();
+
+        Assert.DoesNotContain("(", mermaid.Replace("Start([\"Start\"])", string.Empty));
+        Assert.DoesNotContain("(", text);
     }
 
     [Fact]

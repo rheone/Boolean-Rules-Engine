@@ -5,7 +5,7 @@ using TruthWeaver.Evaluation;
 using TruthWeaver.Printing;
 
 /// <summary>
-/// <see cref="RuleRenderTree.Build(RuleDescription, EvaluatedNode, OperatorStyle)"/> zips a <see cref="RuleDescription"/>
+/// <see cref="RuleRenderTree.Build(RuleDescription, EvaluatedNode, OperatorStyle, bool)"/> zips a <see cref="RuleDescription"/>
 /// and an <see cref="EvaluatedNode"/> positionally, on the assumption that both trees were built from the
 /// same operand order. This guards that invariant: a deliberately mismatched pair of trees should fail
 /// loudly (debug-only) instead of silently mislabeling evaluation state.

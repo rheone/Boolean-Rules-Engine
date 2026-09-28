@@ -438,7 +438,15 @@ Before writing one by hand, check whether
 string comparison, null/empty checks, set equality, and regex matching as
 generic factories parameterized by a value selector, and
 `ResolvedValuePredicates` covers the externally-resolved-value pattern
-(below) for a safe-to-share resolving client.
+(below) for a safe-to-share resolving client. Every method on
+`StringPredicates` except one is ordinal-only and fixed-behavior by
+design — a case-insensitive variant is a separate predicate
+(`EqualsIgnoreCase`), never a rule-text flag on `Equals`. The exception,
+`StringPredicates.EqualsConfigurable`, deliberately inverts that: it's one
+predicate whose `ignoreCase`/`culture`/`trim` arguments are set per rule
+(case-insensitive and `InvariantCulture` by default), for the case where a
+rule author genuinely needs that flexibility rather than a fixed-behavior
+predicate per name.
 
 ### 0 arguments, stateless lambda
 
@@ -871,6 +879,9 @@ operands:
 Registering predicates and evaluating:
 
 ```csharp
+(PredicateSchema hasCrustSchema, var hasCrustEvaluate) =
+    StringPredicates.EqualsConfigurable<PizzaOrder>("hasCrust", order => order.Crust, "Has Crust", argumentName: "crust");
+
 PredicateRegistry<PizzaOrder> registry = PredicateRegistry<PizzaOrder>.CreateBuilder()
     .Add<IsDineIn>()
     .Add<IsTakeout>()
@@ -881,13 +892,7 @@ PredicateRegistry<PizzaOrder> registry = PredicateRegistry<PizzaOrder>.CreateBui
             "Does the order include the given topping?",
             [new PredicateArgumentSchema("topping", "The topping to check for.", LiteralKind.String)]),
         (order, args, ct) => ValueTask.FromResult(order.Toppings.Contains(args.GetString("topping"))))
-    .Add(
-        new PredicateSchema(
-            "hasCrust",
-            "Has Crust",
-            "Does the order have the given crust?",
-            [new PredicateArgumentSchema("crust", "The crust style to check for.", LiteralKind.String)]),
-        (order, args, ct) => ValueTask.FromResult(order.Crust == args.GetString("crust")))
+    .Add(hasCrustSchema, hasCrustEvaluate)
     .Build();
 
 RuleCompiler<PizzaOrder> compiler = new(registry);
@@ -911,9 +916,13 @@ if (decision.IsSatisfied)
 
 `IsDineIn`/`IsTakeout` are class-based predicates (`IPredicate<PizzaOrder>`),
 resolved fresh from `serviceProvider` on every call — the right shape for a
-predicate with a scoped dependency such as a `DbContext`. `hasTopping`/
-`hasCrust` are stateless lambdas. Both forms register against the same
-`PredicateRegistryBuilder<TContext>`; see
+predicate with a scoped dependency such as a `DbContext`. `hasTopping` is a
+hand-written stateless lambda; `hasCrust` comes from the ready-made
+`StringPredicates.EqualsConfigurable` factory instead (see
+[Predicate types](#predicate-types)) — it takes `crust` as its rule-text
+comparison target, plus `ignoreCase`/`culture`/`trim` arguments with sensible
+defaults, so `hasCrust(crust: "thin")` alone already compiles. All three
+forms register against the same `PredicateRegistryBuilder<TContext>`; see
 [ADR-0002](docs/adr/0002-evaluation-semantics.md#predicate-registration-and-dependency-lifetimes).
 
 Wiring into a host's DI container instead of constructing things by hand:
@@ -953,13 +962,14 @@ string mermaid = result.CompiledRule!.PrintMermaid();
 
 ```mermaid
 flowchart TD
+    Start(["Start"]) --> n0
     n0["AND"]
-    n1["Has Topping"]
+    n1["Has Topping (topping: #quot;greenOlives#quot;)"]
     n0 --> n1
     n2["OR"]
-    n3["Has Crust"]
+    n3["Has Crust (crust: #quot;thin#quot;, culture: #quot;#quot;, ignoreCase: true, trim: false)"]
     n2 --> n3
-    n4["Has Crust"]
+    n4["Has Crust (crust: #quot;stuffed#quot;, culture: #quot;#quot;, ignoreCase: true, trim: false)"]
     n2 --> n4
     n5["XOR"]
     n6["Is Dine In"]
@@ -978,20 +988,23 @@ string tree = result.CompiledRule!.PrintPlainText();
 
 ```text
 AND
-├─ Has Topping
+├─ Has Topping (topping: "greenOlives")
 └─ OR
-   ├─ Has Crust
-   ├─ Has Crust
+   ├─ Has Crust (crust: "thin", culture: "", ignoreCase: true, trim: false)
+   ├─ Has Crust (crust: "stuffed", culture: "", ignoreCase: true, trim: false)
    └─ XOR
       ├─ Is Dine In
       └─ Is Takeout
 ```
 
-Both printers label a term from its predicate's registered `PredicateSchema.Label`,
-not its rule-text arguments — that's why the two `hasCrust` terms above both
-render as "Has Crust" with no visible `"thin"`/`"stuffed"` distinction, even
-though they're different terms (see [Describing a compiled rule](#describing-a-compiled-rule)
-and [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
+Both diagrams show every term's rule-text argument values by default —
+including `hasCrust`'s `ignoreCase`/`culture`/`trim` arguments, filled in
+from their schema defaults even though the DSL text above never mentions
+them (ADR-0003's compiler behavior for optional arguments) — which is also
+why the two `hasCrust` terms are now visually distinct by their `crust`
+value, unlike a predicate label alone. Pass `showArgumentValues: false` to
+either `PrintMermaid`/`PrintPlainText` overload to render structure-only
+labels instead (see [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram)).
 
 `RuleBuilder` is not a fourth parallel parser into the AST — every builder
 method renders to the exact same flat JSON tree shape [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)
@@ -1255,12 +1268,19 @@ string annotatedText = PlainTextTreePrinter.Print(description, decision.Evaluate
 `MermaidTreePrinter`'s result is plain Mermaid text — paste it into any
 Mermaid renderer, or hand it to a UI that already embeds one, to see the
 rule's structure (and optionally, why one particular evaluation came out the
-way it did) as a diagram instead of a nested expression.
-`PlainTextTreePrinter`'s result needs no renderer at all — the same
-information as an indented tree, suitable for a log line or a terminal.
-`CompiledRule<TContext>` also exposes both directly as `PrintMermaid()`/
-`PrintMermaid(decision)` and `PrintPlainText()`/`PrintPlainText(decision)`,
-without a separate `Describe()` call.
+way it did) as a diagram instead of a nested expression. Its output always
+includes a synthetic `Start` node pointing at the root, so the diagram shows
+where evaluation begins without the reader having to infer it from "the node
+with no incoming edge." `PlainTextTreePrinter`'s result needs no renderer at
+all — the same information as an indented tree, suitable for a log line or a
+terminal. Both printers include each term's rule-text argument values in its
+label by default (e.g. `Has Crust (crust: "thin")`) — pass
+`showArgumentValues: false` to either `Print` overload (or to
+`CompiledRule<TContext>`'s `PrintMermaid`/`PrintPlainText` below) for
+structure-only labels instead. `CompiledRule<TContext>` also exposes both
+directly as `PrintMermaid()`/`PrintMermaid(decision)` and
+`PrintPlainText()`/`PrintPlainText(decision)`, without a separate
+`Describe()` call.
 
 ## Evaluation flow
 

@@ -1,5 +1,6 @@
 namespace TruthWeaver.Evaluation;
 
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TruthWeaver.Abstractions;
@@ -58,10 +59,11 @@ public sealed class CompiledRule<TContext>
     }
 
     /// <summary>Renders this rule's structure as Mermaid <c>flowchart</c> text, for a diagram UI.</summary>
+    /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>Mermaid <c>flowchart</c> text.</returns>
-    public string PrintMermaid()
+    public string PrintMermaid(bool showArgumentValues = true)
     {
-        return MermaidTreePrinter.Print(this.Describe());
+        return MermaidTreePrinter.Print(this.Describe(), showArgumentValues: showArgumentValues);
     }
 
     /// <summary>
@@ -69,18 +71,24 @@ public sealed class CompiledRule<TContext>
     /// result and short-circuit path.
     /// </summary>
     /// <param name="decision">A <see cref="Decision"/> returned from <see cref="EvaluateAsync"/> for this same rule.</param>
+    /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>Mermaid <c>flowchart</c> text.</returns>
     /// <exception cref="ArgumentException"><paramref name="decision"/> has no <see cref="Decision.EvaluatedTree"/>.</exception>
-    public string PrintMermaid(Decision decision)
+    public string PrintMermaid(Decision decision, bool showArgumentValues = true)
     {
-        return MermaidTreePrinter.Print(this.Describe(), RequireEvaluatedTree(decision));
+        return MermaidTreePrinter.Print(
+            this.Describe(),
+            RequireEvaluatedTree(decision),
+            showArgumentValues: showArgumentValues
+        );
     }
 
     /// <summary>Renders this rule's structure as an indented plain-text tree.</summary>
+    /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>The indented tree text.</returns>
-    public string PrintPlainText()
+    public string PrintPlainText(bool showArgumentValues = true)
     {
-        return PlainTextTreePrinter.Print(this.Describe());
+        return PlainTextTreePrinter.Print(this.Describe(), showArgumentValues: showArgumentValues);
     }
 
     /// <summary>
@@ -88,11 +96,16 @@ public sealed class CompiledRule<TContext>
     /// result and short-circuit path.
     /// </summary>
     /// <param name="decision">A <see cref="Decision"/> returned from <see cref="EvaluateAsync"/> for this same rule.</param>
+    /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>The indented tree text.</returns>
     /// <exception cref="ArgumentException"><paramref name="decision"/> has no <see cref="Decision.EvaluatedTree"/>.</exception>
-    public string PrintPlainText(Decision decision)
+    public string PrintPlainText(Decision decision, bool showArgumentValues = true)
     {
-        return PlainTextTreePrinter.Print(this.Describe(), RequireEvaluatedTree(decision));
+        return PlainTextTreePrinter.Print(
+            this.Describe(),
+            RequireEvaluatedTree(decision),
+            showArgumentValues: showArgumentValues
+        );
     }
 
     /// <summary>Evaluates this rule against a context.</summary>
@@ -146,7 +159,7 @@ public sealed class CompiledRule<TContext>
             (string label, string description) = registry.TryGetSchema(term.Identity.PredicateName, out PredicateSchema? schema)
                 ? (schema!.Label, schema.Description)
                 : (term.Identity.PredicateName, "An unregistered predicate (CompilationMode.Lenient).");
-            return new RuleDescription(label, description, []);
+            return new RuleDescription(label, description, [], ArgumentText(term.Identity));
         }
 
         OperatorDescriptor descriptor = OperatorInfo.Describe(node);
@@ -157,6 +170,36 @@ public sealed class CompiledRule<TContext>
             descriptor.Description,
             [.. operands.Select(operand => DescribeNode(operand, registry))]
         );
+    }
+
+    /// <summary>
+    /// Renders a term's rule-text arguments as comma-joined <c>name: value</c> pairs, matching the
+    /// per-argument formatting <see cref="TermIdentity.ToString"/> uses for its parenthesized part, but
+    /// without repeating the predicate name — that comes from the term's own
+    /// <see cref="RuleDescription.Label"/> instead.
+    /// </summary>
+    /// <param name="identity">The term's identity.</param>
+    /// <returns>The joined argument text, or <see langword="null"/> for a zero-argument term.</returns>
+    private static string? ArgumentText(TermIdentity identity)
+    {
+        if (identity.Arguments.Count == 0)
+        {
+            return null;
+        }
+
+        StringBuilder builder = new();
+        for (int i = 0; i < identity.Arguments.Count; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append(", ");
+            }
+
+            KeyValuePair<string, LiteralValue> argument = identity.Arguments[i];
+            builder.Append(argument.Key).Append(": ").Append(argument.Value);
+        }
+
+        return builder.ToString();
     }
 
     private static EvaluatedNode RequireEvaluatedTree(Decision decision)
