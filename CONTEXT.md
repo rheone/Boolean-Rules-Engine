@@ -2,8 +2,10 @@
 
 This document is the shared vocabulary and domain model for the
 `TruthWeaver` library. Read it before making structural changes to the
-engine, and update it when the vocabulary or the deferred list changes. See
-`docs/adr/` for the reasoning behind individual decisions.
+engine, and update it when the vocabulary changes. See `docs/adr/` for the
+reasoning behind individual decisions, and
+[`.scratch/deferred-features`](.scratch/deferred-features/spec.md) for
+capabilities intentionally left out of the current design.
 
 ## What this is
 
@@ -16,8 +18,9 @@ It is not an authorization engine, a workflow engine, or a policy engine.
 Those are all things you can *build on top of it* — permission checks
 ("can the current user do X"), process-flow gating, feature-flag
 combination logic — but the engine itself has no opinion about permit/deny,
-effects, or side effects. See [Deferred](#deferred) for the authorization
-layer this may grow later.
+effects, or side effects. See
+[`.scratch/deferred-features`](.scratch/deferred-features/spec.md) for why
+an authorization layer is intentionally out of scope.
 
 ## Vocabulary
 
@@ -42,7 +45,58 @@ a bound call to it); "gate" is circuit vocabulary, not used here;
 
 ## Conceptual model
 
+```mermaid
+classDiagram
+    class Rule {
+        +Expression Expression
+    }
+    class Expression {
+        <<abstract>>
+    }
+    class Term {
+        +string PredicateName
+    }
+    class AndExpression
+    class OrExpression
+    class NotExpression
+    class XorExpression
+    class XnorExpression
+    class ExactlyOneExpression
+    class ThresholdExpression {
+        +int K
+        +ThresholdKind Kind
+    }
+    class ConstantExpression {
+        +bool Value
+    }
+    class Predicate {
+        <<Interface>>
+        +EvaluateAsync() bool
+    }
+
+    Rule "1" *-- "1" Expression : has
+    Expression <|-- Term
+    Expression <|-- AndExpression
+    Expression <|-- OrExpression
+    Expression <|-- NotExpression
+    Expression <|-- XorExpression
+    Expression <|-- XnorExpression
+    Expression <|-- ExactlyOneExpression
+    Expression <|-- ThresholdExpression
+    Expression <|-- ConstantExpression
+    AndExpression "1" o-- "2..*" Expression : operands
+    OrExpression "1" o-- "2..*" Expression : operands
+    NotExpression "1" o-- "1" Expression : operand
+    XorExpression "1" o-- "2" Expression : operands
+    XnorExpression "1" o-- "2" Expression : operands
+    ExactlyOneExpression "1" o-- "2..*" Expression : operands
+    ThresholdExpression "1" o-- "2..*" Expression : operands
+    Term "1" --> "1" Predicate : bound to
 ```
+
+The same shape, as a grammar:
+
+```text
 Rule = Expression
 
 Expression =
@@ -64,6 +118,21 @@ Expression =
 Every expression evaluates to exactly one `TruthValue`. At the API boundary,
 a `Decision.IsSatisfied` is `true` only when the result is `True` — `Unknown`
 fails closed.
+
+## Term identity
+
+Term identity is what makes memoization, canonical equality, and constant/
+contradiction analysis sound — two terms are "the same variable" if and only
+if:
+
+- predicate name, normalized case-insensitively to the registered casing, **and**
+- arguments, sorted by name, each compared by exact type-normalized value.
+
+Argument **values** are case-**sensitive** (`role: "Y"` and `role: "y"` are
+different terms — role codes are frequently case-significant, and folding
+them silently would be a security bug in an authorization consumer).
+Argument **order** in the source text does not affect identity. Array-valued
+arguments **are** order-sensitive.
 
 ## Equivalency rules
 
@@ -121,21 +190,6 @@ Nothing broader is claimed or enforced:
 See [ADR-0002](docs/adr/0002-evaluation-semantics.md) for the full
 evaluation model this contract supports.
 
-## Term identity
-
-Term identity is what makes memoization, canonical equality, and constant/
-contradiction analysis sound — two terms are "the same variable" if and only
-if:
-
-- predicate name, normalized case-insensitively to the registered casing, **and**
-- arguments, sorted by name, each compared by exact type-normalized value.
-
-Argument **values** are case-**sensitive** (`role: "Y"` and `role: "y"` are
-different terms — role codes are frequently case-significant, and folding
-them silently would be a security bug in an authorization consumer).
-Argument **order** in the source text does not affect identity. Array-valued
-arguments **are** order-sensitive.
-
 ## Failure model (summary)
 
 Internally three-valued (Kleene), two-valued at the boundary. A predicate
@@ -180,29 +234,10 @@ parser, compiler, analyzer, evaluator, System.Text.Json support, DI
 extensions), `TruthWeaver.Yaml` (YamlDotNet only). Full reasoning:
 [ADR-0004](docs/adr/0004-package-boundaries-and-extensibility.md).
 
-## Deferred
-
-Recorded so they're revisited deliberately rather than rediscovered from
-scratch. None of these are rejected outright — the AST and compiler are
-designed so each remains addable without a breaking rework.
-
-| Item | Why deferred |
-| --- | --- |
-| **Authorization layer** (policy sets, permit/forbid, forbid-overrides, decision-with-provenance) | A genuinely different, larger problem than "evaluate one boolean expression." Belongs as a layer built *on* this engine, likely a separate package, once there's a concrete consumer. |
-| **Partial evaluation / residual expressions** (bind known facts, simplify, hand the caller a residual expression to push into e.g. a SQL `WHERE` clause) | This is what "who can do X against many resources" really wants, but it requires predicates to be *translatable*, not just callable, which contradicts "a predicate is opaque application code." v1 is evaluate-only; callers loop over candidates, made cheap by per-evaluation memoization and a shared `CompiledRule`. |
-| **Rule-to-rule references / named reusable fragments** | Valuable for a real rule library (shared sub-rules, cycle detection, compile-time inlining) but adds a resolver abstraction the v1 scope doesn't need yet. |
-| **Cross-evaluation caching** | The predicate-author contract only promises stability *within* one evaluation. A cache spanning evaluations is a distinct feature with its own invalidation story. |
-| **OpenTelemetry-shaped observability** (activity per rule, event per term, fault attributes) | v1 logs via `Microsoft.Extensions.Logging.Abstractions`. OTel is additive on top later, not a v1 requirement. |
-| **Context-bound term arguments** (e.g. `IsManagerOf({{resource.ownerId}})`) | Requires a typed path-expression mini-language and breaks static canonical-equality between rules. v1 arguments are literals only; a predicate that needs a live-resolved value — keyed by a rule-text literal, a `TContext`-supplied value, or both, with no requirement that either side be an identity or "the current user" — resolves it itself. See [README's "n arguments, class-based, externally-resolved value"](README.md#n-arguments-class-based-externally-resolved-value) for the documented, tested alternative. |
-| **Symbol operator aliases** (`&&`, `||`) | Word operators only, to keep the surface to one thing to learn and test. |
-| **Concurrent operand evaluation** | Purely additive once predicates are contractually pure; left as an `EvaluationOptions` knob for later rather than v1 default behavior. |
-| **Minimal satisfying assignments** (BDD-derived "what facts would make this true") | The BDD exists anyway for constant/contradiction diagnostics; exposing satisfying-assignment enumeration is an authoring-tool feature with no current consumer. |
-| **Attribute-based / assembly-scanned predicate registration** | Explicit registration only in v1 — scanning is magic, breaks trimming/AOT, and the repo's own rule is "do not introduce unnecessary abstractions." |
-
 ## AOT / trim compatibility
 
-The deferred item above treats trimming/AOT as a design constraint rather than an
-afterthought, so it's verified rather than assumed. `src/Directory.Build.props` sets
+Trimming/AOT is a design constraint rather than an afterthought here, so
+it's verified rather than assumed. `src/Directory.Build.props` sets
 `IsAotCompatible` for every shipping package (`TruthWeaver.Abstractions`,
 `TruthWeaver`, `TruthWeaver.Predicates`, `TruthWeaver.Testing`,
 `TruthWeaver.Yaml`), enabling both the trim analyzer (`IL2xxx`) and the NativeAOT
