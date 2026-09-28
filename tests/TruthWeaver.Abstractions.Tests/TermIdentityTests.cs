@@ -128,4 +128,48 @@ public sealed class TermIdentityTests
         Assert.True(term != nullTerm);
         Assert.True(nullTerm != term);
     }
+
+    [Fact]
+    public void Boxed_equals_returns_true_for_a_boxed_term_identity_with_equal_predicate_name_and_arguments()
+    {
+        TermIdentity first = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+        object second = new TermIdentity(
+            "hasRole",
+            [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]
+        );
+
+        Assert.True(first.Equals(second));
+    }
+
+    [Fact]
+    public void Boxed_equals_returns_false_for_a_boxed_term_identity_with_a_different_predicate_name()
+    {
+        TermIdentity role = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+        object isManager = new TermIdentity(
+            "isManager",
+            [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]
+        );
+
+        Assert.False(role.Equals(isManager));
+    }
+
+    [Fact]
+    public void Boxed_equals_returns_false_for_a_boxed_term_identity_with_a_different_argument_value()
+    {
+        TermIdentity role1 = new("hasRole", [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Y"))]);
+        object role2 = new TermIdentity(
+            "hasRole",
+            [new KeyValuePair<string, LiteralValue>("role", LiteralValue.OfString("Z"))]
+        );
+
+        Assert.False(role1.Equals(role2));
+    }
+
+    [Fact]
+    public void Boxed_equals_returns_false_for_an_unrelated_object()
+    {
+        TermIdentity term = new("isManager", []);
+
+        Assert.False(term.Equals("isManager"));
+    }
 }
