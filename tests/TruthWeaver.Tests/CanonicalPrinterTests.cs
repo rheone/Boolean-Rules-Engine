@@ -138,6 +138,15 @@ public sealed class CanonicalPrinterTests
         Assert.Equal(rule.CanonicalText, rule.CanonicalText);
     }
 
+    [Fact]
+    public void ToString_returns_the_same_text_as_canonical_text()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> rule = compiler.Compile("isManager AND hasRole(role: \"Y\")").CompiledRule!;
+
+        Assert.Equal(rule.CanonicalText, rule.ToString());
+    }
+
     private static RuleCompiler<RuleTestContext> CreateCompiler()
     {
         return new(
