@@ -1,6 +1,8 @@
 namespace TruthWeaver.Tests;
 
+using System.Reflection;
 using TruthWeaver.Abstractions;
+using TruthWeaver.Ast;
 using TruthWeaver.Compilation;
 using TruthWeaver.Evaluation;
 using TruthWeaver.Registry;
@@ -91,6 +93,38 @@ public sealed class OperatorInfoTests
         Assert.NotNull(found);
         Assert.False(registry.TryGetSchema("neverRegistered", out PredicateSchema? notFound));
         Assert.Null(notFound);
+    }
+
+    [Fact]
+    public void Describe_throws_for_a_term_expression_pointing_callers_at_the_predicate_schema_instead()
+    {
+        TermExpression term = new(new TermIdentity("isManager", []));
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => OperatorInfo.Describe(term));
+
+        Assert.Equal("node", exception.ParamName);
+        Assert.Contains("PredicateSchema", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThresholdDescriptions_default_branch_throws_for_an_unhandled_comparison_name()
+    {
+        // ThresholdComparison's five values (ADR-0004's closed set) are all handled by
+        // OperatorInfo's private ThresholdDescription switch, so its `default` arm is unreachable
+        // through the public API today - it exists defensively so a future comparison value added to
+        // the enum without updating this switch fails loudly instead of silently. Exercised directly
+        // via reflection since no public path reaches it, matching the precedent set by ticket 08's
+        // direct-constructor coverage for similarly unreachable defensive code.
+        MethodInfo method = typeof(OperatorInfo).GetMethod(
+            "ThresholdDescription",
+            BindingFlags.NonPublic | BindingFlags.Static
+        )!;
+        NodeShape bogusShape = new("Bogus", 1, []);
+
+        TargetInvocationException wrapped = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [bogusShape]));
+
+        Assert.IsType<InvalidOperationException>(wrapped.InnerException);
+        Assert.Contains("Unhandled threshold comparison", wrapped.InnerException.Message, StringComparison.Ordinal);
     }
 
     private static CompiledRule<RuleTestContext> Compile(RuleCompiler<RuleTestContext> compiler, string dsl)
