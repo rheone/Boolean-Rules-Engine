@@ -211,6 +211,191 @@ public sealed class RuleBuilderTests
         Assert.Equal(viaOriginal.CanonicalText, reparsed.CompiledRule!.CanonicalText);
     }
 
+    [Fact]
+    public async Task Predicate_builder_with_a_bool_argument_value_compiles_and_evaluates_correctly()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddBooleanArgPredicate("hasFlag", "flag", true).Build()
+        );
+
+        CompilationResult<RuleTestContext> result = RuleBuilder.Predicate("hasFlag", ("flag", true)).Compile(compiler);
+
+        Assert.True(result.Succeeded);
+        Decision decision = await result.CompiledRule!.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public async Task Predicate_builder_with_an_int_argument_value_compiles_and_evaluates_correctly()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .Add(
+                    new PredicateSchema(
+                        "hasCode",
+                        "hasCode",
+                        "True iff 'code' equals 7.",
+                        [new PredicateArgumentSchema("code", "The code to compare against 7.", LiteralKind.Int64)]
+                    ),
+                    (_, args, _) => ValueTask.FromResult(args.GetInt64("code") == 7)
+                )
+                .Build()
+        );
+
+        CompilationResult<RuleTestContext> result = RuleBuilder.Predicate("hasCode", ("code", 7)).Compile(compiler);
+
+        Assert.True(result.Succeeded);
+        Decision decision = await result.CompiledRule!.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public async Task Predicate_builder_with_a_long_argument_value_compiles_and_evaluates_correctly()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .Add(
+                    new PredicateSchema(
+                        "hasCode",
+                        "hasCode",
+                        "True iff 'code' equals 7.",
+                        [new PredicateArgumentSchema("code", "The code to compare against 7.", LiteralKind.Int64)]
+                    ),
+                    (_, args, _) => ValueTask.FromResult(args.GetInt64("code") == 7)
+                )
+                .Build()
+        );
+
+        CompilationResult<RuleTestContext> result = RuleBuilder.Predicate("hasCode", ("code", 7L)).Compile(compiler);
+
+        Assert.True(result.Succeeded);
+        Decision decision = await result.CompiledRule!.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public async Task Predicate_builder_with_a_double_argument_value_compiles_and_evaluates_correctly()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddDecimalArgPredicate("exceedsThreshold", "threshold", 12.5m)
+                .Build()
+        );
+
+        CompilationResult<RuleTestContext> result = RuleBuilder
+            .Predicate("exceedsThreshold", ("threshold", 12.5d))
+            .Compile(compiler);
+
+        Assert.True(result.Succeeded);
+        Decision decision = await result.CompiledRule!.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public async Task Predicate_builder_with_a_decimal_argument_value_compiles_and_evaluates_correctly()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddDecimalArgPredicate("exceedsThreshold", "threshold", 12.5m)
+                .Build()
+        );
+
+        CompilationResult<RuleTestContext> result = RuleBuilder
+            .Predicate("exceedsThreshold", ("threshold", 12.5m))
+            .Compile(compiler);
+
+        Assert.True(result.Succeeded);
+        Decision decision = await result.CompiledRule!.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public async Task Predicate_builder_with_a_datetimeoffset_argument_value_compiles_and_evaluates_correctly()
+    {
+        DateTimeOffset when = new(2024, 6, 1, 12, 30, 0, TimeSpan.Zero);
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddDateTimeOffsetArgPredicate("occurredAt", "when", when).Build()
+        );
+
+        CompilationResult<RuleTestContext> result = RuleBuilder.Predicate("occurredAt", ("when", when)).Compile(compiler);
+
+        Assert.True(result.Succeeded);
+        Decision decision = await result.CompiledRule!.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public async Task Predicate_builder_with_an_array_argument_value_compiles_and_evaluates_correctly_via_ArrayToNode()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .Add(
+                    new PredicateSchema(
+                        "hasAnyCode",
+                        "hasAnyCode",
+                        "True iff any of 'codes' matches.",
+                        [new PredicateArgumentSchema("codes", "The codes to check for.", LiteralKind.Int64Array)]
+                    ),
+                    (_, args, _) => ValueTask.FromResult(args.GetInt64Array("codes").Count > 0)
+                )
+                .Build()
+        );
+
+        CompilationResult<RuleTestContext> result = RuleBuilder
+            .Predicate("hasAnyCode", ("codes", new object[] { 1, 2, 3 }))
+            .Compile(compiler);
+
+        Assert.True(result.Succeeded);
+        Decision decision = await result.CompiledRule!.EvaluateAsync(
+            new RuleTestContext(),
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        Assert.Equal(TruthValue.True, decision.Result);
+    }
+
+    [Fact]
+    public void An_unsupported_argument_value_type_throws_ArgumentException_naming_the_type()
+    {
+        object unsupported = new StringBuilder("not a supported literal type");
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            RuleBuilder.Predicate("anything", ("arg", unsupported)).ToJson()
+        );
+
+        Assert.Contains(unsupported.GetType().ToString(), exception.Message, StringComparison.Ordinal);
+        Assert.Equal("value", exception.ParamName);
+    }
+
     private static async Task EvaluateAsync(bool[] operandValues, Func<RuleBuilder[], RuleBuilder> build, TruthValue expected)
     {
         PredicateRegistryBuilder<RuleTestContext> registryBuilder = PredicateRegistry<RuleTestContext>.CreateBuilder();
