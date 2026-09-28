@@ -47,7 +47,11 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="Microsoft.Testing.Platform" Version="2.4.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <!-- coverlet.MTP, not coverlet.collector (a VSTest data collector, which the
+         UseMicrosoftTestingPlatformRunner test host below cannot load), is the native
+         Microsoft.Testing.Platform coverage extension; run via the "coverlet" CLI flag
+         documented at https://github.com/coverlet-coverage/coverlet. -->
+    <PackageVersion Include="coverlet.MTP" Version="10.0.1" />
   </ItemGroup>
   <!-- NSubstitute -->
   <ItemGroup>
