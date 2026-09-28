@@ -104,4 +104,39 @@ public sealed class EquatableArrayTests
         Assert.True(empty == alsoEmpty);
         Assert.False(empty != alsoEmpty);
     }
+
+    [Fact]
+    public void Boxed_equals_returns_true_for_a_boxed_array_with_equal_elements()
+    {
+        EquatableArray<int> left = new([1, 2, 3]);
+        object right = new EquatableArray<int>([1, 2, 3]);
+
+        Assert.True(left.Equals(right));
+    }
+
+    [Fact]
+    public void Boxed_equals_returns_false_for_a_boxed_array_with_different_elements()
+    {
+        EquatableArray<int> left = new([1, 2, 3]);
+        object right = new EquatableArray<int>([1, 2, 4]);
+
+        Assert.False(left.Equals(right));
+    }
+
+    [Fact]
+    public void Boxed_equals_returns_false_for_an_unrelated_object()
+    {
+        EquatableArray<int> array = new([1, 2, 3]);
+        object unrelated = "not an array";
+
+        Assert.False(array.Equals(unrelated));
+    }
+
+    [Fact]
+    public void Boxed_equals_returns_false_for_null()
+    {
+        EquatableArray<int> array = new([1, 2, 3]);
+
+        Assert.False(array.Equals(null));
+    }
 }
