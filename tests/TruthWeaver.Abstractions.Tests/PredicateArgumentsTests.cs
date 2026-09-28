@@ -53,6 +53,27 @@ public sealed class PredicateArgumentsTests
     }
 
     [Fact]
+    public void GetGuid_returns_the_supplied_value()
+    {
+        Guid value = Guid.NewGuid();
+        PredicateArguments args = new(new Dictionary<string, LiteralValue> { ["id"] = LiteralValue.OfGuid(value) });
+
+        Assert.Equal(value, args.GetGuid("id"));
+    }
+
+    [Fact]
+    public void Requesting_a_kind_mismatched_argument_names_the_argument_and_both_kinds_in_the_message()
+    {
+        PredicateArguments args = new(new Dictionary<string, LiteralValue> { ["id"] = LiteralValue.OfString("not-a-guid") });
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => args.GetGuid("id"));
+
+        Assert.Contains("'id'", exception.Message);
+        Assert.Contains($"'{LiteralKind.String}'", exception.Message);
+        Assert.Contains($"'{LiteralKind.Guid}'", exception.Message);
+    }
+
+    [Fact]
     public void GetRaw_returns_the_literal_regardless_of_kind()
     {
         LiteralValue value = LiteralValue.OfGuid(Guid.NewGuid());
