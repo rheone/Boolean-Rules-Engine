@@ -643,7 +643,7 @@ A few things stay true across all three shapes:
   itself; see [`IPredicate<TContext>`](src/TruthWeaver.Abstractions/IPredicate.cs).
 
 This is the documented alternative to the deferred
-"[context-bound term arguments](CONTEXT.md#deferred)" feature (a
+"[context-bound term arguments](.scratch/deferred-features/spec.md)" feature (a
 path-expression mini-language like `IsManagerOf({{resource.ownerId}})`) —
 every shape above is expressible today, with no engine changes, by letting
 the predicate itself resolve whatever it needs.
@@ -1393,8 +1393,8 @@ are covered by the evaluator's behavior described in
 
 ## Design documents
 
-- [CONTEXT.md](CONTEXT.md) — vocabulary, conceptual model, predicate-author
-  contract, and the list of deliberately deferred features.
+- [CONTEXT.md](CONTEXT.md) — vocabulary, conceptual model, and the
+  predicate-author contract.
 - [ADR-0001: Kleene failure model](docs/adr/0001-kleene-failure-model.md) —
   why evaluation is three-valued internally and fails closed at the boundary.
 - [ADR-0002: Evaluation semantics](docs/adr/0002-evaluation-semantics.md) —
