@@ -88,6 +88,50 @@ public sealed class ExternallyResolvedRelationshipPredicateTests
         Assert.NotSame(resolvedInstances[0], resolvedInstances[1]);
     }
 
+    [Fact]
+    public async Task External_lookup_failure_is_absorbed_as_a_fault_and_the_term_evaluates_unknown()
+    {
+        IServiceProvider services = ServicesWithThrowingManagerLookup();
+        CompiledRule<ResourceContext> rule = CompileIsManagedByCandidate();
+
+        Decision decision = await rule.EvaluateAsync(
+            new ResourceContext(ResourceId),
+            services,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(TruthValue.Unknown, decision.Result);
+        Assert.False(decision.IsSatisfied);
+        Fault fault = Assert.Single(decision.Faults);
+        Assert.Equal("isManagedByCandidate", fault.Term.PredicateName);
+        Assert.IsType<TimeoutException>(fault.Exception);
+    }
+
+    [Fact]
+    public async Task External_lookup_failure_still_lets_an_otherwise_determinate_rule_reach_a_decision()
+    {
+        IServiceProvider services = ServicesWithThrowingManagerLookup();
+        RuleCompiler<ResourceContext> compiler = new(
+            PredicateRegistry<ResourceContext>.CreateBuilder().Add<IsManagedByCandidate>().Build()
+        );
+        CompiledRule<ResourceContext> rule = compiler
+            .Compile("isManagedByCandidate(candidateManagerId: \"22222222-2222-2222-2222-222222222222\") OR true")
+            .CompiledRule!;
+
+        Decision decision = await rule.EvaluateAsync(
+            new ResourceContext(ResourceId),
+            services,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        // "Unknown OR True" is True (CONTEXT.md#failure-model-summary): a fault that can't affect the
+        // outcome must not turn a transient lookup blip into a denial.
+        Assert.Equal(TruthValue.True, decision.Result);
+        Assert.True(decision.IsSatisfied);
+        Fault fault = Assert.Single(decision.Faults);
+        Assert.Equal("isManagedByCandidate", fault.Term.PredicateName);
+    }
+
     // Deliberately the same shape as the two-sided IsManagedByCandidate tests above (context anchor +
     // literal key + injected live resolution + comparison) — just with a String key rather than a
     // Guid, and a non-identity Decimal comparison value read straight off the context rather than a
@@ -198,6 +242,18 @@ public sealed class ExternallyResolvedRelationshipPredicateTests
         return compiler
             .Compile("isManagedByCandidate(candidateManagerId: \"22222222-2222-2222-2222-222222222222\")")
             .CompiledRule!;
+    }
+
+    private static IServiceProvider ServicesWithThrowingManagerLookup()
+    {
+        IManagerLookupService lookup = Substitute.For<IManagerLookupService>();
+        lookup
+            .ResolveManagerIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns<Guid>(_ => throw new TimeoutException("The manager lookup service timed out."));
+
+        IServiceProvider services = Substitute.For<IServiceProvider>();
+        services.GetService(typeof(IsManagedByCandidate)).Returns(new IsManagedByCandidate(lookup));
+        return services;
     }
 
     private static IServiceProvider ServicesResolvingLimitAs(decimal resolvedLimit)
