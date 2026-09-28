@@ -45,4 +45,63 @@ public sealed class EquatableArrayTests
         Assert.Equal("c", array[2]);
         Assert.Equal(["a", "b", "c"], array);
     }
+
+    [Fact]
+    public void Equality_operator_returns_false_for_different_elements()
+    {
+        EquatableArray<int> left = new([1, 2, 3]);
+        EquatableArray<int> right = new([1, 2, 4]);
+
+        Assert.False(left == right);
+    }
+
+    [Fact]
+    public void Inequality_operator_is_the_negation_of_the_equality_operator_for_equal_arrays()
+    {
+        EquatableArray<int> left = new([1, 2, 3]);
+        EquatableArray<int> right = new([1, 2, 3]);
+
+        Assert.True(left == right);
+        Assert.False(left != right);
+    }
+
+    [Fact]
+    public void Inequality_operator_is_the_negation_of_the_equality_operator_for_unequal_arrays()
+    {
+        EquatableArray<int> left = new([1, 2, 3]);
+        EquatableArray<int> right = new([1, 2, 4]);
+
+        Assert.False(left == right);
+        Assert.True(left != right);
+    }
+
+    [Fact]
+    public void Equality_operator_returns_false_when_compared_against_a_non_empty_array_on_one_side_and_empty_on_the_other()
+    {
+        EquatableArray<int> nonEmpty = new([1, 2, 3]);
+        EquatableArray<int> empty = EquatableArray<int>.Empty;
+
+        Assert.False(nonEmpty == empty);
+        Assert.False(empty == nonEmpty);
+    }
+
+    [Fact]
+    public void Inequality_operator_returns_true_when_compared_against_a_non_empty_array_on_one_side_and_empty_on_the_other()
+    {
+        EquatableArray<int> nonEmpty = new([1, 2, 3]);
+        EquatableArray<int> empty = EquatableArray<int>.Empty;
+
+        Assert.True(nonEmpty != empty);
+        Assert.True(empty != nonEmpty);
+    }
+
+    [Fact]
+    public void Equality_operator_returns_true_when_both_sides_are_empty()
+    {
+        EquatableArray<int> empty = EquatableArray<int>.Empty;
+        EquatableArray<int> alsoEmpty = new([]);
+
+        Assert.True(empty == alsoEmpty);
+        Assert.False(empty != alsoEmpty);
+    }
 }
