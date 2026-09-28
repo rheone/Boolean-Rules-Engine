@@ -89,4 +89,81 @@ public sealed class EvaluatedTreeTests
         Assert.True(skippedSubtree.NotEvaluated);
         Assert.Empty(skippedSubtree.Children);
     }
+
+    [Fact]
+    public async Task Skipped_or_subtree_is_described_as_OR()
+    {
+        // "a AND (b OR c)" with a = false short-circuits before the (b OR c) OrExpression is
+        // evaluated, so its skipped EvaluatedNode is labelled from the node's static shape alone.
+        PredicateRegistry<RuleTestContext> registry = PredicateRegistry<RuleTestContext>
+            .CreateBuilder()
+            .AddConstant("a", false)
+            .AddConstant("b", true)
+            .AddConstant("c", true)
+            .Build();
+        RuleCompiler<RuleTestContext> compiler = new(registry);
+
+        Decision decision = await compiler
+            .Compile("a AND (b OR c)")
+            .CompiledRule!.EvaluateAsync(
+                new RuleTestContext(),
+                EmptyServiceProvider.Instance,
+                cancellationToken: TestContext.Current.CancellationToken
+            );
+
+        EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
+        Assert.True(skippedSubtree.NotEvaluated);
+        Assert.Equal("OR", skippedSubtree.NodeDescription);
+    }
+
+    [Fact]
+    public async Task Skipped_and_subtree_is_described_as_AND()
+    {
+        // "a OR (b AND c)" with a = true short-circuits before the (b AND c) AndExpression is
+        // evaluated, so its skipped EvaluatedNode is labelled from the node's static shape alone.
+        PredicateRegistry<RuleTestContext> registry = PredicateRegistry<RuleTestContext>
+            .CreateBuilder()
+            .AddConstant("a", true)
+            .AddConstant("b", true)
+            .AddConstant("c", true)
+            .Build();
+        RuleCompiler<RuleTestContext> compiler = new(registry);
+
+        Decision decision = await compiler
+            .Compile("a OR (b AND c)")
+            .CompiledRule!.EvaluateAsync(
+                new RuleTestContext(),
+                EmptyServiceProvider.Instance,
+                cancellationToken: TestContext.Current.CancellationToken
+            );
+
+        EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
+        Assert.True(skippedSubtree.NotEvaluated);
+        Assert.Equal("AND", skippedSubtree.NodeDescription);
+    }
+
+    [Fact]
+    public async Task Skipped_not_subtree_is_described_as_NOT()
+    {
+        // "a AND (NOT b)" with a = false short-circuits before the (NOT b) NotExpression is
+        // evaluated, so its skipped EvaluatedNode is labelled from the node's static shape alone.
+        PredicateRegistry<RuleTestContext> registry = PredicateRegistry<RuleTestContext>
+            .CreateBuilder()
+            .AddConstant("a", false)
+            .AddConstant("b", true)
+            .Build();
+        RuleCompiler<RuleTestContext> compiler = new(registry);
+
+        Decision decision = await compiler
+            .Compile("a AND (NOT b)")
+            .CompiledRule!.EvaluateAsync(
+                new RuleTestContext(),
+                EmptyServiceProvider.Instance,
+                cancellationToken: TestContext.Current.CancellationToken
+            );
+
+        EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
+        Assert.True(skippedSubtree.NotEvaluated);
+        Assert.Equal("NOT", skippedSubtree.NodeDescription);
+    }
 }
