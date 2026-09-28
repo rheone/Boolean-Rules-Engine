@@ -9,6 +9,18 @@ using TruthWeaver.Yaml;
 using YamlDotNet.RepresentationModel;
 
 /// <summary>Ticket 08: YAML tree parse/print.</summary>
+/// <remarks>
+/// Ticket 29: <c>YamlTreeParser.ParseOperator</c>'s unhandled-canonical-op-name <c>default</c> arm
+/// (thrown as an <see cref="InvalidOperationException"/>) is left undocumented-by-test rather than
+/// exercised directly, unlike ticket 15's <c>ThresholdDescription</c> precedent. That switch takes its
+/// discriminant as a method parameter that a test can hand-build with a bogus value; this one instead
+/// switches on the out-value of <c>TreeFormatOpNames.TryFromTreeFormat</c>, an internal lookup whose
+/// backing dictionary has exactly the same ten entries as the switch's non-default cases (see
+/// <c>TreeFormatOpNames.CanonicalToTreeFormat</c>). There is no parameter or public seam through which
+/// a test can make that lookup yield an eleventh, unhandled canonical name, so the branch is genuinely
+/// unreachable rather than merely untested — it exists defensively against the closed set (ADR-0003)
+/// ever growing without updating this switch in lockstep.
+/// </remarks>
 public sealed class YamlTreeTests
 {
     private const string WorkedExampleYaml = """
@@ -150,6 +162,29 @@ public sealed class YamlTreeTests
         Diagnostic diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(DiagnosticCodes.MalformedTree, diagnostic.Code);
         Assert.Contains("must have a 'const', 'predicate', or 'op' key", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_malformed_element_in_an_array_literal_fails_the_whole_literal_rather_than_truncating_it()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddStringArgPredicate("hasRole", "role", "Y").Build()
+        );
+
+        CompilationResult<RuleTestContext> result = compiler.CompileYaml(
+            """
+            predicate: hasRole
+            args:
+              role:
+                - valid
+                - weird: 1
+            """
+        );
+
+        Assert.False(result.Succeeded);
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.MalformedTree, diagnostic.Code);
+        Assert.Contains("Unsupported YAML node type", diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]
