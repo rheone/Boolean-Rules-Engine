@@ -195,9 +195,9 @@ flowchart TD
     AND["AND"]
     OR["OR"]
     XOR["XOR"]
-    HasRoleY["hasRole(role: &quot;Y&quot;)"]
-    HasTrainingQ["hasTraining(training: &quot;Q&quot;)"]
-    HasTrainingZ["hasTraining(training: &quot;Z&quot;)"]
+    HasRoleY["hasRole(role: #quot;Y#quot;)"]
+    HasTrainingQ["hasTraining(training: #quot;Q#quot;)"]
+    HasTrainingZ["hasTraining(training: #quot;Z#quot;)"]
     IsManager["isManager"]
     IsDeptHead["isDepartmentHead"]
 
