@@ -38,6 +38,37 @@ public sealed class LiteralValueTests
     }
 
     [Fact]
+    public void Equality_operator_returns_true_for_equal_literals_of_the_same_kind()
+    {
+        LiteralValue left = LiteralValue.OfInt64(42);
+        LiteralValue right = LiteralValue.OfInt64(42);
+
+        Assert.True(left == right);
+        Assert.False(left != right);
+    }
+
+    [Fact]
+    public void Equality_operator_returns_false_for_unequal_literals_of_the_same_kind()
+    {
+        LiteralValue left = LiteralValue.OfInt64(42);
+        LiteralValue right = LiteralValue.OfInt64(43);
+
+        Assert.False(left == right);
+        Assert.True(left != right);
+    }
+
+    [Fact]
+    public void Equals_returns_false_when_kinds_differ_without_inspecting_payloads()
+    {
+        LiteralValue stringValue = LiteralValue.OfString("42");
+        LiteralValue int64Value = LiteralValue.OfInt64(42);
+
+        Assert.False(stringValue.Equals(int64Value));
+        Assert.False(stringValue == int64Value);
+        Assert.True(stringValue != int64Value);
+    }
+
+    [Fact]
     public void Array_construction_rejects_an_element_that_does_not_match_the_declared_kind()
     {
         Assert.Throws<ArgumentException>(() =>
