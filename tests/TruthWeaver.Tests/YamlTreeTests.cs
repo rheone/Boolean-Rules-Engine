@@ -98,6 +98,61 @@ public sealed class YamlTreeTests
     }
 
     [Fact]
+    public void Not_node_wraps_its_single_operand_and_round_trips_through_yaml()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("a", true).Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile("NOT a").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Contains("op: not", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExactlyOne_node_wraps_its_operands_and_round_trips_through_yaml()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>
+                .CreateBuilder()
+                .AddConstant("a", true)
+                .AddConstant("b", true)
+                .AddConstant("c", true)
+                .Build()
+        );
+        CompiledRule<RuleTestContext> original = compiler.Compile("ExactlyOne(a, b, c)").CompiledRule!;
+
+        string yaml = original.PrintYaml();
+        CompiledRule<RuleTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
+
+        Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
+        Assert.Contains("op: exactlyOne", yaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_malformed_nested_operand_short_circuits_operator_parsing_without_a_parent_diagnostic()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.CompileYaml(
+            """
+            op: and
+            operands:
+              - predicate: isManager
+              - noRecognizedKey: true
+            """
+        );
+
+        Assert.False(result.Succeeded);
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.MalformedTree, diagnostic.Code);
+        Assert.Contains("must have a 'const', 'predicate', or 'op' key", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_string_argument_that_reads_like_a_boolean_stays_a_string_when_quoted()
     {
         RuleCompiler<RuleTestContext> compiler = new(
