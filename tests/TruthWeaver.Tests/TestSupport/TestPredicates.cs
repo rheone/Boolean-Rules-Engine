@@ -149,6 +149,56 @@ public static class TestPredicates
         );
     }
 
+    /// <summary>Registers a single-decimal-argument predicate whose truth is "does the argument equal <paramref name="matchValue"/>?".</summary>
+    public static PredicateRegistryBuilder<RuleTestContext> AddDecimalArgPredicate(
+        this PredicateRegistryBuilder<RuleTestContext> builder,
+        string name,
+        string argumentName,
+        decimal matchValue
+    )
+    {
+        return builder.Add(
+            new PredicateSchema(
+                name,
+                name,
+                $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue}'.",
+                [
+                    new PredicateArgumentSchema(
+                        argumentName,
+                        $"The decimal to compare against '{matchValue}'.",
+                        LiteralKind.Decimal
+                    ),
+                ]
+            ),
+            (_, args, _) => ValueTask.FromResult(args.GetDecimal(argumentName) == matchValue)
+        );
+    }
+
+    /// <summary>Registers a single-boolean-argument predicate whose truth is "does the argument equal <paramref name="matchValue"/>?".</summary>
+    public static PredicateRegistryBuilder<RuleTestContext> AddBooleanArgPredicate(
+        this PredicateRegistryBuilder<RuleTestContext> builder,
+        string name,
+        string argumentName,
+        bool matchValue
+    )
+    {
+        return builder.Add(
+            new PredicateSchema(
+                name,
+                name,
+                $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue}'.",
+                [
+                    new PredicateArgumentSchema(
+                        argumentName,
+                        $"The boolean to compare against '{matchValue}'.",
+                        LiteralKind.Boolean
+                    ),
+                ]
+            ),
+            (_, args, _) => ValueTask.FromResult(args.GetBool(argumentName) == matchValue)
+        );
+    }
+
     /// <summary>Registers a single-DateTimeOffset-argument predicate whose truth is "does the argument equal <paramref name="matchValue"/>?".</summary>
     public static PredicateRegistryBuilder<RuleTestContext> AddDateTimeOffsetArgPredicate(
         this PredicateRegistryBuilder<RuleTestContext> builder,
