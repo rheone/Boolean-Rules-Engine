@@ -122,22 +122,62 @@ public sealed class ExternallyResolvedRelationshipPredicateTests
         Assert.Equal(TruthValue.False, decision.Result);
     }
 
-    private static IServiceProvider ServicesResolvingLimitAs(decimal resolvedLimit)
+    // The simplest instance of the same pattern family as the two tests above: a literal key +
+    // injected live resolution, but with no second value and no context dependency at all — the
+    // resolved value *is* the answer, not a different pattern.
+    [Fact]
+    public async Task Flag_resolved_true_evaluates_true()
     {
-        IBudgetLookupService lookup = Substitute.For<IBudgetLookupService>();
-        lookup.ResolveLimitAsync("CC-100", Arg.Any<CancellationToken>()).Returns(resolvedLimit);
+        IServiceProvider services = ServicesResolvingFlagAs(true);
+        CompiledRule<RuleTestContext> rule = CompileIsFeatureEnabled();
 
-        IServiceProvider services = Substitute.For<IServiceProvider>();
-        services.GetService(typeof(IsWithinBudget)).Returns(new IsWithinBudget(lookup));
-        return services;
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            services,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(TruthValue.True, decision.Result);
     }
 
-    private static CompiledRule<PurchaseRequestContext> CompileIsWithinBudget()
+    [Fact]
+    public async Task Flag_resolved_false_evaluates_false()
     {
-        RuleCompiler<PurchaseRequestContext> compiler = new(
-            PredicateRegistry<PurchaseRequestContext>.CreateBuilder().Add<IsWithinBudget>().Build()
+        IServiceProvider services = ServicesResolvingFlagAs(false);
+        CompiledRule<RuleTestContext> rule = CompileIsFeatureEnabled();
+
+        Decision decision = await rule.EvaluateAsync(
+            new RuleTestContext(),
+            services,
+            cancellationToken: TestContext.Current.CancellationToken
         );
-        return compiler.Compile("isWithinBudget(costCenterCode: \"CC-100\")").CompiledRule!;
+
+        Assert.Equal(TruthValue.False, decision.Result);
+    }
+
+    [Fact]
+    public async Task Feature_flag_lookup_service_is_resolved_fresh_from_the_service_provider_on_every_evaluation()
+    {
+        List<IsFeatureEnabled> resolvedInstances = [];
+        IServiceProvider services = Substitute.For<IServiceProvider>();
+        services
+            .GetService(typeof(IsFeatureEnabled))
+            .Returns(_ =>
+            {
+                IFeatureFlagService flags = Substitute.For<IFeatureFlagService>();
+                flags.IsEnabledAsync("new-checkout", Arg.Any<CancellationToken>()).Returns(true);
+                IsFeatureEnabled instance = new(flags);
+                resolvedInstances.Add(instance);
+                return instance;
+            });
+
+        CompiledRule<RuleTestContext> rule = CompileIsFeatureEnabled();
+
+        await rule.EvaluateAsync(new RuleTestContext(), services, cancellationToken: TestContext.Current.CancellationToken);
+        await rule.EvaluateAsync(new RuleTestContext(), services, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, resolvedInstances.Count);
+        Assert.NotSame(resolvedInstances[0], resolvedInstances[1]);
     }
 
     private static IServiceProvider ServicesResolvingManagerAs(Guid resolvedManagerId)
@@ -158,5 +198,41 @@ public sealed class ExternallyResolvedRelationshipPredicateTests
         return compiler
             .Compile("isManagedByCandidate(candidateManagerId: \"22222222-2222-2222-2222-222222222222\")")
             .CompiledRule!;
+    }
+
+    private static IServiceProvider ServicesResolvingLimitAs(decimal resolvedLimit)
+    {
+        IBudgetLookupService lookup = Substitute.For<IBudgetLookupService>();
+        lookup.ResolveLimitAsync("CC-100", Arg.Any<CancellationToken>()).Returns(resolvedLimit);
+
+        IServiceProvider services = Substitute.For<IServiceProvider>();
+        services.GetService(typeof(IsWithinBudget)).Returns(new IsWithinBudget(lookup));
+        return services;
+    }
+
+    private static CompiledRule<PurchaseRequestContext> CompileIsWithinBudget()
+    {
+        RuleCompiler<PurchaseRequestContext> compiler = new(
+            PredicateRegistry<PurchaseRequestContext>.CreateBuilder().Add<IsWithinBudget>().Build()
+        );
+        return compiler.Compile("isWithinBudget(costCenterCode: \"CC-100\")").CompiledRule!;
+    }
+
+    private static IServiceProvider ServicesResolvingFlagAs(bool resolvedValue)
+    {
+        IFeatureFlagService flags = Substitute.For<IFeatureFlagService>();
+        flags.IsEnabledAsync("new-checkout", Arg.Any<CancellationToken>()).Returns(resolvedValue);
+
+        IServiceProvider services = Substitute.For<IServiceProvider>();
+        services.GetService(typeof(IsFeatureEnabled)).Returns(new IsFeatureEnabled(flags));
+        return services;
+    }
+
+    private static CompiledRule<RuleTestContext> CompileIsFeatureEnabled()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(
+            PredicateRegistry<RuleTestContext>.CreateBuilder().Add<IsFeatureEnabled>().Build()
+        );
+        return compiler.Compile("isFeatureEnabled(flagKey: \"new-checkout\")").CompiledRule!;
     }
 }
