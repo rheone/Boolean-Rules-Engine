@@ -1,7 +1,6 @@
 # TruthWeaver
 
 [![CI](https://github.com/rheone/TruthWeaver/actions/workflows/ci.yml/badge.svg)](https://github.com/rheone/TruthWeaver/actions/workflows/ci.yml)
-![Status](https://img.shields.io/badge/status-proof%20of%20concept-orange)
 [![.NET](https://img.shields.io/badge/.NET-11.0-512BD4)](global.json)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
@@ -10,25 +9,19 @@ text, compile it into an immutable tree, and evaluate it many times against
 whatever application context you supply — a user, a request, a resource, or
 anything else.
 
-> [!NOTE]
-> This is a proof of concept. The design and rationale behind every decision
-> below live in [CONTEXT.md](CONTEXT.md) and [docs/adr/](docs/adr/) — read
-> those before making structural changes. There is no published NuGet
-> package yet (`Version` is `1.0.0-dev`); build from source.
-
 <details>
 <summary><strong>Table of contents</strong></summary>
 
+- [What it is (and isn't)](#what-it-is-and-isnt)
 - [Requirements](#requirements)
 - [Getting started](#getting-started)
-- [Features](#features)
 - [A tour of the codebase](#a-tour-of-the-codebase)
-- [What it is (and isn't)](#what-it-is-and-isnt)
+- [Packages](#packages)
+- [Features](#features)
 - [Operators](#operators)
   - [Order of operations](#order-of-operations)
   - [Binary vs. unary operators](#binary-vs-unary-operators)
   - [All operators](#all-operators)
-- [Packages](#packages)
 - [Choosing a rule format](#choosing-a-rule-format)
 - [Predicate types](#predicate-types)
 - [Examples](#examples)
@@ -39,13 +32,34 @@ anything else.
   - [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram)
 - [Evaluation flow](#evaluation-flow)
 - [Compilation pipeline](#compilation-pipeline)
+- [Benchmarks](#benchmarks)
 - [Glossary](#glossary)
 - [Appendix: Truth tables](#appendix-truth-tables)
-- [Benchmarks](#benchmarks)
 - [Design documents](#design-documents)
 - [License](#license)
 
 </details>
+
+## What it is (and isn't)
+
+`TruthWeaver` answers one question: *is this expression true right
+now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `XNOR`,
+`ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
+`LessThan`/`Exactly`), terms, and evaluation. It does not know about
+permissions, workflows, or policies — those are things you build *on top* of
+it. A permission check ("can the current user do X") is one consumer of this
+engine, not what the engine itself is.
+
+| Concept | Meaning |
+| --- | --- |
+| **Rule** | A named unit of persistence: metadata + one expression. |
+| **Expression** | The boolean tree — operators over terms and sub-expressions. |
+| **Predicate** | A registered, reusable implementation, e.g. `hasRole`, `isManager`. |
+| **Term** | A predicate bound to concrete arguments, e.g. `hasRole(role: "Y")` — the tree's leaf node. |
+| **Operator** | `AND` `OR` `NOT` `XOR` `XNOR` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
+| **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
+
+Full vocabulary and the predicate-author contract: [CONTEXT.md](CONTEXT.md).
 
 ## Requirements
 
@@ -111,63 +125,6 @@ many times. [A tour of the codebase](#a-tour-of-the-codebase) below maps
 that lifecycle onto the actual folders, and [Examples](#examples) builds up
 from here to named arguments, the full operator set, and the full ADR-0003
 worked example in DSL, JSON, and YAML.
-
-## Features
-
-- **Kleene three-valued logic.** Every operator follows the three-valued
-  truth tables in [ADR-0001](docs/adr/0001-kleene-failure-model.md) (full
-  tables: [Appendix](#appendix-truth-tables)) — a predicate fault becomes
-  `Unknown`, never a thrown exception or a silently coerced `false`. Entry
-  point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
-- **Per-evaluation memoization.** A term referenced from multiple branches
-  of the same rule is invoked at most once per evaluation, keyed by
-  structural term identity (see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
-  Entry point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
-- **A BDD-based analyzer**, not brute-force truth tables, flags structurally
-  constant or contradictory sub-expressions (e.g.
-  `hasRole(role: "Y") AND NOT hasRole(role: "Y")`) as compile diagnostics.
-  Entry point: [`Analyzer`](src/TruthWeaver/Analysis/Analyzer.cs) and
-  [`BddManager`](src/TruthWeaver/Analysis/BddManager.cs).
-- **Resource limits and `CompilationMode.Lenient`.** `CompilerOptions`
-  bounds tree depth, node count, and the analyzer's term cap so an
-  admin-authored rule can't hang a request thread; `Lenient` mode compiles
-  an unregistered predicate to a permanent `Unknown` term instead of an
-  error. Entry point: [`CompilerOptions`](src/TruthWeaver/Compilation/CompilerOptions.cs).
-- **`EvaluationOptions`**: an opt-in `FaultBudget` for fail-fast behavior
-  during a known outage, an `Exhaustive` mode that runs every reachable term
-  without changing the result, and an overall evaluation timeout linked into
-  the caller's `CancellationToken`. Entry point:
-  [`EvaluationOptions`](src/TruthWeaver/Evaluation/EvaluationOptions.cs).
-- **Scoped DI resolution.** Class-based predicates resolve fresh from the
-  `IServiceProvider` supplied to each evaluation call, so a predicate with a
-  scoped dependency works correctly even though a `CompiledRule<TContext>`
-  is long-lived and shared. Entry point:
-  [`TruthWeaverServiceCollectionExtensions`](src/TruthWeaver/DependencyInjection/TruthWeaverServiceCollectionExtensions.cs).
-- **Structured logging and metrics.** Faults, compile diagnostics, and
-  rule-swap notifications log as structured events through `ILogger<T>`; a
-  `"TruthWeaver"` `Meter` exposes counters for evaluations, faults, and
-  compile diagnostics, observable through OpenTelemetry's `AddMeter` with no
-  new dependency. Entry points: [`src/TruthWeaver/Logging`](src/TruthWeaver/Logging)
-  and [`TruthWeaverMetrics`](src/TruthWeaver/Metrics/TruthWeaverMetrics.cs).
-- **Structural rule diffing.** `RuleDiff.Compare` compares two compiled
-  rules and reports which operator, term, or constant nodes were added,
-  removed, or changed, each located by operand-index path and paired with a
-  human-readable description — useful for "what did this edit actually
-  change" tooling. Entry point:
-  [`RuleDiff`](src/TruthWeaver/Diffing/RuleDiff.cs).
-- **Diagram rendering.** A compiled rule renders as a Mermaid flowchart,
-  optionally colored by one evaluation's result and short-circuit path — see
-  [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram). Entry
-  point: [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs).
-- **Ready-made predicates.** `TruthWeaver.Predicates` ships generic
-  string-comparison, null/empty, set-equality, and regex-matching predicate
-  factories so common checks don't need a hand-written class. Entry point:
-  [`src/TruthWeaver.Predicates`](src/TruthWeaver.Predicates).
-- **Test support.** `TruthWeaver.Testing` ships fluent `Decision`
-  assertions and fake/scripted predicate factories (fixed answer, simulated
-  fault, sequenced answers) for testing without a hand-written
-  `IPredicate<TContext>` per test. Entry point:
-  [`src/TruthWeaver.Testing`](src/TruthWeaver.Testing).
 
 ## A tour of the codebase
 
@@ -258,26 +215,117 @@ Beyond `src`, the rest of the repository:
 - [`CONTEXT.md`](CONTEXT.md) — the domain vocabulary and conceptual model,
   kept in sync with the code.
 
-## What it is (and isn't)
+## Packages
 
-`TruthWeaver` answers one question: *is this expression true right
-now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `XNOR`,
-`ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
-`LessThan`/`Exactly`), terms, and evaluation. It does not know about
-permissions, workflows, or policies — those are things you build *on top* of
-it. A permission check ("can the current user do X") is one consumer of this
-engine, not what the engine itself is.
+| Package | Depends on | Ships |
+| --- | --- | --- |
+| `TruthWeaver.Abstractions` | *(nothing third-party)* | `IPredicate<TContext>`, `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault` — everything a predicate-implementing service needs. |
+| `TruthWeaver` | `Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions` | The DSL parser, `RuleCompiler<TContext>`, `CompiledRule<TContext>`, the BDD-based analyzer, the evaluator, `System.Text.Json` tree support, printing/diffing, and DI registration extensions. |
+| `TruthWeaver.Yaml` | `TruthWeaver`, YamlDotNet | YAML tree support (`CompileYaml`/`PrintYaml`), isolated so a consumer with no interest in YAML never pulls in YamlDotNet. |
+| `TruthWeaver.Predicates` | `TruthWeaver.Abstractions` | Ready-made generic `IPredicate<TContext>` factories — string comparison, null/empty, set equality, regex matching, and externally-resolved-value predicates for a safe-to-share resolving client — for a consumer that wants common checks without writing a class, and without acquiring the parser, compiler, or analyzer. |
+| `TruthWeaver.Testing` | `TruthWeaver.Abstractions` | Fluent `Decision` assertions and fake/scripted predicate factories for tests, without a hand-written `IPredicate<TContext>` per test. |
 
-| Concept | Meaning |
-| --- | --- |
-| **Rule** | A named unit of persistence: metadata + one expression. |
-| **Expression** | The boolean tree — operators over terms and sub-expressions. |
-| **Predicate** | A registered, reusable implementation, e.g. `hasRole`, `isManager`. |
-| **Term** | A predicate bound to concrete arguments, e.g. `hasRole(role: "Y")` — the tree's leaf node. |
-| **Operator** | `AND` `OR` `NOT` `XOR` `XNOR` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
-| **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
+```mermaid
+flowchart LR
+    subgraph Abstractions["TruthWeaver.Abstractions<br/>(zero third-party dependencies)"]
+        IPredicate["IPredicate&lt;TContext&gt;"]
+        Schema["PredicateSchema / PredicateArguments"]
+        Truth["TruthValue / Decision / Fault"]
+    end
 
-Full vocabulary and the predicate-author contract: [CONTEXT.md](CONTEXT.md).
+    subgraph Core["TruthWeaver"]
+        Parser["DSL parser"]
+        Compiler["RuleCompiler&lt;TContext&gt;"]
+        Analyzer["Analyzer (BDD)"]
+        Evaluator["Evaluator"]
+        Json["System.Text.Json tree support"]
+        DI["DI registration extensions"]
+    end
+
+    subgraph YamlPkg["TruthWeaver.Yaml"]
+        Yaml["YAML tree support"]
+    end
+
+    subgraph PredicatesPkg["TruthWeaver.Predicates"]
+        ReadyMade["Ready-made predicate factories"]
+    end
+
+    subgraph TestingPkg["TruthWeaver.Testing"]
+        Assertions["Decision assertions + fake predicates"]
+    end
+
+    Core --> Abstractions
+    YamlPkg --> Core
+    PredicatesPkg --> Abstractions
+    TestingPkg --> Abstractions
+
+    App["Predicate-implementing service"] -.->|"references only"| Abstractions
+    Host["Rule-authoring / evaluation host"] -->|"references"| Core
+    Host -.->|"optional"| YamlPkg
+    Host -.->|"optional"| PredicatesPkg
+    Host -.->|"optional, test projects only"| TestingPkg
+```
+
+A service that only *implements* domain predicates references
+`Abstractions` alone — no parser, no BDD analyzer, no YAML library. See
+[ADR-0004](docs/adr/0004-package-boundaries-and-extensibility.md).
+
+## Features
+
+- **Kleene three-valued logic.** Every operator follows the three-valued
+  truth tables in [ADR-0001](docs/adr/0001-kleene-failure-model.md) (full
+  tables: [Appendix](#appendix-truth-tables)) — a predicate fault becomes
+  `Unknown`, never a thrown exception or a silently coerced `false`. Entry
+  point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
+- **Per-evaluation memoization.** A term referenced from multiple branches
+  of the same rule is invoked at most once per evaluation, keyed by
+  structural term identity (see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
+  Entry point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
+- **A BDD-based analyzer**, not brute-force truth tables, flags structurally
+  constant or contradictory sub-expressions (e.g.
+  `hasRole(role: "Y") AND NOT hasRole(role: "Y")`) as compile diagnostics.
+  Entry point: [`Analyzer`](src/TruthWeaver/Analysis/Analyzer.cs) and
+  [`BddManager`](src/TruthWeaver/Analysis/BddManager.cs).
+- **Resource limits and `CompilationMode.Lenient`.** `CompilerOptions`
+  bounds tree depth, node count, and the analyzer's term cap so an
+  admin-authored rule can't hang a request thread; `Lenient` mode compiles
+  an unregistered predicate to a permanent `Unknown` term instead of an
+  error. Entry point: [`CompilerOptions`](src/TruthWeaver/Compilation/CompilerOptions.cs).
+- **`EvaluationOptions`**: an opt-in `FaultBudget` for fail-fast behavior
+  during a known outage, an `Exhaustive` mode that runs every reachable term
+  without changing the result, and an overall evaluation timeout linked into
+  the caller's `CancellationToken`. Entry point:
+  [`EvaluationOptions`](src/TruthWeaver/Evaluation/EvaluationOptions.cs).
+- **Scoped DI resolution.** Class-based predicates resolve fresh from the
+  `IServiceProvider` supplied to each evaluation call, so a predicate with a
+  scoped dependency works correctly even though a `CompiledRule<TContext>`
+  is long-lived and shared. Entry point:
+  [`TruthWeaverServiceCollectionExtensions`](src/TruthWeaver/DependencyInjection/TruthWeaverServiceCollectionExtensions.cs).
+- **Structured logging and metrics.** Faults, compile diagnostics, and
+  rule-swap notifications log as structured events through `ILogger<T>`; a
+  `"TruthWeaver"` `Meter` exposes counters for evaluations, faults, and
+  compile diagnostics, observable through OpenTelemetry's `AddMeter` with no
+  new dependency. Entry points: [`src/TruthWeaver/Logging`](src/TruthWeaver/Logging)
+  and [`TruthWeaverMetrics`](src/TruthWeaver/Metrics/TruthWeaverMetrics.cs).
+- **Structural rule diffing.** `RuleDiff.Compare` compares two compiled
+  rules and reports which operator, term, or constant nodes were added,
+  removed, or changed, each located by operand-index path and paired with a
+  human-readable description — useful for "what did this edit actually
+  change" tooling. Entry point:
+  [`RuleDiff`](src/TruthWeaver/Diffing/RuleDiff.cs).
+- **Diagram rendering.** A compiled rule renders as a Mermaid flowchart,
+  optionally colored by one evaluation's result and short-circuit path — see
+  [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram). Entry
+  point: [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs).
+- **Ready-made predicates.** `TruthWeaver.Predicates` ships generic
+  string-comparison, null/empty, set-equality, and regex-matching predicate
+  factories so common checks don't need a hand-written class. Entry point:
+  [`src/TruthWeaver.Predicates`](src/TruthWeaver.Predicates).
+- **Test support.** `TruthWeaver.Testing` ships fluent `Decision`
+  assertions and fake/scripted predicate factories (fixed answer, simulated
+  fault, sequenced answers) for testing without a hand-written
+  `IPredicate<TContext>` per test. Entry point:
+  [`src/TruthWeaver.Testing`](src/TruthWeaver.Testing).
 
 ## Operators
 
@@ -335,61 +383,6 @@ not grouping, so they never participate in precedence at all.
 Every operator above follows the three-valued Kleene truth tables in
 [ADR-0001](docs/adr/0001-kleene-failure-model.md) — see the
 [truth table appendix](#appendix-truth-tables) for the full tables.
-
-## Packages
-
-| Package | Depends on | Ships |
-| --- | --- | --- |
-| `TruthWeaver.Abstractions` | *(nothing third-party)* | `IPredicate<TContext>`, `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault` — everything a predicate-implementing service needs. |
-| `TruthWeaver` | `Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions` | The DSL parser, `RuleCompiler<TContext>`, `CompiledRule<TContext>`, the BDD-based analyzer, the evaluator, `System.Text.Json` tree support, printing/diffing, and DI registration extensions. |
-| `TruthWeaver.Yaml` | `TruthWeaver`, YamlDotNet | YAML tree support (`CompileYaml`/`PrintYaml`), isolated so a consumer with no interest in YAML never pulls in YamlDotNet. |
-| `TruthWeaver.Predicates` | `TruthWeaver.Abstractions` | Ready-made generic `IPredicate<TContext>` factories — string comparison, null/empty, set equality, regex matching, and externally-resolved-value predicates for a safe-to-share resolving client — for a consumer that wants common checks without writing a class, and without acquiring the parser, compiler, or analyzer. |
-| `TruthWeaver.Testing` | `TruthWeaver.Abstractions` | Fluent `Decision` assertions and fake/scripted predicate factories for tests, without a hand-written `IPredicate<TContext>` per test. |
-
-```mermaid
-flowchart LR
-    subgraph Abstractions["TruthWeaver.Abstractions<br/>(zero third-party dependencies)"]
-        IPredicate["IPredicate&lt;TContext&gt;"]
-        Schema["PredicateSchema / PredicateArguments"]
-        Truth["TruthValue / Decision / Fault"]
-    end
-
-    subgraph Core["TruthWeaver"]
-        Parser["DSL parser"]
-        Compiler["RuleCompiler&lt;TContext&gt;"]
-        Analyzer["Analyzer (BDD)"]
-        Evaluator["Evaluator"]
-        Json["System.Text.Json tree support"]
-        DI["DI registration extensions"]
-    end
-
-    subgraph YamlPkg["TruthWeaver.Yaml"]
-        Yaml["YAML tree support"]
-    end
-
-    subgraph PredicatesPkg["TruthWeaver.Predicates"]
-        ReadyMade["Ready-made predicate factories"]
-    end
-
-    subgraph TestingPkg["TruthWeaver.Testing"]
-        Assertions["Decision assertions + fake predicates"]
-    end
-
-    Core --> Abstractions
-    YamlPkg --> Core
-    PredicatesPkg --> Abstractions
-    TestingPkg --> Abstractions
-
-    App["Predicate-implementing service"] -.->|"references only"| Abstractions
-    Host["Rule-authoring / evaluation host"] -->|"references"| Core
-    Host -.->|"optional"| YamlPkg
-    Host -.->|"optional"| PredicatesPkg
-    Host -.->|"optional, test projects only"| TestingPkg
-```
-
-A service that only *implements* domain predicates references
-`Abstractions` alone — no parser, no BDD analyzer, no YAML library. See
-[ADR-0004](docs/adr/0004-package-boundaries-and-extensibility.md).
 
 ## Choosing a rule format
 
@@ -649,7 +642,7 @@ A few things stay true across all three shapes:
   unhandled exception. No special handling is needed in the predicate
   itself; see [`IPredicate<TContext>`](src/TruthWeaver.Abstractions/IPredicate.cs).
 
-This is the documented, tested alternative to the deferred
+This is the documented alternative to the deferred
 "[context-bound term arguments](CONTEXT.md#deferred)" feature (a
 path-expression mini-language like `IsManagerOf({{resource.ownerId}})`) —
 every shape above is expressible today, with no engine changes, by letting
@@ -1154,8 +1147,8 @@ void Print(RuleDescription node, int depth = 0)
 
 `RuleDescription` also feeds
 [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs),
-which renders it as a Mermaid `flowchart` — structure only, or colored by
-one evaluation's result and short-circuit path:
+which renders it as a Mermaid `flowchart`, either structure only or colored
+by one evaluation's result and short-circuit path:
 
 ```csharp
 CompiledRule<User> rule = compiler.Compile("isManager AND hasRole(role: \"Y\")").CompiledRule!;
@@ -1240,6 +1233,43 @@ severity, source span) in the returned `CompilationResult<TContext>`.
 diagnostics, which is what makes "a bad edit is rejected, the previously
 persisted rule stays active" true by construction rather than by convention.
 Full reasoning: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
+
+## Benchmarks
+
+`benchmarks/TruthWeaver.Benchmarks` is a [BenchmarkDotNet](https://benchmarkdotnet.org/)
+console project (dev-only — never packed, never referenced by `src/`) measuring:
+
+- **Compile-time cost** (`CompileBenchmarks.Compile`) — `RuleCompiler.CompileJson`'s full
+  Parse → Validate → Analyze → Build pipeline, including the BDD-based tautology/contradiction
+  analyzer, across a small (10-term) and a large (200-term) representative rule.
+- **Eval-time memoized term lookup** (`EvaluationBenchmarks.EvaluateAsync`) — `CompiledRule.EvaluateAsync`
+  against a rule whose branches all share one term, at increasing branch fan-out, exercising the
+  per-evaluation term memoization ADR-0002 describes.
+
+A committed baseline (captured with `--job Short`) lives at
+[`benchmarks/TruthWeaver.Benchmarks/results/baseline-results.md`](benchmarks/TruthWeaver.Benchmarks/results/baseline-results.md).
+
+Run the full suite (this repo's `net11.0` preview target isn't yet recognized by BenchmarkDotNet's
+default toolchain, so `--inProcess` is required — see the code comment on `CompileBenchmarks`/
+`EvaluationBenchmarks`' host project for why):
+
+```powershell
+dotnet build benchmarks/TruthWeaver.Benchmarks -c Release
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --inProcess
+```
+
+Useful variations:
+
+```powershell
+# Discover benchmark names without running them
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --list flat
+
+# Fast smoke test (one iteration per case, no meaningful measurement)
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --job Dry --inProcess
+
+# Regenerate the committed baseline
+dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --job Short --inProcess --exporters github --artifacts ./benchmarks/TruthWeaver.Benchmarks/results
+```
 
 ## Glossary
 
@@ -1360,43 +1390,6 @@ fixed two-input truth tables; their exact Kleene semantics (what counts as
 are covered by the evaluator's behavior described in
 [Evaluation flow](#evaluation-flow) and tested directly in
 `XorExactlyOneThresholdTests`.
-
-## Benchmarks
-
-`benchmarks/TruthWeaver.Benchmarks` is a [BenchmarkDotNet](https://benchmarkdotnet.org/)
-console project (dev-only — never packed, never referenced by `src/`) measuring:
-
-- **Compile-time cost** (`CompileBenchmarks.Compile`) — `RuleCompiler.CompileJson`'s full
-  Parse → Validate → Analyze → Build pipeline, including the BDD-based tautology/contradiction
-  analyzer, across a small (10-term) and a large (200-term) representative rule.
-- **Eval-time memoized term lookup** (`EvaluationBenchmarks.EvaluateAsync`) — `CompiledRule.EvaluateAsync`
-  against a rule whose branches all share one term, at increasing branch fan-out, exercising the
-  per-evaluation term memoization ADR-0002 describes.
-
-A committed baseline (captured with `--job Short`) lives at
-[`benchmarks/TruthWeaver.Benchmarks/results/baseline-results.md`](benchmarks/TruthWeaver.Benchmarks/results/baseline-results.md).
-
-Run the full suite (this repo's `net11.0` preview target isn't yet recognized by BenchmarkDotNet's
-default toolchain, so `--inProcess` is required — see the code comment on `CompileBenchmarks`/
-`EvaluationBenchmarks`' host project for why):
-
-```powershell
-dotnet build benchmarks/TruthWeaver.Benchmarks -c Release
-dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --inProcess
-```
-
-Useful variations:
-
-```powershell
-# Discover benchmark names without running them
-dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --list flat
-
-# Fast smoke test (one iteration per case, no meaningful measurement)
-dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --job Dry --inProcess
-
-# Regenerate the committed baseline
-dotnet run -c Release --no-build --project benchmarks/TruthWeaver.Benchmarks -- --filter "*" --job Short --inProcess --exporters github --artifacts ./benchmarks/TruthWeaver.Benchmarks/results
-```
 
 ## Design documents
 
