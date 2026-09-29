@@ -10,4 +10,13 @@ namespace TruthWeaver.Evaluation;
 /// <param name="Label">A short, human-friendly display name for this node.</param>
 /// <param name="Description">A human-readable description of what this node means.</param>
 /// <param name="Operands">This node's operands, described the same way, or empty for a leaf node.</param>
-public sealed record RuleDescription(string Label, string Description, IReadOnlyList<RuleDescription> Operands);
+/// <param name="ArgumentText">
+/// A term's rule-text arguments, rendered as comma-joined <c>name: value</c> pairs, or
+/// <see langword="null"/> for an operator, a constant, or a zero-argument term.
+/// </param>
+public sealed record RuleDescription(
+    string Label,
+    string Description,
+    IReadOnlyList<RuleDescription> Operands,
+    string? ArgumentText = null
+);

@@ -28,8 +28,8 @@ an authorization layer is intentionally out of scope.
 | --- | --- |
 | **Rule** | A named, versioned unit of persistence: metadata plus one `Expression`. |
 | **Expression** | The boolean tree: operators over terms and sub-expressions. |
-| **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasRole` or `isManager`. The *function*, not any particular call to it. |
-| **Term** | A predicate bound to concrete arguments, e.g. `hasRole(role: "Y")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
+| **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasTopping` or `lovesPineapple`. The *function*, not any particular call to it. |
+| **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
 | **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `true`/`false`. Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
 | **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |

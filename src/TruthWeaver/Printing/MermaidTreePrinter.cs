@@ -15,26 +15,34 @@ public static class MermaidTreePrinter
     /// <summary>Prints a rule's structure only, with no evaluation coloring.</summary>
     /// <param name="root">The rule's described tree.</param>
     /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
+    /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>Mermaid <c>flowchart</c> text.</returns>
-    public static string Print(RuleDescription root, OperatorStyle style = OperatorStyle.Word)
+    public static string Print(RuleDescription root, OperatorStyle style = OperatorStyle.Word, bool showArgumentValues = true)
     {
-        return Print(RuleRenderTree.Build(root, style));
+        return Print(RuleRenderTree.Build(root, style, showArgumentValues));
     }
 
     /// <summary>Prints a rule's structure, colored by one evaluation's result and short-circuit path.</summary>
     /// <param name="root">The rule's described tree.</param>
     /// <param name="evaluatedTree">The matching <see cref="Decision.EvaluatedTree"/> from that evaluation.</param>
     /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
+    /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>Mermaid <c>flowchart</c> text.</returns>
-    public static string Print(RuleDescription root, EvaluatedNode evaluatedTree, OperatorStyle style = OperatorStyle.Word)
+    public static string Print(
+        RuleDescription root,
+        EvaluatedNode evaluatedTree,
+        OperatorStyle style = OperatorStyle.Word,
+        bool showArgumentValues = true
+    )
     {
-        return Print(RuleRenderTree.Build(root, evaluatedTree, style));
+        return Print(RuleRenderTree.Build(root, evaluatedTree, style, showArgumentValues));
     }
 
     private static string Print(RenderNode root)
     {
         StringBuilder text = new();
         text.Append("flowchart TD\n");
+        text.Append("    Start([\"Start\"]) --> n0\n");
         List<string> classAssignments = [];
         int nextId = 0;
         bool anyColored = WriteNode(root, text, classAssignments, ref nextId) != RenderState.NoData;

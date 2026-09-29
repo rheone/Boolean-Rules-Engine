@@ -54,8 +54,8 @@ engine, not what the engine itself is.
 | --- | --- |
 | **Rule** | A named unit of persistence: metadata + one expression. |
 | **Expression** | The boolean tree — operators over terms and sub-expressions. |
-| **Predicate** | A registered, reusable implementation, e.g. `hasRole`, `isManager`. |
-| **Term** | A predicate bound to concrete arguments, e.g. `hasRole(role: "Y")` — the tree's leaf node. |
+| **Predicate** | A registered, reusable implementation, e.g. `hasTopping`, `lovesPineapple`. |
+| **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")` — the tree's leaf node. |
 | **Operator** | `AND` `OR` `NOT` `XOR` `XNOR` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
 | **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
 
@@ -85,22 +85,22 @@ isn't a pin to that exact patch.
    shape — a class implementing `IPredicate<TContext>`:
 
    ```csharp
-   public sealed class IsManager : IPredicate<User>
+   public sealed class LovesPineapple : IPredicate<Customer>
    {
        public static PredicateSchema Schema =>
-           PredicateSchema.NoArguments("isManager", "Is Manager", "Does the current user hold the manager role?");
+           PredicateSchema.NoArguments("lovesPineapple", "Loves Pineapple", "Does this customer like pineapple on pizza?");
 
-       public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct) =>
-           ValueTask.FromResult(user.IsManager);
+       public ValueTask<bool> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct) =>
+           ValueTask.FromResult(customer.LovesPineapple);
    }
    ```
 
 3. **Register it and compile a rule:**
 
    ```csharp
-   PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder().Add<IsManager>().Build();
-   RuleCompiler<User> compiler = new(registry);
-   CompilationResult<User> result = compiler.Compile("isManager");
+   PredicateRegistry<Customer> registry = PredicateRegistry<Customer>.CreateBuilder().Add<LovesPineapple>().Build();
+   RuleCompiler<Customer> compiler = new(registry);
+   CompilationResult<Customer> result = compiler.Compile("lovesPineapple");
 
    if (!result.Succeeded)
    {
@@ -112,7 +112,7 @@ isn't a pin to that exact patch.
 4. **Evaluate it against a context:**
 
    ```csharp
-   Decision decision = await result.CompiledRule!.EvaluateAsync(user, serviceProvider, cancellationToken: ct);
+   Decision decision = await result.CompiledRule!.EvaluateAsync(customer, serviceProvider, cancellationToken: ct);
 
    if (decision.IsSatisfied)
    {
@@ -283,7 +283,7 @@ A service that only *implements* domain predicates references
   Entry point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
 - **A BDD-based analyzer**, not brute-force truth tables, flags structurally
   constant or contradictory sub-expressions (e.g.
-  `hasRole(role: "Y") AND NOT hasRole(role: "Y")`) as compile diagnostics.
+  `hasTopping(topping: "greenOlives") AND NOT hasTopping(topping: "greenOlives")`) as compile diagnostics.
   Entry point: [`Analyzer`](src/TruthWeaver/Analysis/Analyzer.cs) and
   [`BddManager`](src/TruthWeaver/Analysis/BddManager.cs).
 - **Resource limits and `CompilationMode.Lenient`.** `CompilerOptions`
@@ -313,10 +313,12 @@ A service that only *implements* domain predicates references
   human-readable description — useful for "what did this edit actually
   change" tooling. Entry point:
   [`RuleDiff`](src/TruthWeaver/Diffing/RuleDiff.cs).
-- **Diagram rendering.** A compiled rule renders as a Mermaid flowchart,
-  optionally colored by one evaluation's result and short-circuit path — see
+- **Diagram rendering.** A compiled rule renders as a Mermaid flowchart or
+  an indented plain-text tree, optionally colored by one evaluation's
+  result and short-circuit path — see
   [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram). Entry
-  point: [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs).
+  points: [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs),
+  [`PlainTextTreePrinter`](src/TruthWeaver/Printing/PlainTextTreePrinter.cs).
 - **Ready-made predicates.** `TruthWeaver.Predicates` ships generic
   string-comparison, null/empty, set-equality, and regex-matching predicate
   factories so common checks don't need a hand-written class. Entry point:
@@ -342,8 +344,8 @@ their head.
 3. **`AND`** — binds tighter than `OR`.
 4. **`OR`** — binds loosest of the infix operators.
 
-`isManager AND NOT isSuspended OR isAdmin` therefore parses as
-`(isManager AND (NOT isSuspended)) OR isAdmin`.
+`lovesPineapple AND NOT isBanned OR isVip` therefore parses as
+`(lovesPineapple AND (NOT isBanned)) OR isVip`.
 
 `XOR` and `XNOR` are **not** part of this precedence chain: mixing either of
 them with `AND`/`OR`, or mixing `XOR` with `XNOR`, at the same syntactic
@@ -426,7 +428,7 @@ class resolved from DI).
 | Shape | Arguments | Implementation | When to use |
 | --- | --- | --- | --- |
 | Lambda, 0 args | none | stateless delegate | A simple stateless check with no rule-authored parameter. |
-| Lambda, 1 arg | one | stateless delegate with a 1-argument schema | The common case — a stateless check parameterized by the rule text, e.g. `hasRole(role: "Y")`. |
+| Lambda, 1 arg | one | stateless delegate with a 1-argument schema | The common case — a stateless check parameterized by the rule text, e.g. `hasTopping(topping: "greenOlives")`. |
 | Class-based (DI), 0 args | none | `IPredicate<TContext>` | Needs a scoped/injected dependency but no rule-authored parameter. |
 | Class-based (DI), n args | several | `IPredicate<TContext>` with a multi-argument schema | Needs both rule-authored parameters *and* one or more injected dependencies. |
 
@@ -436,26 +438,34 @@ Before writing one by hand, check whether
 string comparison, null/empty checks, set equality, and regex matching as
 generic factories parameterized by a value selector, and
 `ResolvedValuePredicates` covers the externally-resolved-value pattern
-(below) for a safe-to-share resolving client.
+(below) for a safe-to-share resolving client. Every method on
+`StringPredicates` except one is ordinal-only and fixed-behavior by
+design — a case-insensitive variant is a separate predicate
+(`EqualsIgnoreCase`), never a rule-text flag on `Equals`. The exception,
+`StringPredicates.EqualsConfigurable`, deliberately inverts that: it's one
+predicate whose `ignoreCase`/`culture`/`trim` arguments are set per rule
+(case-insensitive and `InvariantCulture` by default), for the case where a
+rule author genuinely needs that flexibility rather than a fixed-behavior
+predicate per name.
 
 ### 0 arguments, stateless lambda
 
 ```csharp
 .Add(
-    PredicateSchema.NoArguments("isSuspended", "Is Suspended", "Is the current user's account suspended?"),
-    (user, args, ct) => ValueTask.FromResult(user.IsSuspended))
+    PredicateSchema.NoArguments("isBanned", "Is Banned", "Is the current customer's account banned?"),
+    (customer, args, ct) => ValueTask.FromResult(customer.IsBanned))
 ```
 
 ### 1 argument, stateless lambda
 
-See [Example 3](#3-named-arguments)'s `hasRole(role: "Y")` — a single named
-`string` argument, no injected dependency.
+See [Example 3](#3-named-arguments)'s `hasTopping(topping: "greenOlives")` —
+a single named `string` argument, no injected dependency.
 
 ### 0 arguments, class-based (DI)
 
-See [Example 1](#1-a-single-predicate)'s `IsManager` — a class implementing
-`IPredicate<TContext>`, resolved fresh from `IServiceProvider` on every
-evaluation (the right shape whenever a scoped dependency, e.g. a
+See [Example 1](#1-a-single-predicate)'s `LovesPineapple` — a class
+implementing `IPredicate<TContext>`, resolved fresh from `IServiceProvider`
+on every evaluation (the right shape whenever a scoped dependency, e.g. a
 `DbContext`, is involved, even with no rule-authored parameter).
 
 ### n arguments, class-based, multiple injected dependencies
@@ -464,43 +474,43 @@ The shape that combines everything: two rule-authored arguments *and* two
 constructor-injected dependencies, resolved from DI per evaluation:
 
 ```csharp
-public sealed class HasEnoughRecentApprovals : IPredicate<Resource>
+public sealed class HasEarnedEnoughLoyaltyStamps : IPredicate<PizzaOrder>
 {
-    private readonly IApprovalStore approvals;
+    private readonly ILoyaltyStampStore stamps;
     private readonly TimeProvider clock;
 
-    public HasEnoughRecentApprovals(IApprovalStore approvals, TimeProvider clock)
+    public HasEarnedEnoughLoyaltyStamps(ILoyaltyStampStore stamps, TimeProvider clock)
     {
-        this.approvals = approvals;
+        this.stamps = stamps;
         this.clock = clock;
     }
 
     public static PredicateSchema Schema =>
         new(
-            "hasEnoughRecentApprovals",
-            "Has Enough Recent Approvals",
-            "Has the resource received at least the given number of approvals within the given time window?",
+            "hasEarnedEnoughLoyaltyStamps",
+            "Has Earned Enough Loyalty Stamps",
+            "Has the order's customer earned at least the given number of loyalty stamps within the given time window?",
             [
-                new PredicateArgumentSchema("minCount", "The minimum number of approvals required.", LiteralKind.Int64),
-                new PredicateArgumentSchema("withinHours", "The lookback window, in hours.", LiteralKind.Int64),
+                new PredicateArgumentSchema("minCount", "The minimum number of loyalty stamps required.", LiteralKind.Int64),
+                new PredicateArgumentSchema("withinDays", "The lookback window, in days.", LiteralKind.Int64),
             ]);
 
-    public async ValueTask<bool> EvaluateAsync(Resource resource, PredicateArguments args, CancellationToken ct)
+    public async ValueTask<bool> EvaluateAsync(PizzaOrder order, PredicateArguments args, CancellationToken ct)
     {
         long minCount = args.GetInt64("minCount");
-        long withinHours = args.GetInt64("withinHours");
-        DateTimeOffset cutoff = this.clock.GetUtcNow().AddHours(-withinHours);
+        long withinDays = args.GetInt64("withinDays");
+        DateTimeOffset cutoff = this.clock.GetUtcNow().AddDays(-withinDays);
 
-        long count = await this.approvals.CountApprovalsSinceAsync(resource.Id, cutoff, ct);
+        long count = await this.stamps.CountStampsSinceAsync(order.Id, cutoff, ct);
         return count >= minCount;
     }
 }
 ```
 
-Used in a rule as `hasEnoughRecentApprovals(minCount: 2, withinHours: 24)`.
-`IApprovalStore` might be scoped (an `IDbContextFactory`-backed store) and
-`TimeProvider` is typically a singleton — both resolve correctly on every
-evaluation because the predicate itself is resolved fresh from
+Used in a rule as `hasEarnedEnoughLoyaltyStamps(minCount: 5, withinDays: 30)`.
+`ILoyaltyStampStore` might be scoped (an `IDbContextFactory`-backed store)
+and `TimeProvider` is typically a singleton — both resolve correctly on
+every evaluation because the predicate itself is resolved fresh from
 `IServiceProvider`, not constructed once at registration.
 
 Wiring it up: **`AddTruthWeaver` registers the registry and compiler,
@@ -509,14 +519,14 @@ dependencies) must be registered in the host's container separately, same
 as any other DI service:
 
 ```csharp
-services.AddScoped<IApprovalStore, ApprovalStore>();
+services.AddScoped<ILoyaltyStampStore, LoyaltyStampStore>();
 services.AddSingleton(TimeProvider.System);
-services.AddScoped<HasEnoughRecentApprovals>();      // the predicate type itself
-services.AddScoped<IsManager>();
+services.AddScoped<HasEarnedEnoughLoyaltyStamps>();  // the predicate type itself
+services.AddScoped<LovesPineapple>();
 
-services.AddTruthWeaver<Resource>(builder => builder
-    .Add<IsManager>()
-    .Add<HasEnoughRecentApprovals>());
+services.AddTruthWeaver<PizzaOrder>(builder => builder
+    .Add<LovesPineapple>()
+    .Add<HasEarnedEnoughLoyaltyStamps>());
 ```
 
 Both lambda and class-based predicates register against the same
@@ -528,8 +538,8 @@ term. See
 
 ### n arguments, class-based, externally-resolved value
 
-`HasEnoughRecentApprovals` above injects a dependency to read a value it
-already knows how to interpret (`minCount`, `withinHours` are values, used
+`HasEarnedEnoughLoyaltyStamps` above injects a dependency to read a value it
+already knows how to interpret (`minCount`, `withinDays` are values, used
 directly). A related but distinct shape: a rule-text literal argument and/or
 a `TContext`-supplied value is a **key to be resolved** — not a value
 already ready to use — and a constructor-injected service performs that
@@ -543,21 +553,21 @@ central than the others:
    the classic instance:
 
    ```csharp
-   public sealed class IsFeatureEnabled(IFeatureFlagService flags) : IPredicate<object?>
+   public sealed class IsPromoActive(IPromoService promos) : IPredicate<object?>
    {
        public static PredicateSchema Schema =>
            new(
-               "isFeatureEnabled",
-               "Is Feature Enabled",
-               "Is the given feature flag currently enabled, resolved live from the flag service?",
-               [new PredicateArgumentSchema("flagKey", "The feature flag key to look up.", LiteralKind.String)]);
+               "isPromoActive",
+               "Is Promo Active",
+               "Is the given promo code currently active, resolved live from the promotions service?",
+               [new PredicateArgumentSchema("promoCode", "The promo code to look up.", LiteralKind.String)]);
 
        public ValueTask<bool> EvaluateAsync(object? context, PredicateArguments args, CancellationToken ct) =>
-           flags.IsEnabledAsync(args.GetString("flagKey"), ct);
+           promos.IsActiveAsync(args.GetString("promoCode"), ct);
    }
    ```
 
-   Used in a rule as `isFeatureEnabled(flagKey: "new-checkout")`.
+   Used in a rule as `isPromoActive(promoCode: "SUMMER-2026")`.
 
 2. **Single-sided value check.** One side — the argument or a context
    value — is resolved live; the other side is a plain value already
@@ -566,26 +576,26 @@ central than the others:
    current user," it's about a key that needs a live lookup:
 
    ```csharp
-   public sealed class IsWithinBudget(IBudgetLookupService budget) : IPredicate<PurchaseRequest>
+   public sealed class IsWithinZoneLimit(IZoneLimitLookupService zoneLimits) : IPredicate<DeliveryRun>
    {
        public static PredicateSchema Schema =>
            new(
-               "isWithinBudget",
-               "Is Within Budget",
-               "Is the request's amount within the live spending limit resolved for the given cost center code?",
-               [new PredicateArgumentSchema("costCenterCode", "The cost center code to look up a live limit for.", LiteralKind.String)]);
+               "isWithinZoneLimit",
+               "Is Within Zone Limit",
+               "Is the delivery run's amount within the live order limit resolved for the given delivery zone code?",
+               [new PredicateArgumentSchema("zoneCode", "The delivery zone code to look up a live limit for.", LiteralKind.String)]);
 
-       public async ValueTask<bool> EvaluateAsync(PurchaseRequest request, PredicateArguments args, CancellationToken ct)
+       public async ValueTask<bool> EvaluateAsync(DeliveryRun run, PredicateArguments args, CancellationToken ct)
        {
-           string costCenterCode = args.GetString("costCenterCode");
-           decimal limit = await budget.ResolveLimitAsync(costCenterCode, ct);
-           return request.Amount <= limit;
+           string zoneCode = args.GetString("zoneCode");
+           decimal limit = await zoneLimits.ResolveLimitAsync(zoneCode, ct);
+           return run.Amount <= limit;
        }
    }
    ```
 
-   Used in a rule as `isWithinBudget(costCenterCode: "CC-100")`. Only
-   `costCenterCode` is resolved; `request.Amount` is read straight off
+   Used in a rule as `isWithinZoneLimit(zoneCode: "Z-100")`. Only
+   `zoneCode` is resolved; `run.Amount` is read straight off
    `TContext`, no lookup needed.
 
 3. **Two-sided comparison.** Both a `TContext`-supplied anchor and the
@@ -595,27 +605,28 @@ central than the others:
    family, not the pattern itself:
 
    ```csharp
-   public sealed class IsManagedByCandidate(IManagerLookupService managers) : IPredicate<Resource>
+   public sealed class IsAssignedToCandidateDriver(IDriverLookupService drivers) : IPredicate<PizzaOrder>
    {
        public static PredicateSchema Schema =>
            new(
-               "isManagedByCandidate",
-               "Is Managed By Candidate",
-               "Does the resource's actual manager, resolved live, match the given candidate?",
-               [new PredicateArgumentSchema("candidateManagerId", "The candidate manager to validate.", LiteralKind.Guid)]);
+               "isAssignedToCandidateDriver",
+               "Is Assigned To Candidate Driver",
+               "Does the order's actual assigned driver, resolved live, match the given candidate?",
+               [new PredicateArgumentSchema("candidateDriverId", "The candidate driver to validate.", LiteralKind.Guid)]);
 
-       public async ValueTask<bool> EvaluateAsync(Resource resource, PredicateArguments args, CancellationToken ct)
+       public async ValueTask<bool> EvaluateAsync(PizzaOrder order, PredicateArguments args, CancellationToken ct)
        {
-           Guid candidateManagerId = args.GetGuid("candidateManagerId");
-           Guid actualManagerId = await managers.ResolveManagerIdAsync(resource.ResourceId, ct);
-           return actualManagerId == candidateManagerId;
+           Guid candidateDriverId = args.GetGuid("candidateDriverId");
+           // candidateDriverId here belongs to "Mister Moneybags," our top delivery driver.
+           Guid actualDriverId = await drivers.ResolveDriverIdAsync(order.Id, ct);
+           return actualDriverId == candidateDriverId;
        }
    }
    ```
 
    Used in a rule as
-   `isManagedByCandidate(candidateManagerId: "3fa85f64-5717-4562-b3fc-2c963f66afa6")`.
-   `resource` (the context) is a resource id, not "the current user" — it
+   `isAssignedToCandidateDriver(candidateDriverId: "3fa85f64-5717-4562-b3fc-2c963f66afa6")`.
+   `order` (the context) is an order id, not "the current user" — it
    needs its own resolution just as much as the argument does. Neither side
    of a two-sided comparison is privileged as "the identity one."
 
@@ -661,11 +672,11 @@ class needed. The single-value convenience overload matches shape 1 above:
 ```csharp
 (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
     ResolvedValuePredicates.Create<object?>(
-        "isFeatureEnabled",
-        "Is Feature Enabled",
-        "Is the given feature flag currently enabled, resolved live from the flag service?",
-        (_, args, ct) => flags.IsEnabledAsync(args.GetString("flagKey"), ct),
-        new PredicateArgumentSchema("flagKey", "The feature flag key to look up.", LiteralKind.String));
+        "isPromoActive",
+        "Is Promo Active",
+        "Is the given promo code currently active, resolved live from the promotions service?",
+        (_, args, ct) => promos.IsActiveAsync(args.GetString("promoCode"), ct),
+        new PredicateArgumentSchema("promoCode", "The promo code to look up.", LiteralKind.String));
 ```
 
 A second overload takes a separate `test` delegate for shapes 2 and 3 above,
@@ -687,61 +698,63 @@ sentence.
 ### 1. A single predicate
 
 ```text
-isManager
+lovesPineapple
 ```
 
 ```csharp
-PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder().Add<IsManager>().Build();
-RuleCompiler<User> compiler = new(registry);
-CompiledRule<User> rule = compiler.Compile("isManager").CompiledRule!;
+PredicateRegistry<Customer> registry = PredicateRegistry<Customer>.CreateBuilder().Add<LovesPineapple>().Build();
+RuleCompiler<Customer> compiler = new(registry);
+CompiledRule<Customer> rule = compiler.Compile("lovesPineapple").CompiledRule!;
 
-Decision decision = await rule.EvaluateAsync(user, serviceProvider, cancellationToken: ct);
+Decision decision = await rule.EvaluateAsync(customer, serviceProvider, cancellationToken: ct);
 ```
 
 ### 2. Combining predicates: `AND` / `OR` / `NOT`
 
 ```text
-isManager AND NOT isSuspended
+lovesPineapple AND NOT isBanned
 ```
 
 `NOT` binds tighter than `AND`, which binds tighter than `OR`, so this
-parses as `isManager AND (NOT isSuspended)` without needing parentheses.
+parses as `lovesPineapple AND (NOT isBanned)` without needing parentheses.
 
 ### 3. Named arguments
 
 ```text
-hasRole(role: "Y")
+hasTopping(topping: "greenOlives")
 ```
 
 ```csharp
-PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder()
+PredicateRegistry<Customer> registry = PredicateRegistry<Customer>.CreateBuilder()
     .Add(
         new PredicateSchema(
-            "hasRole",
-            "Has Role",
-            "Does the current user hold the given role?",
-            [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]),
-        (user, args, ct) => ValueTask.FromResult(user.Roles.Contains(args.GetString("role"))))
+            "hasTopping",
+            "Has Topping",
+            "Does the order include the given topping?",
+            [new PredicateArgumentSchema("topping", "The topping to check for.", LiteralKind.String)]),
+        (customer, args, ct) => ValueTask.FromResult(customer.Toppings.Contains(args.GetString("topping"))))
     .Build();
 ```
 
-Argument order in the source text never matters (`hasRole(role: "Y")` and a
-predicate with several arguments written in any order compile to the same
-term identity); argument *values* are case-sensitive (`"Y"` and `"y"` are
-different terms — see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
-`Description` is required on both `PredicateSchema` and
-`PredicateArgumentSchema`, and `PredicateSchema` also requires a `Label` — a
-short display name distinct from the machine-facing `Name` used in rule text
-(e.g. `Name: "hasRole"`, `Label: "Has Role"`) — so a rule-authoring UI or
-generated documentation always has something to show for every predicate and
-argument. See [Describing a compiled rule](#describing-a-compiled-rule)
-below for how this pairs with operators' own label/description.
+Argument order in the source text never matters (`hasTopping(topping:
+"greenOlives")` and a predicate with several arguments written in any order
+compile to the same term identity); argument *values* are case-sensitive
+(`"greenOlives"` and `"Greenolives"` are different terms — see
+[CONTEXT.md#term-identity](CONTEXT.md#term-identity)). `Description` is
+required on both `PredicateSchema` and `PredicateArgumentSchema`, and
+`PredicateSchema` also requires a `Label` — a short display name distinct
+from the machine-facing `Name` used in rule text (e.g. `Name: "hasTopping"`,
+`Label: "Has Topping"`) — so a rule-authoring UI or generated documentation
+always has something to show for every predicate and argument. See
+[Describing a compiled rule](#describing-a-compiled-rule) below for how this
+pairs with operators' own label/description.
 
 A DSL string-literal argument supports four escape sequences: `\"` for a
 literal quote, `\\` for a literal backslash, `\n` for a newline, and `\t` for
-a tab. For example, `hasRole(role: "V\"IP")` compiles to a string argument
-whose value is `V"IP`, and printing that compiled rule back to DSL text
-reproduces `hasRole(role: "V\"IP")` unchanged. Any other backslash sequence
+a tab. For example, `hasTopping(topping: "Chef's \"Special\"")` compiles to
+a string argument whose value is `Chef's "Special"`, and printing that
+compiled rule back to DSL text reproduces `hasTopping(topping: "Chef's
+\"Special\"")` unchanged. Any other backslash sequence
 (e.g. `\p`) is a compile-time `InvalidEscapeSequence` diagnostic, not a
 silently-corrupted literal value — the compilation fails rather than
 guessing what you meant. This escaping rule is specific to the DSL text
@@ -749,6 +762,37 @@ format: the JSON and YAML forms (see
 [Converting between DSL, JSON, and YAML](#converting-between-dsl-json-and-yaml))
 use their own format's native string escaping (`System.Text.Json` and
 YamlDotNet respectively), not this rule.
+
+A predicate can take more than one named argument — same registration shape,
+just a longer `PredicateArgumentSchema` array and an `EvaluateAsync` that
+reads more than one `Get*` call:
+
+```text
+hasToppingAmount(topping: "pepperoni", amount: "extra")
+```
+
+```csharp
+PredicateRegistry<Customer> registry = PredicateRegistry<Customer>.CreateBuilder()
+    .Add(
+        new PredicateSchema(
+            "hasToppingAmount",
+            "Has Topping Amount",
+            "Does the order include the given topping at the given amount?",
+            [
+                new PredicateArgumentSchema("topping", "The topping to check for.", LiteralKind.String),
+                new PredicateArgumentSchema("amount", "The amount requested (e.g. \"regular\" or \"extra\").", LiteralKind.String),
+            ]),
+        (customer, args, ct) =>
+            ValueTask.FromResult(customer.ToppingAmounts.TryGetValue(args.GetString("topping"), out string? amount)
+                && amount == args.GetString("amount")))
+    .Build();
+```
+
+`hasToppingAmount(topping: "pepperoni", amount: "extra")` and
+`hasToppingAmount(amount: "extra", topping: "pepperoni")` compile to the
+exact same term identity — argument order in the source text still never
+matters, however many arguments a predicate declares (see
+[Term identity](CONTEXT.md#term-identity)).
 
 ### 4. `XOR`, `XNOR`, `ExactlyOne`, and the threshold family
 
@@ -782,7 +826,7 @@ when both are reviewers or neither is, false when exactly one is.
 Rule text (the canonical, persisted form):
 
 ```text
-hasRole(role: "Y") AND (hasTraining(training: "Q") OR hasTraining(training: "Z") OR (isManager XOR isDepartmentHead))
+hasTopping(topping: "greenOlives") AND (hasCrust(crust: "thin") OR hasCrust(crust: "stuffed", ignoreCase: false) OR (isDineIn XOR isTakeout))
 ```
 
 The same rule as JSON:
@@ -791,17 +835,17 @@ The same rule as JSON:
 {
   "op": "and",
   "operands": [
-    { "predicate": "hasRole", "args": { "role": "Y" } },
+    { "predicate": "hasTopping", "args": { "topping": "greenOlives" } },
     {
       "op": "or",
       "operands": [
-        { "predicate": "hasTraining", "args": { "training": "Q" } },
-        { "predicate": "hasTraining", "args": { "training": "Z" } },
+        { "predicate": "hasCrust", "args": { "crust": "thin" } },
+        { "predicate": "hasCrust", "args": { "crust": "stuffed", "ignoreCase": false } },
         {
           "op": "xor",
           "operands": [
-            { "predicate": "isManager" },
-            { "predicate": "isDepartmentHead" }
+            { "predicate": "isDineIn" },
+            { "predicate": "isTakeout" }
           ]
         }
       ]
@@ -815,47 +859,45 @@ The same rule as JSON:
 ```yaml
 op: and
 operands:
-  - predicate: hasRole
+  - predicate: hasTopping
     args:
-      role: "Y"
+      topping: "greenOlives"
   - op: or
     operands:
-      - predicate: hasTraining
+      - predicate: hasCrust
         args:
-          training: "Q"
-      - predicate: hasTraining
+          crust: "thin"
+      - predicate: hasCrust
         args:
-          training: "Z"
+          crust: "stuffed"
+          ignoreCase: false
       - op: xor
         operands:
-          - predicate: isManager
-          - predicate: isDepartmentHead
+          - predicate: isDineIn
+          - predicate: isTakeout
 ```
 
 Registering predicates and evaluating:
 
 ```csharp
-PredicateRegistry<User> registry = PredicateRegistry<User>.CreateBuilder()
-    .Add<IsManager>()
-    .Add<IsDepartmentHead>()
+(PredicateSchema hasCrustSchema, var hasCrustEvaluate) =
+    StringPredicates.EqualsConfigurable<PizzaOrder>("hasCrust", order => order.Crust, "Has Crust", argumentName: "crust");
+
+PredicateRegistry<PizzaOrder> registry = PredicateRegistry<PizzaOrder>.CreateBuilder()
+    .Add<IsDineIn>()
+    .Add<IsTakeout>()
     .Add(
         new PredicateSchema(
-            "hasRole",
-            "Has Role",
-            "Does the current user hold the given role?",
-            [new PredicateArgumentSchema("role", "The role code to check for.", LiteralKind.String)]),
-        (user, args, ct) => ValueTask.FromResult(user.Roles.Contains(args.GetString("role"))))
-    .Add(
-        new PredicateSchema(
-            "hasTraining",
-            "Has Training",
-            "Has the current user completed the given training course?",
-            [new PredicateArgumentSchema("training", "The training course code to check for.", LiteralKind.String)]),
-        (user, args, ct) => ValueTask.FromResult(user.Training.Contains(args.GetString("training"))))
+            "hasTopping",
+            "Has Topping",
+            "Does the order include the given topping?",
+            [new PredicateArgumentSchema("topping", "The topping to check for.", LiteralKind.String)]),
+        (order, args, ct) => ValueTask.FromResult(order.Toppings.Contains(args.GetString("topping"))))
+    .Add(hasCrustSchema, hasCrustEvaluate)
     .Build();
 
-RuleCompiler<User> compiler = new(registry);
-CompilationResult<User> result = compiler.Compile(ruleText);
+RuleCompiler<PizzaOrder> compiler = new(registry);
+CompilationResult<PizzaOrder> result = compiler.Compile(ruleText);
 
 if (!result.Succeeded)
 {
@@ -864,8 +906,8 @@ if (!result.Succeeded)
     return;
 }
 
-CompiledRule<User> rule = result.CompiledRule!;
-Decision decision = await rule.EvaluateAsync(user, serviceProvider, cancellationToken: cancellationToken);
+CompiledRule<PizzaOrder> rule = result.CompiledRule!;
+Decision decision = await rule.EvaluateAsync(order, serviceProvider, cancellationToken: cancellationToken);
 
 if (decision.IsSatisfied)
 {
@@ -873,25 +915,29 @@ if (decision.IsSatisfied)
 }
 ```
 
-`IsManager`/`IsDepartmentHead` are class-based predicates (`IPredicate<User>`),
+`IsDineIn`/`IsTakeout` are class-based predicates (`IPredicate<PizzaOrder>`),
 resolved fresh from `serviceProvider` on every call — the right shape for a
-predicate with a scoped dependency such as a `DbContext`. `hasRole`/
-`hasTraining` are stateless lambdas. Both forms register against the same
-`PredicateRegistryBuilder<TContext>`; see
+predicate with a scoped dependency such as a `DbContext`. `hasTopping` is a
+hand-written stateless lambda; `hasCrust` comes from the ready-made
+`StringPredicates.EqualsConfigurable` factory instead (see
+[Predicate types](#predicate-types)) — it takes `crust` as its rule-text
+comparison target, plus `ignoreCase`/`culture`/`trim` arguments with sensible
+defaults, so `hasCrust(crust: "thin")` alone already compiles. All three
+forms register against the same `PredicateRegistryBuilder<TContext>`; see
 [ADR-0002](docs/adr/0002-evaluation-semantics.md#predicate-registration-and-dependency-lifetimes).
 
 Wiring into a host's DI container instead of constructing things by hand:
 
 ```csharp
-services.AddTruthWeaver<User>(builder => builder
-    .Add<IsManager>()
-    .Add<IsDepartmentHead>());
+services.AddTruthWeaver<PizzaOrder>(builder => builder
+    .Add<IsDineIn>()
+    .Add<IsTakeout>());
 ```
 
 ### 6. The same rule, assembled with `RuleBuilder` instead of text
 
-Same tree as example 5's `hasRole(role: "Y") AND (hasTraining(...) OR
-hasTraining(...) OR (isManager XOR isDepartmentHead))`, built without
+Same tree as example 5's `hasTopping(topping: "greenOlives") AND
+(hasCrust(...) OR hasCrust(...) OR (isDineIn XOR isTakeout))`, built without
 writing DSL, JSON, or YAML text by hand — useful when a rule's shape comes
 from application logic (e.g. a dynamically assembled list of conditions)
 rather than an author typing it directly:
@@ -900,14 +946,72 @@ rather than an author typing it directly:
 using TruthWeaver.Building;
 
 RuleBuilder rule = RuleBuilder.And(
-    RuleBuilder.Predicate("hasRole", ("role", "Y")),
+    RuleBuilder.Predicate("hasTopping", ("topping", "greenOlives")),
     RuleBuilder.Or(
-        RuleBuilder.Predicate("hasTraining", ("training", "Q")),
-        RuleBuilder.Predicate("hasTraining", ("training", "Z")),
-        RuleBuilder.Xor(RuleBuilder.Predicate("isManager"), RuleBuilder.Predicate("isDepartmentHead"))));
+        RuleBuilder.Predicate("hasCrust", ("crust", "thin")),
+        RuleBuilder.Predicate("hasCrust", ("crust", "stuffed"), ("ignoreCase", false)),
+        RuleBuilder.Xor(RuleBuilder.Predicate("isDineIn"), RuleBuilder.Predicate("isTakeout"))));
 
-CompilationResult<User> result = rule.Compile(compiler);
+CompilationResult<PizzaOrder> result = rule.Compile(compiler);
 ```
+
+Rendering the same rule as a Mermaid diagram:
+
+```csharp
+string mermaid = result.CompiledRule!.PrintMermaid();
+```
+
+```mermaid
+flowchart TD
+    Start(["Start"]) --> n0
+    n0["AND"]
+    n1["Has Topping (topping: #quot;greenOlives#quot;)"]
+    n0 --> n1
+    n2["OR"]
+    n3["Has Crust (crust: #quot;thin#quot;, culture: #quot;#quot;, ignoreCase: true, trim: false)"]
+    n2 --> n3
+    n4["Has Crust (crust: #quot;stuffed#quot;, culture: #quot;#quot;, ignoreCase: false, trim: false)"]
+    n2 --> n4
+    n5["XOR"]
+    n6["Is Dine In"]
+    n5 --> n6
+    n7["Is Takeout"]
+    n5 --> n7
+    n2 --> n5
+    n0 --> n2
+```
+
+Rendering the same rule as a text tree:
+
+```csharp
+string tree = result.CompiledRule!.PrintPlainText();
+```
+
+```text
+AND
+├─ Has Topping (topping: "greenOlives")
+└─ OR
+   ├─ Has Crust (crust: "thin", culture: "", ignoreCase: true, trim: false)
+   ├─ Has Crust (crust: "stuffed", culture: "", ignoreCase: false, trim: false)
+   └─ XOR
+      ├─ Is Dine In
+      └─ Is Takeout
+```
+
+The second `hasCrust` term deliberately sets `ignoreCase: false` in the rule
+text itself, rather than leaving every optional argument at its default —
+`StringPredicates.EqualsConfigurable` (see [Predicate types](#predicate-types))
+declares four rule-text arguments (`crust`, `ignoreCase`, `culture`, `trim`),
+and this shows a rule actually setting more than one of them, not just the
+one required argument every other predicate in this example takes. Both
+diagrams show every term's rule-text argument values by default — the first
+`hasCrust` term's `ignoreCase`/`culture`/`trim` are filled in from their
+schema defaults even though its rule text never mentions them (ADR-0003's
+compiler behavior for optional arguments), which is also why the two
+`hasCrust` terms are visually distinct here, unlike a predicate label alone.
+Pass `showArgumentValues: false` to either `PrintMermaid`/`PrintPlainText`
+overload to render structure-only labels instead (see
+[Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram)).
 
 `RuleBuilder` is not a fourth parallel parser into the AST — every builder
 method renders to the exact same flat JSON tree shape [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)
@@ -922,16 +1026,16 @@ for the full API.
 
 ### 7. Matching against a constant, or any of several constants
 
-"Has at least one training course of either A, B, or C" — two ways to write
-this, depending on whether the set of alternatives already has a predicate
-per value or not.
+"Has at least one topping of either pepperoni, mushroom, or green olives" —
+two ways to write this, depending on whether the set of alternatives already
+has a predicate per value or not.
 
 **If a single-value predicate already exists** (e.g. [Example 3](#3-named-arguments)'s
-`hasTraining(training: "Q")`), just `OR` it together per alternative — no
-new predicate needed:
+`hasTopping(topping: "greenOlives")`), just `OR` it together per
+alternative — no new predicate needed:
 
 ```text
-hasTraining(training: "A") OR hasTraining(training: "B") OR hasTraining(training: "C")
+hasTopping(topping: "pepperoni") OR hasTopping(topping: "mushroom") OR hasTopping(topping: "greenOlives")
 ```
 
 Each call is a distinct term (and a distinct memoization unit), so this
@@ -945,25 +1049,25 @@ and the alternatives are rule-authored data rather than repeated rule
 structure:
 
 ```csharp
-public sealed class HasAnyTrainingCourse : IPredicate<User>
+public sealed class HasAnyTopping : IPredicate<Customer>
 {
     public static PredicateSchema Schema =>
         new(
-            "hasAnyTrainingCourse",
-            "Has Any Training Course",
-            "Has the current user completed at least one of the given training courses?",
+            "hasAnyTopping",
+            "Has Any Topping",
+            "Does the order include at least one of the given toppings?",
             [
                 new PredicateArgumentSchema(
-                    "courses",
-                    "The training course codes to check for (any match).",
+                    "toppings",
+                    "The toppings to check for (any match).",
                     LiteralKind.StringArray
                 ),
             ]);
 
-    public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct)
+    public ValueTask<bool> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct)
     {
-        IReadOnlyList<string> courses = args.GetStringArray("courses");
-        bool result = courses.Any(course => user.Training.Any(t => string.Equals(t, course, StringComparison.Ordinal)));
+        IReadOnlyList<string> toppings = args.GetStringArray("toppings");
+        bool result = toppings.Any(topping => customer.Toppings.Any(t => string.Equals(t, topping, StringComparison.Ordinal)));
         return ValueTask.FromResult(result);
     }
 }
@@ -972,25 +1076,26 @@ public sealed class HasAnyTrainingCourse : IPredicate<User>
 Used in a rule as:
 
 ```text
-hasAnyTrainingCourse(courses: ["A", "B", "C"])
+hasAnyTopping(toppings: ["pepperoni", "mushroom", "greenOlives"])
 ```
 
 **Case sensitivity is the predicate's own decision, not the engine's.** Term
 identity (which two term references count as "the same variable" for
-memoization) is always exact/case-sensitive — `"A"` and `"a"` are different
-arguments, full stop (see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
-But *what the predicate does* with the string it reads via `GetString`/
-`GetStringArray` is ordinary C#: the example above uses
-`StringComparison.Ordinal` (case-sensitive); switch that one argument to
+memoization) is always exact/case-sensitive — `"pepperoni"` and
+`"Pepperoni"` are different arguments, full stop (see
+[CONTEXT.md#term-identity](CONTEXT.md#term-identity)). But *what the
+predicate does* with the string it reads via `GetString`/`GetStringArray` is
+ordinary C#: the example above uses `StringComparison.Ordinal`
+(case-sensitive); switch that one argument to
 `StringComparison.OrdinalIgnoreCase` and the same predicate becomes
 case-insensitive, with no other change. If both variants are needed, they're
-two distinct predicates (e.g. `hasAnyTrainingCourse` vs.
-`hasAnyTrainingCourseIgnoreCase`) rather than a flag threaded through rule
-text, keeping each one's behavior fixed and inspectable from its name alone.
+two distinct predicates (e.g. `hasAnyTopping` vs. `hasAnyToppingIgnoreCase`)
+rather than a flag threaded through rule text, keeping each one's behavior
+fixed and inspectable from its name alone.
 
 The same shape works for "equals one specific constant" too — just compare
 against a single value instead of checking array membership (e.g.
-`args.GetGuid("id") == expectedId`, or the `hasRole`/`hasId`-style
+`args.GetGuid("id") == expectedId`, or the `hasTopping`/`hasFlavor`-style
 single-argument predicates already shown). Whether the constant(s) come
 from a `LiteralKind.String`, `Int64`, `Decimal`, `Boolean`, `DateTimeOffset`,
 or `Guid` argument (scalar or array) is purely a schema choice — the
@@ -1003,25 +1108,25 @@ again, just with `Regex.IsMatch` instead of set membership — the pattern
 itself is a rule-authored `string` argument, not a special literal kind:
 
 ```csharp
-public sealed class HasTrainingCourseMatching : IPredicate<User>
+public sealed class HasToppingMatching : IPredicate<Customer>
 {
     public static PredicateSchema Schema =>
         new(
-            "hasTrainingCourseMatching",
-            "Has Training Course Matching",
-            "Has the current user completed a training course whose code matches the given regular expression?",
-            [new PredicateArgumentSchema("pattern", "The regular expression to match a course code against.", LiteralKind.String)]);
+            "hasToppingMatching",
+            "Has Topping Matching",
+            "Does the order include a topping whose code matches the given regular expression?",
+            [new PredicateArgumentSchema("pattern", "The regular expression to match a topping code against.", LiteralKind.String)]);
 
-    public ValueTask<bool> EvaluateAsync(User user, PredicateArguments args, CancellationToken ct)
+    public ValueTask<bool> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct)
     {
         Regex pattern = new(args.GetString("pattern"), RegexOptions.None, TimeSpan.FromMilliseconds(100));
-        return ValueTask.FromResult(user.Training.Any(pattern.IsMatch));
+        return ValueTask.FromResult(customer.Toppings.Any(pattern.IsMatch));
     }
 }
 ```
 
-Used in a rule as `hasTrainingCourseMatching(pattern: "^SEC-\\d{3}$")` — "any
-training course code of the form `SEC-123`." Pass `RegexOptions.IgnoreCase`
+Used in a rule as `hasToppingMatching(pattern: "^EXTRA-.+$")` — "any
+topping code of the form `EXTRA-CHEESE`." Pass `RegexOptions.IgnoreCase`
 instead of `RegexOptions.None` for a case-insensitive match, same as the
 `StringComparison` choice above. The explicit timeout matters here more than
 in the other examples: unlike a fixed-set comparison, a pattern is
@@ -1052,7 +1157,7 @@ if (!decision.IsSatisfied && decision.Faults.Count > 0)
 
     foreach (Fault fault in decision.Faults)
     {
-        // "hasRole" -> "has role"
+        // "hasTopping" -> "has topping"
         Console.WriteLine($"  - {fault.Term.PredicateName.Humanize()}: {fault.Exception.Message}");
     }
 }
@@ -1067,12 +1172,12 @@ printing from one and compiling from the other — nothing about the compiled
 tree itself is format-specific:
 
 ```csharp
-CompiledRule<User> rule = compiler.Compile(dslText).CompiledRule!;
+CompiledRule<PizzaOrder> rule = compiler.Compile(dslText).CompiledRule!;
 
 string json = rule.PrintJson();                       // DSL -> JSON
 string yaml = rule.PrintYaml();                        // DSL -> YAML (TruthWeaver.Yaml)
 
-CompiledRule<User> fromJson = compiler.CompileJson(json).CompiledRule!;
+CompiledRule<PizzaOrder> fromJson = compiler.CompileJson(json).CompiledRule!;
 string backToDsl = fromJson.CanonicalText;              // JSON -> DSL
 
 // backToDsl == rule.CanonicalText always: parse(print(x)) is structurally
@@ -1120,13 +1225,13 @@ useful for a rule-authoring UI or a generated "what does this rule mean"
 report, without needing access to the closed-set AST types themselves:
 
 ```csharp
-CompiledRule<User> rule = compiler.Compile("isManager AND hasRole(role: \"Y\")").CompiledRule!;
+CompiledRule<Customer> rule = compiler.Compile("lovesPineapple AND hasTopping(topping: \"greenOlives\")").CompiledRule!;
 
 RuleDescription description = rule.Describe();
 // description.Label       == "AND"
 // description.Description == "True iff every operand is true. Short-circuits at the first False."
-// description.Operands[0].Label == "Is Manager"   (from IsManager's PredicateSchema.Label)
-// description.Operands[1].Label == "Has Role"     (from hasRole's PredicateSchema.Label)
+// description.Operands[0].Label == "Loves Pineapple"   (from LovesPineapple's PredicateSchema.Label)
+// description.Operands[1].Label == "Has Topping"       (from hasTopping's PredicateSchema.Label)
 ```
 
 A simple recursive print, for the shape of a "what does this rule mean"
@@ -1146,26 +1251,43 @@ void Print(RuleDescription node, int depth = 0)
 ### Rendering a rule as a diagram
 
 `RuleDescription` also feeds
-[`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs),
-which renders it as a Mermaid `flowchart`, either structure only or colored
-by one evaluation's result and short-circuit path:
+[`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs) and
+[`PlainTextTreePrinter`](src/TruthWeaver/Printing/PlainTextTreePrinter.cs),
+which render it as a Mermaid `flowchart` or an indented ASCII tree
+respectively — either structure only, or colored/annotated by one
+evaluation's result and short-circuit path:
 
 ```csharp
-CompiledRule<User> rule = compiler.Compile("isManager AND hasRole(role: \"Y\")").CompiledRule!;
+CompiledRule<Customer> rule = compiler.Compile("lovesPineapple AND hasTopping(topping: \"greenOlives\")").CompiledRule!;
 RuleDescription description = rule.Describe();
 
 // Structure only:
 string mermaid = MermaidTreePrinter.Print(description);
+string plainText = PlainTextTreePrinter.Print(description);
 
-// Colored by one evaluation (green = contributed True, red = contributed False, gray = short-circuited):
-Decision decision = await rule.EvaluateAsync(user, serviceProvider, cancellationToken: ct);
+// Colored/annotated by one evaluation (Mermaid: green = contributed True, red = contributed False,
+// gray = short-circuited; plain text: a "[true]"/"[false]"/"[skipped]" suffix per node):
+Decision decision = await rule.EvaluateAsync(customer, serviceProvider, cancellationToken: ct);
 string coloredMermaid = MermaidTreePrinter.Print(description, decision.EvaluatedTree);
+string annotatedText = PlainTextTreePrinter.Print(description, decision.EvaluatedTree);
 ```
 
-The result is plain Mermaid text — paste it into any Mermaid renderer, or
-hand it to a UI that already embeds one, to see the rule's structure (and
-optionally, why one particular evaluation came out the way it did) as a
-diagram instead of a nested expression.
+`MermaidTreePrinter`'s result is plain Mermaid text — paste it into any
+Mermaid renderer, or hand it to a UI that already embeds one, to see the
+rule's structure (and optionally, why one particular evaluation came out the
+way it did) as a diagram instead of a nested expression. Its output always
+includes a synthetic `Start` node pointing at the root, so the diagram shows
+where evaluation begins without the reader having to infer it from "the node
+with no incoming edge." `PlainTextTreePrinter`'s result needs no renderer at
+all — the same information as an indented tree, suitable for a log line or a
+terminal. Both printers include each term's rule-text argument values in its
+label by default (e.g. `Has Crust (crust: "thin")`) — pass
+`showArgumentValues: false` to either `Print` overload (or to
+`CompiledRule<TContext>`'s `PrintMermaid`/`PrintPlainText` below) for
+structure-only labels instead. `CompiledRule<TContext>` also exposes both
+directly as `PrintMermaid()`/`PrintMermaid(decision)` and
+`PrintPlainText()`/`PrintPlainText(decision)`, without a separate
+`Describe()` call.
 
 ## Evaluation flow
 
@@ -1295,7 +1417,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
 | Operator | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, the threshold family, and the `true`/`false` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
 | `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`TruthWeaver.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
-| Predicate | A registered, reusable implementation (e.g. `hasRole`, `isManager`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Label` and `Description`; see [Predicate types](#predicate-types). |
+| Predicate | A registered, reusable implementation (e.g. `hasTopping`, `lovesPineapple`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Label` and `Description`; see [Predicate types](#predicate-types). |
 | `PredicateArguments` | The non-generic accessor (`GetString`, `GetInt64`, ...) a predicate uses to read its own term's arguments inside `EvaluateAsync`. |
 | `PredicateRegistry<TContext>` | Where predicates are registered under a name, with their `PredicateSchema`. Built once via `PredicateRegistryBuilder<TContext>`; no attribute or assembly scanning. `TryGetSchema` looks one up by name. |
 | `PredicateSchema` | A predicate's registered name, a required read-only `Label` and `Description`, and its named-argument declarations (each also carrying a required `Description`), validated against a term's arguments at compile time. |
@@ -1304,7 +1426,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `RuleDiff` | Computes a structural diff between two compiled rules — which operator, term, or constant nodes were added, removed, or changed, located by operand-index path. See [Features](#features). |
 | Rule | A named unit of persistence: metadata plus one expression. What gets compiled into a `CompiledRule<TContext>`. |
 | Short-circuit | `AND` stops evaluating operands at the first `False`; `OR` stops at the first `True`. Skipped operands are recorded as `NotEvaluated` in the trace, not omitted. |
-| Term | A predicate bound to concrete, literal arguments (e.g. `hasRole(role: "Y")`) — the tree's leaf node, and the unit of memoization. |
+| Term | A predicate bound to concrete, literal arguments (e.g. `hasTopping(topping: "greenOlives")`) — the tree's leaf node, and the unit of memoization. |
 | Term identity | What makes two term references "the same variable": predicate name (normalized to registered casing) plus arguments sorted by name and compared by exact, case-sensitive value. Argument order in source text never matters; array-valued arguments are order-sensitive. |
 | `Trace` | An ordered, literal record of every node an evaluation visited or explicitly skipped — the "why was this denied" explanation. |
 | `TruthValue` | The three-valued result type: `True`, `False`, or `Unknown`. Never `bool?`. |

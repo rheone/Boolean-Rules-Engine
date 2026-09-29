@@ -1,5 +1,6 @@
 namespace TruthWeaver.Predicates.Tests;
 
+using System.Globalization;
 using TruthWeaver.Abstractions;
 
 public class StringPredicatesTests
@@ -206,8 +207,127 @@ public class StringPredicatesTests
         Assert.False(result);
     }
 
+    [Fact]
+    public async Task EqualsConfigurable_DefaultShapedArguments_IsCaseInsensitiveUnderInvariantCulture()
+    {
+        (PredicateSchema schema, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+            StringPredicates.EqualsConfigurable<TestContext>("equalsConfigurable", c => c.Value);
+
+        bool result = await evaluate(
+            new TestContext("Alice"),
+            ConfigurableArgs("ALICE", ignoreCase: true, culture: string.Empty, trim: false),
+            CancellationToken.None
+        );
+
+        Assert.True(result);
+        Assert.Equal("equalsConfigurable", schema.Name);
+    }
+
+    [Fact]
+    public async Task EqualsConfigurable_IgnoreCaseFalse_IsCaseSensitive()
+    {
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+            StringPredicates.EqualsConfigurable<TestContext>("equalsConfigurable", c => c.Value);
+
+        bool result = await evaluate(
+            new TestContext("Alice"),
+            ConfigurableArgs("ALICE", ignoreCase: false, culture: string.Empty, trim: false),
+            CancellationToken.None
+        );
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task EqualsConfigurable_TurkishCulture_TurkishIProblemMakesCaseInsensitiveCompareNonMatching()
+    {
+        // The classic "Turkish I problem": under tr-TR, lowercase "i" does not case-fold to "I" the way
+        // it does under InvariantCulture, so this same ignoreCase comparison disagrees by culture.
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+            StringPredicates.EqualsConfigurable<TestContext>("equalsConfigurable", c => c.Value);
+
+        bool invariantResult = await evaluate(
+            new TestContext("i"),
+            ConfigurableArgs("I", ignoreCase: true, culture: string.Empty, trim: false),
+            CancellationToken.None
+        );
+        bool turkishResult = await evaluate(
+            new TestContext("i"),
+            ConfigurableArgs("I", ignoreCase: true, culture: "tr-TR", trim: false),
+            CancellationToken.None
+        );
+
+        Assert.True(invariantResult);
+        Assert.False(turkishResult);
+    }
+
+    [Fact]
+    public async Task EqualsConfigurable_TrimTrue_IgnoresLeadingAndTrailingWhitespace()
+    {
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+            StringPredicates.EqualsConfigurable<TestContext>("equalsConfigurable", c => c.Value);
+
+        bool trimmedResult = await evaluate(
+            new TestContext(" Alice "),
+            ConfigurableArgs("Alice", ignoreCase: false, culture: string.Empty, trim: true),
+            CancellationToken.None
+        );
+        bool untrimmedResult = await evaluate(
+            new TestContext(" Alice "),
+            ConfigurableArgs("Alice", ignoreCase: false, culture: string.Empty, trim: false),
+            CancellationToken.None
+        );
+
+        Assert.True(trimmedResult);
+        Assert.False(untrimmedResult);
+    }
+
+    [Fact]
+    public async Task EqualsConfigurable_NullSelectedValue_ReturnsFalse()
+    {
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+            StringPredicates.EqualsConfigurable<TestContext>("equalsConfigurable", c => c.Value);
+
+        bool result = await evaluate(
+            new TestContext(null),
+            ConfigurableArgs("Alice", ignoreCase: true, culture: string.Empty, trim: false),
+            CancellationToken.None
+        );
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public Task EqualsConfigurable_InvalidCultureName_ThrowsAtEvaluationTime()
+    {
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+            StringPredicates.EqualsConfigurable<TestContext>("equalsConfigurable", c => c.Value);
+
+        return Assert.ThrowsAsync<CultureNotFoundException>(() =>
+            evaluate(
+                    new TestContext("Alice"),
+                    ConfigurableArgs("Alice", ignoreCase: true, culture: "not!a!culture", trim: false),
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+    }
+
     private static PredicateArguments Args(string name, string value)
     {
         return new PredicateArguments(new Dictionary<string, LiteralValue> { [name] = LiteralValue.OfString(value) });
+    }
+
+    private static PredicateArguments ConfigurableArgs(string value, bool ignoreCase, string culture, bool trim)
+    {
+        return new PredicateArguments(
+            new Dictionary<string, LiteralValue>
+            {
+                ["value"] = LiteralValue.OfString(value),
+                ["ignoreCase"] = LiteralValue.OfBoolean(ignoreCase),
+                ["culture"] = LiteralValue.OfString(culture),
+                ["trim"] = LiteralValue.OfBoolean(trim),
+            }
+        );
     }
 }
