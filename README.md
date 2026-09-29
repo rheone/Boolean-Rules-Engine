@@ -826,7 +826,7 @@ when both are reviewers or neither is, false when exactly one is.
 Rule text (the canonical, persisted form):
 
 ```text
-hasTopping(topping: "greenOlives") AND (hasCrust(crust: "thin") OR hasCrust(crust: "stuffed") OR (isDineIn XOR isTakeout))
+hasTopping(topping: "greenOlives") AND (hasCrust(crust: "thin") OR hasCrust(crust: "stuffed", ignoreCase: false) OR (isDineIn XOR isTakeout))
 ```
 
 The same rule as JSON:
@@ -840,7 +840,7 @@ The same rule as JSON:
       "op": "or",
       "operands": [
         { "predicate": "hasCrust", "args": { "crust": "thin" } },
-        { "predicate": "hasCrust", "args": { "crust": "stuffed" } },
+        { "predicate": "hasCrust", "args": { "crust": "stuffed", "ignoreCase": false } },
         {
           "op": "xor",
           "operands": [
@@ -870,6 +870,7 @@ operands:
       - predicate: hasCrust
         args:
           crust: "stuffed"
+          ignoreCase: false
       - op: xor
         operands:
           - predicate: isDineIn
@@ -948,7 +949,7 @@ RuleBuilder rule = RuleBuilder.And(
     RuleBuilder.Predicate("hasTopping", ("topping", "greenOlives")),
     RuleBuilder.Or(
         RuleBuilder.Predicate("hasCrust", ("crust", "thin")),
-        RuleBuilder.Predicate("hasCrust", ("crust", "stuffed")),
+        RuleBuilder.Predicate("hasCrust", ("crust", "stuffed"), ("ignoreCase", false)),
         RuleBuilder.Xor(RuleBuilder.Predicate("isDineIn"), RuleBuilder.Predicate("isTakeout"))));
 
 CompilationResult<PizzaOrder> result = rule.Compile(compiler);
@@ -969,7 +970,7 @@ flowchart TD
     n2["OR"]
     n3["Has Crust (crust: #quot;thin#quot;, culture: #quot;#quot;, ignoreCase: true, trim: false)"]
     n2 --> n3
-    n4["Has Crust (crust: #quot;stuffed#quot;, culture: #quot;#quot;, ignoreCase: true, trim: false)"]
+    n4["Has Crust (crust: #quot;stuffed#quot;, culture: #quot;#quot;, ignoreCase: false, trim: false)"]
     n2 --> n4
     n5["XOR"]
     n6["Is Dine In"]
@@ -991,20 +992,26 @@ AND
 ├─ Has Topping (topping: "greenOlives")
 └─ OR
    ├─ Has Crust (crust: "thin", culture: "", ignoreCase: true, trim: false)
-   ├─ Has Crust (crust: "stuffed", culture: "", ignoreCase: true, trim: false)
+   ├─ Has Crust (crust: "stuffed", culture: "", ignoreCase: false, trim: false)
    └─ XOR
       ├─ Is Dine In
       └─ Is Takeout
 ```
 
-Both diagrams show every term's rule-text argument values by default —
-including `hasCrust`'s `ignoreCase`/`culture`/`trim` arguments, filled in
-from their schema defaults even though the DSL text above never mentions
-them (ADR-0003's compiler behavior for optional arguments) — which is also
-why the two `hasCrust` terms are now visually distinct by their `crust`
-value, unlike a predicate label alone. Pass `showArgumentValues: false` to
-either `PrintMermaid`/`PrintPlainText` overload to render structure-only
-labels instead (see [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram)).
+The second `hasCrust` term deliberately sets `ignoreCase: false` in the rule
+text itself, rather than leaving every optional argument at its default —
+`StringPredicates.EqualsConfigurable` (see [Predicate types](#predicate-types))
+declares four rule-text arguments (`crust`, `ignoreCase`, `culture`, `trim`),
+and this shows a rule actually setting more than one of them, not just the
+one required argument every other predicate in this example takes. Both
+diagrams show every term's rule-text argument values by default — the first
+`hasCrust` term's `ignoreCase`/`culture`/`trim` are filled in from their
+schema defaults even though its rule text never mentions them (ADR-0003's
+compiler behavior for optional arguments), which is also why the two
+`hasCrust` terms are visually distinct here, unlike a predicate label alone.
+Pass `showArgumentValues: false` to either `PrintMermaid`/`PrintPlainText`
+overload to render structure-only labels instead (see
+[Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram)).
 
 `RuleBuilder` is not a fourth parallel parser into the AST — every builder
 method renders to the exact same flat JSON tree shape [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)
