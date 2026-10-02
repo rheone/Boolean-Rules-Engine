@@ -25,16 +25,43 @@
     <Project Name="TruthWeaver.Benchmarks" Configuration="Debug|AnyCPU" Build="true" />
     <Project Name="TruthWeaver.Benchmarks" Configuration="Release|AnyCPU" Build="true" />
   </Solution>
-  <Project Path="src\TruthWeaver.Abstractions\TruthWeaver.Abstractions.csproj" />
-  <Project Path="src\TruthWeaver\TruthWeaver.csproj" />
-  <Project Path="src\TruthWeaver.Yaml\TruthWeaver.Yaml.csproj" />
-  <Project Path="src\TruthWeaver.Predicates\TruthWeaver.Predicates.csproj" />
-  <Project Path="src\TruthWeaver.Testing\TruthWeaver.Testing.csproj" />
-  <Project Path="tests\TruthWeaver.Tests\TruthWeaver.Tests.csproj" />
-  <Project Path="tests\TruthWeaver.Predicates.Tests\TruthWeaver.Predicates.Tests.csproj" />
-  <Project Path="tests\TruthWeaver.Testing.Tests\TruthWeaver.Testing.Tests.csproj" />
-  <Project Path="tests\TruthWeaver.Abstractions.Tests\TruthWeaver.Abstractions.Tests.csproj" />
-  <Project Path="tests\TruthWeaver.Yaml.Tests\TruthWeaver.Yaml.Tests.csproj" />
-  <Project Path="tests\TruthWeaver.Architecture.Tests\TruthWeaver.Architecture.Tests.csproj" />
-  <Project Path="benchmarks\TruthWeaver.Benchmarks\TruthWeaver.Benchmarks.csproj" />
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks\TruthWeaver.Benchmarks\TruthWeaver.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src\TruthWeaver.Abstractions\TruthWeaver.Abstractions.csproj" />
+    <Project Path="src\TruthWeaver.Predicates\TruthWeaver.Predicates.csproj" />
+    <Project Path="src\TruthWeaver.Testing\TruthWeaver.Testing.csproj" />
+    <Project Path="src\TruthWeaver.Yaml\TruthWeaver.Yaml.csproj" />
+    <Project Path="src\TruthWeaver\TruthWeaver.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests\TruthWeaver.Abstractions.Tests\TruthWeaver.Abstractions.Tests.csproj" />
+    <Project Path="tests\TruthWeaver.Architecture.Tests\TruthWeaver.Architecture.Tests.csproj" />
+    <Project Path="tests\TruthWeaver.Predicates.Tests\TruthWeaver.Predicates.Tests.csproj" />
+    <Project Path="tests\TruthWeaver.Testing.Tests\TruthWeaver.Testing.Tests.csproj" />
+    <Project Path="tests\TruthWeaver.Tests\TruthWeaver.Tests.csproj" />
+    <Project Path="tests\TruthWeaver.Yaml.Tests\TruthWeaver.Yaml.Tests.csproj" />
+  </Folder>
+  <Folder Name="/_project/">
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/_project/build/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="dotnet-tools.json" />
+    <File Path="global.json" />
+    <File Path="NuGet.config" />
+  </Folder>
+  <Folder Name="/_project/git/">
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+  </Folder>
+  <Folder Name="/_project/quality/">
+    <File Path=".csharpierrc.json" />
+    <File Path=".editorconfig" />
+    <File Path="stylecop.json" />
+  </Folder>
 </Solution>
