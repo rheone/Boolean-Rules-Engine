@@ -57,6 +57,9 @@ Desktop.ini
 *.swp
 *.bak
 *.orig
+.tmp
 
 # Local Skills
 .claude/skills/
+
+

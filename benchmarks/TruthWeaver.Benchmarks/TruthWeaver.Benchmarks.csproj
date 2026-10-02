@@ -4,7 +4,7 @@
     <RootNamespace>TruthWeaver.Benchmarks</RootNamespace>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Not a shipping library: never packed, never a NuGet dependency of anything. -->
     <Description>
       BenchmarkDotNet suite measuring RuleCompiler compile-time cost (including BDD tautology/contradiction

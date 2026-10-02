@@ -1,5 +1,7 @@
 namespace TruthWeaver.Abstractions;
 
+// TODO Predicates should repect pure K3 and reuturn one of a Truthy, Falsey, or Unknown value rather than a boolean
+
 /// <summary>
 /// A registered, reusable boolean condition over an application-supplied context — the function a
 /// rule's terms bind arguments to and call (CONTEXT.md). Implementations should be stateless; any

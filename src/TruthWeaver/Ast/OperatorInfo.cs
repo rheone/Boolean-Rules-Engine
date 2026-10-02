@@ -9,6 +9,8 @@ namespace TruthWeaver.Ast;
 /// </summary>
 public static class OperatorInfo
 {
+    // TODO operator descriptions should be enriched with context, not be a static value unless a static value is actually called for
+
     /// <summary>Gets the label and description for an operator node.</summary>
     /// <param name="node">The expression node.</param>
     /// <returns>The operator's label and description.</returns>
@@ -17,9 +19,10 @@ public static class OperatorInfo
     {
         if (node is ConstantExpression c)
         {
+            // TODO? Add "Unknown" to possible values / descriptor
             return c.Value
-                ? new OperatorDescriptor("True", "A fixed truth value.")
-                : new OperatorDescriptor("False", "A fixed truth value.");
+                ? new OperatorDescriptor("True", "A fixed True value.")
+                : new OperatorDescriptor("False", "A fixed False value.");
         }
 
         if (node is TermExpression)
@@ -34,6 +37,8 @@ public static class OperatorInfo
         NodeShape shape = ExpressionShape.Of(node);
         return shape.OpName switch
         {
+            // TODO add all operators
+
             "Not" => new OperatorDescriptor("NOT", "Logical negation. Unknown stays Unknown."),
             "And" => new OperatorDescriptor("AND", "True iff every operand is true. Short-circuits at the first False."),
             "Or" => new OperatorDescriptor("OR", "True iff at least one operand is true. Short-circuits at the first True."),

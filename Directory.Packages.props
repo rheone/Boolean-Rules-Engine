@@ -17,7 +17,7 @@
   </ItemGroup>
   <!-- SonarAnalyzer -->
   <ItemGroup>
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.34.0.3385" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
   </ItemGroup>
   <!-- Async/await usage analyzers -->
   <ItemGroup>
@@ -51,7 +51,7 @@
          UseMicrosoftTestingPlatformRunner test host below cannot load), is the native
          Microsoft.Testing.Platform coverage extension; run via the "coverlet" CLI flag
          documented at https://github.com/coverlet-coverage/coverlet. -->
-    <PackageVersion Include="coverlet.MTP" Version="10.0.1" />
+    <PackageVersion Include="coverlet.MTP" Version="10.1.0" />
   </ItemGroup>
   <!-- NSubstitute -->
   <ItemGroup>
@@ -88,6 +88,6 @@
        throwaway console app that measures RuleCompiler/CompiledRule performance from outside the
        library. -->
   <ItemGroup>
-    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.16.0-preview.2" />
   </ItemGroup>
 </Project>
