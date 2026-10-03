@@ -40,7 +40,7 @@ public sealed class DelimiterRenderingTests
     {
         CompiledRule<RuleTestContext> rule = Compile("a AND [b OR {c AND d}]");
 
-        Assert.Equal(rule.CanonicalText, rule.PrintText(GroupingStyle.Parentheses));
+        Assert.Equal(rule.CanonicalText, rule.PrintRuleText(GroupingStyle.Parentheses));
     }
 
     /// <summary>Depth cycling uses ( at depth 0, [ at depth 1, { at depth 2, then repeats.</summary>
@@ -49,7 +49,7 @@ public sealed class DelimiterRenderingTests
     {
         CompiledRule<RuleTestContext> rule = Compile("a AND (b OR (c AND (d OR (e AND (f OR g)))))");
 
-        string text = rule.PrintText(GroupingStyle.DepthCycling);
+        string text = rule.PrintRuleText(GroupingStyle.DepthCycling);
 
         Assert.Equal("a AND (b OR [c AND {d OR (e AND [f OR g])}])", text);
     }
@@ -60,7 +60,7 @@ public sealed class DelimiterRenderingTests
     {
         CompiledRule<RuleTestContext> rule = Compile("ANY(a AND (b OR c), d XOR (e AND (f OR g)))");
 
-        string text = rule.PrintText(GroupingStyle.DepthCycling);
+        string text = rule.PrintRuleText(GroupingStyle.DepthCycling);
 
         Assert.Equal("ANY(a AND (b OR c), (d XOR [e AND {f OR g}]))", text);
     }
@@ -76,7 +76,7 @@ public sealed class DelimiterRenderingTests
     {
         CompiledRule<RuleTestContext> rule = Compile(text);
 
-        CompiledRule<RuleTestContext> reparsed = Compile(rule.PrintText(GroupingStyle.DepthCycling));
+        CompiledRule<RuleTestContext> reparsed = Compile(rule.PrintRuleText(GroupingStyle.DepthCycling));
 
         Assert.Equal(rule.Root, reparsed.Root);
         Assert.Equal(rule.CanonicalText, reparsed.CanonicalText);
@@ -88,7 +88,7 @@ public sealed class DelimiterRenderingTests
     {
         CompiledRule<RuleTestContext> rule = Compile("a AND b AND NOT c");
 
-        Assert.Equal(rule.CanonicalText, rule.PrintText(GroupingStyle.DepthCycling));
+        Assert.Equal(rule.CanonicalText, rule.PrintRuleText(GroupingStyle.DepthCycling));
     }
 
     private static CompiledRule<RuleTestContext> Compile(string text)

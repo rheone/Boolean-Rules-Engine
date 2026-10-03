@@ -19,7 +19,7 @@ public static class DiagnosticCodes
     public const string UnknownArgument = "BRE0005";
 
     /// <summary><c>XOR</c>, <c>EQUIVALENT</c> (<c>XNOR</c>), <c>IMPLIES</c>, <c>NAND</c> or <c>NOR</c> was given other than exactly two operands.</summary>
-    public const string XorArityViolation = "BRE0006";
+    public const string InfixArityViolation = "BRE0006";
 
     /// <summary>
     /// An infix operator other than <c>NOT</c>/<c>AND</c>/<c>OR</c> (<c>XOR</c>, <c>XNOR</c>, ...) was combined

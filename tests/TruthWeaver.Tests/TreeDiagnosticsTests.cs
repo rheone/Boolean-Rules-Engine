@@ -78,7 +78,7 @@ public sealed class TreeDiagnosticsTests
             """{"op":"and","operands":[{"const":true},{"op":"xor","operands":[{"const":true},{"const":false},{"const":true}]}]}"""
         );
 
-        Assert.Equal(DiagnosticCodes.XorArityViolation, diagnostic.Code);
+        Assert.Equal(DiagnosticCodes.InfixArityViolation, diagnostic.Code);
         Assert.Equal("$.operands[1].operands", diagnostic.Path);
         Assert.Equal("2 operands", diagnostic.Expected);
         Assert.Equal("3 operands", diagnostic.Found);
@@ -331,7 +331,7 @@ public sealed class TreeDiagnosticsTests
     {
         Diagnostic diagnostic = SingleYaml("op: xor\noperands:\n  - const: true\n  - const: false\n  - const: true");
 
-        Assert.Equal(DiagnosticCodes.XorArityViolation, diagnostic.Code);
+        Assert.Equal(DiagnosticCodes.InfixArityViolation, diagnostic.Code);
         Assert.Equal("$.operands", diagnostic.Path);
         Assert.Equal("2 operands", diagnostic.Expected);
         Assert.Equal("3 operands", diagnostic.Found);

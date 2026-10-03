@@ -65,7 +65,7 @@ the aliases are cheap once the canonical form stays single.
 ## Amendments (2026-10-02 grilling, round 2)
 
 7. **`XOR` with more than two operands remains a compile error**
-   (`XorArityViolation`); the diagnostic message hints at `NXOR` for parity.
+   (`InfixArityViolation`); the diagnostic message hints at `NXOR` for parity.
 8. **Precedence.** `NOT` > `AND` > `OR` is unchanged. Every other infix
    operator (`XOR`, `EQUIVALENT`, `NAND`, `NOR`, `IMPLIES`, `??`) must not be
    mixed with another infix operator at the same nesting level without
@@ -83,7 +83,7 @@ the aliases are cheap once the canonical form stays single.
    close '(' at offset 4 but found ']'."), end of input is reported at the
    opener ("Unclosed '(' ..."), and a closer with nothing open is reported as
    "Unexpected closing ..." at the closer.
-   Implemented (k3-conformance 21): `CompiledRule.PrintText(GroupingStyle)`
+   Implemented (k3-conformance 21): `CompiledRule.PrintRuleText(GroupingStyle)`
    with `GroupingStyle.Parentheses` (identical to `CanonicalText`, the default
    and persisted form) and `GroupingStyle.DepthCycling`. The cycle is by group
    depth: outermost group `(`, then `[`, then `{`, then repeating (the
@@ -216,7 +216,7 @@ the aliases are cheap once the canonical form stays single.
     optimal-string-alignment distance (case-insensitive, cut-off 1/2/3 edits for
     words of up to 4/8/more characters, ties to the ordinally first candidate)
     over the DSL vocabulary and the registry's predicate names. The shared
-    `XorArityViolation` code (`BRE0006`) is kept for the five binary operators;
+    `InfixArityViolation` code (`BRE0006`) is kept for the five binary operators;
     its `Expected`/`Found` carry the operand counts and the `Suggestion` names
     `NXOR`/`ExactlyOne` for `XOR` and nesting for the others. The
     no-mixing "add parentheses" advice is now also a `Hint` suggestion that
@@ -299,7 +299,7 @@ the aliases are cheap once the canonical form stays single.
     number of `True` operands; evaluation folds binary XOR and the analyzer rail
     is the same fold of the XOR rail. The canonical printer writes
     `NXOR(a, b, ...)`; every tree-printer style keeps the word (no symbol or
-    C-family spelling). The `XOR` arity message (still `XorArityViolation`) now
+    C-family spelling). The `XOR` arity message (still `InfixArityViolation`) now
     names `NXOR` and `ExactlyOne`. `ExactlyOne` is unchanged and differs from
     `NXOR` from three operands on. `rule-tree.schema.json` lists `nxor`.
     `RuleBuilder.Nxor` is new.

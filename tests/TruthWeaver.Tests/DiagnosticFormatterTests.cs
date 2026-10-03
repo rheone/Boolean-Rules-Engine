@@ -52,7 +52,7 @@ public sealed class DiagnosticFormatterTests
     public void Format_DiagnosticOnSecondLine_ShowsThatLineAndItsColumn_Test()
     {
         const string source = "a AND\n(b XOR b XOR a)";
-        Diagnostic diagnostic = Compiler.Compile(source).Diagnostics.Single(d => d.Code == DiagnosticCodes.XorArityViolation);
+        Diagnostic diagnostic = Compiler.Compile(source).Diagnostics.Single(d => d.Code == DiagnosticCodes.InfixArityViolation);
 
         string text = DiagnosticFormatter.Format(diagnostic, source);
 

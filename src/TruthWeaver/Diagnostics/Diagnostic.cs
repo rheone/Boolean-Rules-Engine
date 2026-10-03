@@ -14,7 +14,7 @@ public sealed record Diagnostic(string Code, DiagnosticSeverity Severity, string
 {
     /// <summary>
     /// Gets the location of the problem in a JSON or YAML rule as a path from the document root, such as
-    /// <c>$.operands[1].op</c>; <see langword="null"/> for DSL rule text, which is located by <see cref="Span"/>.
+    /// <c>$.operands[1].op</c> (an RFC 9535 JSONPath singular query; plain identifier keys use <c>.key</c>, other keys use <c>['key']</c>, array items use <c>[n]</c>); <see langword="null"/> for DSL rule text, which is located by <see cref="Span"/>.
     /// </summary>
     public string? Path { get; init; }
 

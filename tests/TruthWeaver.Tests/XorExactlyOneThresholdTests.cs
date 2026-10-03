@@ -76,7 +76,7 @@ public sealed class XorExactlyOneThresholdTests
         );
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.XorArityViolation);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.InfixArityViolation);
     }
 
     [Theory]

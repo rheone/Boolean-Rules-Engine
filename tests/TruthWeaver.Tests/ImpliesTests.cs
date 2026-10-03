@@ -103,7 +103,7 @@ public sealed class ImpliesTests
 
         Assert.False(result.Succeeded);
         Diagnostic diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticCodes.XorArityViolation, diagnostic.Code);
+        Assert.Equal(DiagnosticCodes.InfixArityViolation, diagnostic.Code);
         Assert.Contains("IMPLIES is binary", diagnostic.Message, StringComparison.Ordinal);
         Assert.Contains("parentheses", diagnostic.Message, StringComparison.Ordinal);
     }
@@ -165,7 +165,7 @@ public sealed class ImpliesTests
         CompilationResult<RuleTestContext> result = Compiler.CompileJson(json);
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.XorArityViolation);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.InfixArityViolation);
     }
 
     /// <summary>The builder produces the same rule as the DSL.</summary>

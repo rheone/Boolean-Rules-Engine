@@ -132,7 +132,7 @@ public sealed class NxorTests
 
         Assert.False(result.Succeeded);
         Diagnostic diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticCodes.XorArityViolation, diagnostic.Code);
+        Assert.Equal(DiagnosticCodes.InfixArityViolation, diagnostic.Code);
         Assert.Contains("NXOR", diagnostic.Message, StringComparison.Ordinal);
     }
 
@@ -154,7 +154,7 @@ public sealed class NxorTests
         CompilationResult<RuleTestContext> result = Compiler.CompileJson(Json);
 
         Diagnostic diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticCodes.XorArityViolation, diagnostic.Code);
+        Assert.Equal(DiagnosticCodes.InfixArityViolation, diagnostic.Code);
         Assert.Contains("NXOR", diagnostic.Message, StringComparison.Ordinal);
     }
 

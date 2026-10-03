@@ -381,7 +381,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 + "Use NXOR(...) for n-ary parity (an odd number of True operands) or ExactlyOne(...) for n-ary 'exactly one'.";
             this.diagnostics.Add(
                 Diagnostic.Error(
-                    DiagnosticCodes.XorArityViolation,
+                    DiagnosticCodes.InfixArityViolation,
                     message,
                     node.Span,
                     expected: "2 operands",
@@ -410,7 +410,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 + "Add parentheses (or nest EQUIVALENT nodes) to say how chained equivalences group.";
             this.diagnostics.Add(
                 Diagnostic.Error(
-                    DiagnosticCodes.XorArityViolation,
+                    DiagnosticCodes.InfixArityViolation,
                     message,
                     node.Span,
                     expected: "2 operands",
@@ -429,7 +429,7 @@ internal sealed class RuleNodeCompiler<TContext>
 
     /// <summary>
     /// Builds a strictly binary infix operator (<c>NAND</c>/<c>NOR</c>). Anything but two operands (a DSL chain or a
-    /// malformed JSON/YAML node) is an <see cref="DiagnosticCodes.XorArityViolation"/> with a parentheses hint.
+    /// malformed JSON/YAML node) is an <see cref="DiagnosticCodes.InfixArityViolation"/> with a parentheses hint.
     /// </summary>
     private Expression BuildNegatedBinary(
         IReadOnlyList<RuleNode> operands,
@@ -446,7 +446,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 + $"Add parentheses (or nest {name} nodes) to say how chained operations group.";
             this.diagnostics.Add(
                 Diagnostic.Error(
-                    DiagnosticCodes.XorArityViolation,
+                    DiagnosticCodes.InfixArityViolation,
                     message,
                     owner.Span,
                     expected: "2 operands",
@@ -472,7 +472,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 + "Add parentheses (or nest IMPLIES nodes) to say how chained implications group.";
             this.diagnostics.Add(
                 Diagnostic.Error(
-                    DiagnosticCodes.XorArityViolation,
+                    DiagnosticCodes.InfixArityViolation,
                     message,
                     node.Span,
                     expected: "2 operands",

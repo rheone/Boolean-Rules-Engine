@@ -130,7 +130,7 @@ public sealed class StructuredDiagnosticsTests
     {
         Diagnostic diagnostic = Single("a XOR b XOR c");
 
-        Assert.Equal(DiagnosticCodes.XorArityViolation, diagnostic.Code);
+        Assert.Equal(DiagnosticCodes.InfixArityViolation, diagnostic.Code);
         Assert.Equal("2 operands", diagnostic.Expected);
         Assert.Equal("3 operands", diagnostic.Found);
         Assert.Equal(DiagnosticSuggestionKind.Hint, diagnostic.Suggestion?.Kind);

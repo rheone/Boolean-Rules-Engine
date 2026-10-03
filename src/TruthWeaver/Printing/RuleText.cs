@@ -40,7 +40,7 @@ public static class RuleText
     /// Characters the DSL does not recognise are kept in place (as their own whitespace-separated pieces) instead of being
     /// dropped, so no input is lost; compiling the result reports them as it would the original. To also rewrite the
     /// delimiters or operators, compile the rule and print it with <c>CompiledRule.CanonicalText</c> or
-    /// <c>CompiledRule.PrintText</c>.
+    /// <c>CompiledRule.PrintRuleText</c>.
     /// </remarks>
     /// <param name="ruleText">The rule text. Need not compile.</param>
     /// <returns>The text with normalised whitespace; empty if <paramref name="ruleText"/> is empty or only whitespace.</returns>

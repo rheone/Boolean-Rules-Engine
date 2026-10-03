@@ -156,7 +156,7 @@ public sealed class NandNorTests
 
         Assert.False(result.Succeeded);
         Diagnostic diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticCodes.XorArityViolation, diagnostic.Code);
+        Assert.Equal(DiagnosticCodes.InfixArityViolation, diagnostic.Code);
         Assert.Contains(expected, diagnostic.Message, StringComparison.Ordinal);
         Assert.Contains("parentheses", diagnostic.Message, StringComparison.Ordinal);
     }
@@ -200,7 +200,7 @@ public sealed class NandNorTests
         CompilationResult<RuleTestContext> result = Compiler.CompileJson(json);
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.XorArityViolation);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.InfixArityViolation);
     }
 
     /// <summary>YAML uses the same node shape and round-trips.</summary>

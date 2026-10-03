@@ -500,14 +500,14 @@ Delimiter mistakes are `SyntaxError` diagnostics with the exact span:
 | Unclosed group | `a AND (b OR c` | `Unclosed '(' at offset 6: expected ')' before the end of the rule.` (the `(`) |
 | Closer with no opener | `a AND b)` | `Unexpected closing ')' with no matching opener.` (the `)`) |
 
-To print a rule with delimiters that vary by nesting depth, pass a `GroupingStyle` to `CompiledRule.PrintText`:
+To print a rule with delimiters that vary by nesting depth, pass a `GroupingStyle` to `CompiledRule.PrintRuleText`:
 
 ```csharp
 CompiledRule<MyContext> rule = compiler.Compile("a AND (b OR (c AND (d OR (e AND (f OR g)))))").CompiledRule!;
 
 rule.CanonicalText;                                  // a AND (b OR (c AND (d OR (e AND (f OR g)))))  (parentheses only)
-rule.PrintText(GroupingStyle.Parentheses);           // same as CanonicalText
-rule.PrintText(GroupingStyle.DepthCycling);          // a AND (b OR [c AND {d OR (e AND [f OR g])}])
+rule.PrintRuleText(GroupingStyle.Parentheses);           // same as CanonicalText
+rule.PrintRuleText(GroupingStyle.DepthCycling);          // a AND (b OR [c AND {d OR (e AND [f OR g])}])
 ```
 
 `DepthCycling` is opt-in and deterministic: the delimiter depends only on how many groups enclose it, cycling `(`,
@@ -536,7 +536,7 @@ Characters the DSL does not recognise are kept in place, so the text of a rule t
 | Arity | Operators | Notes |
 | --- | --- | --- |
 | **Unary** | `NOT`, `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown` | Take exactly one operand (`MalformedTree` otherwise). The four inspections are function calls (`IsUnknown(a)`). |
-| **Binary only** | `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR` | Always exactly two operands — a compile error otherwise (`XorArityViolation`). `XOR` with three or more operands is an error whose message points at `NXOR` (n-ary parity) and `ExactlyOne` (see [ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 7); a chain such as `a IMPLIES b IMPLIES c` or `a NAND b NAND c` is rejected too — parenthesize it. |
+| **Binary only** | `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR` | Always exactly two operands — a compile error otherwise (`InfixArityViolation`). `XOR` with three or more operands is an error whose message points at `NXOR` (n-ary parity) and `ExactlyOne` (see [ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 7); a chain such as `a IMPLIES b IMPLIES c` or `a NAND b NAND c` is rejected too — parenthesize it. |
 | **Unary with a policy** | `Project` | `Project(x, True)` / `Project(x, False)`: one operand expression plus the constant `True` or `False` that replaces `Unknown` (see below). The policy is part of the node, not an operand. |
 | **Ternary** | `If` | Takes exactly three operands, `[condition, whenTrue, whenFalse]` — `MalformedTree` otherwise. |
 | **N-ary (≥ 2)** | `AND`, `OR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `ExactlyOne`, `AtLeast`, `AtMost`, `GreaterThan`, `LessThan`, `Exactly` | Take two or more operands. `AND`/`OR` are commonly thought of as "binary" from C-family languages, but this engine treats them as flat n-ary chains (`AND(a, b, c)`, not `AND(AND(a, b), c)`). |
@@ -2024,7 +2024,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `a IMPLIES b` / `→` | Strong Kleene material implication, `NOT a OR b`; a first-class binary node that prints as written (`(a IMPLIES b)`). Mixing it with `AND`/`OR` or another infix operator without parentheses is a compile error. See [Operators](#operators). |
 | Inspection | `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`: operators that test the K3 state of their operand and always answer a definite `True`/`False`. |
 | Rewrite | An opt-in, value-preserving transform of a compiled rule returning a new rule: `ExpandToPrimitives`, `ExpandToNand`, `ExpandToNor`, `CompressToDerived`, `Canonicalize`, `Simplify`. See [Rewriting rules](#rewriting-rules). |
-| `GroupingStyle` / `RuleText` | `CompiledRule.PrintText(GroupingStyle)` prints with `()` only or depth-cycling `()` `[]` `{}`; `RuleText.NormalizeWhitespace` tidies rule text as written without compiling it. See [Grouping delimiters](#grouping-delimiters). |
+| `GroupingStyle` / `RuleText` | `CompiledRule.PrintRuleText(GroupingStyle)` prints with `()` only or depth-cycling `()` `[]` `{}`; `RuleText.NormalizeWhitespace` tidies rule text as written without compiling it. See [Grouping delimiters](#grouping-delimiters). |
 | Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
 | Operator | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `If`, `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`, `Project`, `ExactlyOne`, the threshold family, and the `True`/`False`/`Unknown` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |

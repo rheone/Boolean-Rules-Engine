@@ -65,7 +65,7 @@ public sealed class CompiledRule<TContext>
     /// </summary>
     /// <param name="grouping">The grouping delimiters to print with.</param>
     /// <returns>The DSL text.</returns>
-    public string PrintText(GroupingStyle grouping)
+    public string PrintRuleText(GroupingStyle grouping)
     {
         return grouping == GroupingStyle.Parentheses
             ? this.CanonicalText
