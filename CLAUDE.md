@@ -52,6 +52,7 @@ The k3-conformance effort (Strong K3 language surface, `.scratch/k3-conformance/
 - Prefer NSubstitute for test doubles.
 - Do not suppress analyzers merely to make a build pass.
 - Do not weaken analyzer severity without documenting why.
+- Exception, documented in `src/Directory.Build.props`: S1135 (a `TODO` comment) is a warning in CI, not a failure. Every other warning still fails a `CI=true` build.
 - Do not add preview language features merely because the SDK is an RC.
 
 ## Required validation
