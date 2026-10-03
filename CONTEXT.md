@@ -151,6 +151,8 @@ with an operator that would just be a synonym for one of these:
 | `GreaterThan(0, ...)` | `OR(...)` |
 | `LessThan(n, ...)`, where `n` is the operand count | `NOT(AND(...))` |
 
+> **Superseded in part by [ADR-0005](docs/adr/0005-strong-k3-language-surface.md):** `ANY`/`ALL`/`NONE`/`BETWEEN` become derived cardinality aliases, and `IMPLIES`/symbol aliases are accepted. The paragraph below is the pre-ADR-0005 rationale and is rewritten when ticket `k3-conformance/03` lands.
+
 There are no `All`/`None` operators. `All(...)` would just be `AND(...)`
 and `None(...)` would just be `NOT(OR(...))` (see `AtMost(0, ...)` above) —
 adding them would mean a second spelling for an existing operator with no

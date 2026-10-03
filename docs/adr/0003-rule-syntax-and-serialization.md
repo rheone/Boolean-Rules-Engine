@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Partly superseded by [ADR-0005](0005-strong-k3-language-surface.md): the operator set, the ban on `IMPLIES` and symbol aliases, binary-only `XOR`/`XNOR` naming, and "word operators only" no longer hold. All other decisions here stand.
 
 ## Context
 

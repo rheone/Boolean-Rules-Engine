@@ -1,0 +1,127 @@
+# ADR-0005: Strong K3 language surface
+
+## Status
+
+Accepted. Supersedes the operator-set, alias, `IMPLIES`, `XOR`/`XNOR`
+and "word operators only" decisions in
+[ADR-0003](0003-rule-syntax-and-serialization.md). Source requirements: `.scratch/2026-10-02-TODO.md`; planning
+spec: `.scratch/k3-conformance/spec.md`.
+
+## Context
+
+[ADR-0001](0001-kleene-failure-model.md) made Strong Kleene (K3) the engine's
+internal logic. ADR-0003 then deliberately kept the *authoring surface* small:
+no `IMPLIES`, no symbol aliases, binary-only `XOR`/`XNOR`, and `ExactlyOne` as
+the n-ary "exactly one" operator. The library is now being positioned as a
+general-purpose Strong K3 expression engine, and the reference specifications
+(`.tmp/`) define a complete K3 language: a primitive kernel, derived operators,
+cardinality aliases, K3 value operations (`COALESCE`, `If`), inspection and
+boundary functions, and alternate notations. The reasons ADR-0003 declined
+those conveniences (two spellings, rule authors getting truth tables wrong)
+are outweighed by the goal of conforming to a published K3 operator set, and
+the aliases are cheap once the canonical form stays single.
+
+## Decision
+
+1. **Every expression, including every predicate result, is a `TruthValue`**
+   (`True`, `False`, `Unknown`). `Unknown` is never implicitly converted to
+   `True` or `False`; conversion to a two-valued result happens only at an
+   explicit boundary (`Project`, `Collapse`, or the `Decision` API).
+   `False < Unknown < True` is an implementation aid for truth functions and
+   cardinality bounds, not a numeric ordering of truth.
+2. **Operators are accepted in several notations but have one canonical form.**
+   Named operators are case-insensitive on input; canonical output is upper
+   camel/upper case (`AND`, `OR`, `AtLeast`). Symbol notation (`&&`, `||`,
+   `!`, and the logic symbols `∧ ∨ ¬ ⊕ → ↔`) is accepted on input and maps to
+   the canonical named operator. The canonical printer and persisted DSL text
+   remain word-only. `True`/`False`/`Unknown` literals are case-insensitive,
+   and `Unknown` becomes a valid literal.
+3. **Primitive kernel and derived operators.** Primitives: `NOT`, `AND`, `OR`,
+   `AtLeast`, `AtMost`, `Exactly`, `COALESCE`. Derived: `IMPLIES` (`¬A ∨ B`,
+   Strong Kleene material implication), `EQUIVALENT` (alias `IFF`), `XOR`,
+   `NAND`, `NOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`. Inspection: `IsTrue`,
+   `IsFalse`, `IsUnknown`, `IsKnown`. Conditional: `If` / `? :`. Boundaries:
+   `Project`, `Collapse`.
+3a. **Derived operators remain first-class AST nodes** with their own
+   evaluation, label/description and printing, rather than being desugared at
+   parse time. Their primitive definitions are used by the optional
+   expand-to-primitives transform, by the analyzer, and as the conformance
+   oracle in tests. This preserves the author's operator on round-trip.
+4. **XOR family.** `XOR(a, b)` is binary. `NXOR(a, b, ...)` is n-ary **parity**
+   (odd number of `True`); any `Unknown` operand yields `Unknown`
+   (`.tmp/xor.md`). `ExactlyOne` is retained and is a different operation
+   (exactly one `True`, evaluated with the cardinality interval semantics), as
+   is `Exactly(1, ...)`. ADR-0003's concern that n-ary XOR is ambiguous is
+   resolved by the distinct name `NXOR`.
+5. **`EQUIVALENT` replaces `XNOR` as the canonical biconditional.** `IFF` and
+   `XNOR` are accepted on input as aliases producing the same node. JSON/YAML
+   canonical op name is `equivalent`; `xnor` and `iff` are accepted on read.
+   Persisted rules written with `xnor` continue to compile.
+6. **Cardinality uses the `[definitely true, possibly true]` interval.**
+   `ANY` = `AtLeast(1, ...)`, `ALL` = `AtLeast(n, ...)`, `NONE` = `AtMost(0, ...)`,
+   `BETWEEN(min, max, ...)` = `AND(AtLeast(min, ...), AtMost(max, ...))`.
+   This supersedes CONTEXT.md's "there are no `All`/`None` operators".
+
+## Amendments (2026-10-02 grilling, round 2)
+
+7. **`XOR` with more than two operands remains a compile error**
+   (`XorArityViolation`); the diagnostic message hints at `NXOR` for parity.
+8. **Precedence.** `NOT` > `AND` > `OR` is unchanged. Every other infix
+   operator (`XOR`, `EQUIVALENT`, `NAND`, `NOR`, `IMPLIES`, `??`) must not be
+   mixed with another infix operator at the same nesting level without
+   parentheses (compile error, extending the existing `XOR`/`XNOR` rule).
+   Function-call forms (`NXOR(...)`, `ANY(...)`, `If(...)`) have no precedence.
+9. **Delimiters.** `()`, `[]`, `{}` are interchangeable grouping; the AST does
+   not retain which was written. Printing normalizes to parentheses by
+   default, with an optional deterministic depth-cycling renderer.
+10. **Expression mutation** (primitive/NAND/NOR expansion, compression,
+    simplification, canonicalization, whitespace normalization) all ship in
+    this effort. Every rewrite must be K3-sound, verified exhaustively against
+    the truth-table oracle; classical laws that fail in K3 (for example
+    `A OR NOT A = True`) are not applied.
+11. **Validation messages are structured**: code, message, span (or
+    JSON/YAML path), optional "did you mean" suggestion, and an
+    expected-vs-found pair, with a plain-text rendering.
+
+12. **`Project(expr, unknown)`** is an in-tree node that keeps `True`/`False`
+    and replaces `Unknown` with the chosen `True` or `False`
+    (`.tmp/ProjectAndCollapse.md`). It always yields a definite `TruthValue`
+    and equals `COALESCE(expr, unknown)`; it exists as a named alias for intent.
+13. **JSON/YAML node shapes** for `If`, inspection, boundaries and the
+    `Unknown` literal follow the existing `{"op": ..., "operands": [...]}`
+    pattern (literal: `{"op": "unknown"}`) and are recorded here when
+    implemented.
+
+14. **`Collapse(expr, policy)`** is the final boundary that produces a
+    two-valued application result. Policies: `UnknownAsFalse`,
+    `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a
+    failure: `UnknownIsError` yields an explicit "rejected: unresolved"
+    outcome and never a `Fault` or exception; `Decision.Faults` is reserved
+    for real predicate exceptions, timeouts and cancellation. It lives on the
+    evaluation API and is accepted in the DSL only as the outermost function
+    (never nested). `UnknownRequiresResolution` is out of scope.
+15. **Predicates return `TruthValue`.** `IPredicate` and every predicate
+    delegate return `TruthValue` (breaking change, pre-1.0). A returned
+    `Unknown` records no `Fault`; an exception, timeout or cancellation still
+    becomes `Unknown` plus a `Fault` (ADR-0001).
+16. **`Unknown` is a first-class constant and substitution value.**
+    Constants are `TruthValue`s end to end. Lenient-mode and failed-node
+    substitutions use `Unknown`, not `false`.
+17. **The analyzer is K3-aware.** A dual-rail BDD tracking "definitely true"
+    and "possibly true" replaces classical two-valued analysis, so
+    `A AND NOT A` is a K3 contradiction only when it is, and `A OR NOT A` is
+    not a tautology. Interim: classical diagnostics are relabelled.
+
+## Open decisions
+
+None.
+
+## Consequences
+
+- ADR-0003's "closed operator set" and "no aliases" statements no longer hold;
+  its remaining decisions (named arguments, literal-only arguments, pipeline,
+  precedence of `NOT > AND > OR`) stand.
+- Existing public API names (`XNOR`, `RuleBuilder.Xnor`) need aliases or
+  deprecation, tracked in the planning tickets.
+- The equivalency table in CONTEXT.md becomes a description of derived-operator
+  definitions rather than a list of non-existent operators.

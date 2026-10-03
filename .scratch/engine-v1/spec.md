@@ -1,3 +1,5 @@
+> **Historical.** Operator-set and alias decisions below were partly superseded by ADR-0005 (`docs/adr/0005-strong-k3-language-surface.md`).
+
 # BooleanRulesEngine v1
 
 **Status:** ready-for-agent
