@@ -78,6 +78,30 @@ public sealed class K3ConformanceTests
         Assert.Empty(mismatches);
     }
 
+    /// <summary>Binary NAND, in word, symbol and lower-case spellings, matches the oracle for every assignment.</summary>
+    [Theory]
+    [InlineData("a NAND b")]
+    [InlineData("a nand b")]
+    [InlineData("a ↑ b")]
+    public async Task Evaluate_NandOverAllAssignments_MatchesOracle_Test(string rule)
+    {
+        List<string> mismatches = await MismatchesAsync(rule, 2, v => K3Oracle.Nand(v[0], v[1]));
+
+        Assert.Empty(mismatches);
+    }
+
+    /// <summary>Binary NOR, in word, symbol and lower-case spellings, matches the oracle for every assignment.</summary>
+    [Theory]
+    [InlineData("a NOR b")]
+    [InlineData("a nor b")]
+    [InlineData("a ↓ b")]
+    public async Task Evaluate_NorOverAllAssignments_MatchesOracle_Test(string rule)
+    {
+        List<string> mismatches = await MismatchesAsync(rule, 2, v => K3Oracle.Nor(v[0], v[1]));
+
+        Assert.Empty(mismatches);
+    }
+
     /// <summary>ExactlyOne over 2..4 operands matches the oracle's interval cardinality for every assignment.</summary>
     [Fact]
     public async Task Evaluate_ExactlyOneOverAllAssignments_MatchesOracle_Test()

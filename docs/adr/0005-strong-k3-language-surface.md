@@ -115,6 +115,21 @@ the aliases are cheap once the canonical form stays single.
     `RuleBuilder.Xnor` is kept as a forwarding member of the new
     `RuleBuilder.Equivalent`.
 
+    Implemented in k3-conformance 11: `NAND` and `NOR` are strictly binary
+    (the spec's operator table says binary, and a chain is ambiguous for a
+    non-associative operator), first-class `NandExpression` /
+    `NorExpression` nodes with `{"op": "nand" | "nor", "operands": [left,
+    right]}` in JSON and YAML (case-insensitive on read, exactly two operands,
+    compile-time checked with the shared infix arity code and a parentheses
+    hint). The DSL accepts `NAND`, `NOR`, `↑` and `↓` (reserved words, any
+    case) as infix operators subject to the no-mixing rule; the canonical
+    printer writes `(a NAND b)` / `(a NOR b)`; the symbolic tree-printer style
+    renders `↑` / `↓`, while the C-style has no spelling and keeps the words.
+    Evaluation and the analyzer rail are the negated primitive
+    (`NOT (a AND b)`, `NOT (a OR b)`); both operands are always evaluated.
+    `rule-tree.schema.json` lists `nand` and `nor`. `RuleBuilder.Nand` and
+    `RuleBuilder.Nor` are new.
+
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,
     `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a

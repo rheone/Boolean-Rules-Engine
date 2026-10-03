@@ -30,6 +30,18 @@ public sealed class CanonicalPrinterTests
         Assert.Equal("(isManager XOR isDepartmentHead)", rule.CanonicalText);
     }
 
+    [Theory]
+    [InlineData("isManager ↑ isDepartmentHead", "(isManager NAND isDepartmentHead)")]
+    [InlineData("isManager nor isDepartmentHead", "(isManager NOR isDepartmentHead)")]
+    public void Nand_and_nor_are_always_parenthesized_and_printed_with_the_word_operator(string text, string expected)
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile(text).CompiledRule!;
+
+        Assert.Equal(expected, rule.CanonicalText);
+    }
+
     [Fact]
     public void Implies_is_always_parenthesized_and_printed_with_the_word_operator()
     {

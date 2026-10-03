@@ -71,6 +71,30 @@ public sealed class ExpressionShapeTests
     }
 
     [Fact]
+    public void Nand_shape_exposes_left_then_right_as_operands()
+    {
+        NandExpression node = new(TermA, TermB);
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Nand", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Equal([TermA, TermB], shape.Operands);
+    }
+
+    [Fact]
+    public void Nor_shape_exposes_left_then_right_as_operands()
+    {
+        NorExpression node = new(TermA, TermB);
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Nor", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Equal([TermA, TermB], shape.Operands);
+    }
+
+    [Fact]
     public void Implies_shape_exposes_antecedent_then_consequent_as_operands()
     {
         ImpliesExpression node = new(TermA, TermB);

@@ -62,6 +62,15 @@ internal sealed record EquivalentNode(IReadOnlyList<RuleNode> Operands, SourceSp
 /// </summary>
 internal sealed record ImpliesNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
+/// <summary>
+/// A raw <c>NAND</c> reference (negated conjunction). Operand count is validated by <c>RuleNodeCompiler</c>
+/// (exactly two), like <see cref="XorNode"/>, so a DSL chain and a malformed JSON/YAML node are rejected the same way.
+/// </summary>
+internal sealed record NandNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>A raw <c>NOR</c> reference (negated disjunction); validated exactly like <see cref="NandNode"/>.</summary>
+internal sealed record NorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
 /// <summary>N-ary "exactly one of these is true".</summary>
 internal sealed record ExactlyOneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 

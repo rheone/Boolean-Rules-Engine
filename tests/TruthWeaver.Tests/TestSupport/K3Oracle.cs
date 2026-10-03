@@ -106,6 +106,18 @@ public static class K3Oracle
         return Or([Not(left), right]);
     }
 
+    /// <summary>Negated conjunction, defined from the primitives as <c>NOT (left AND right)</c>.</summary>
+    public static TruthValue Nand(TruthValue left, TruthValue right)
+    {
+        return Not(And([left, right]));
+    }
+
+    /// <summary>Negated disjunction, defined from the primitives as <c>NOT (left OR right)</c>.</summary>
+    public static TruthValue Nor(TruthValue left, TruthValue right)
+    {
+        return Not(Or([left, right]));
+    }
+
     /// <summary>Binary biconditional: the negation of <see cref="Xor"/>.</summary>
     public static TruthValue Equivalent(TruthValue left, TruthValue right)
     {

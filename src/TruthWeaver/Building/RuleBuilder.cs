@@ -120,6 +120,24 @@ public abstract class RuleBuilder
         return new OperatorBuilder("implies", [antecedent, consequent]);
     }
 
+    /// <summary>Creates a builder for negated conjunction (<c>NOT (left AND right)</c>, also written <c>NAND</c> or <c>↑</c>).</summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>A builder for the <c>NAND</c> expression.</returns>
+    public static RuleBuilder Nand(RuleBuilder left, RuleBuilder right)
+    {
+        return new OperatorBuilder("nand", [left, right]);
+    }
+
+    /// <summary>Creates a builder for negated disjunction (<c>NOT (left OR right)</c>, also written <c>NOR</c> or <c>↓</c>).</summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>A builder for the <c>NOR</c> expression.</returns>
+    public static RuleBuilder Nor(RuleBuilder left, RuleBuilder right)
+    {
+        return new OperatorBuilder("nor", [left, right]);
+    }
+
     /// <summary>Creates a builder for the n-ary "exactly one of these is true" operator.</summary>
     /// <param name="operands">The operands (at least two).</param>
     /// <returns>A builder for the <c>ExactlyOne</c> expression.</returns>

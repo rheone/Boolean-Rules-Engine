@@ -83,6 +83,14 @@ internal static class Analyzer
                 CollectTerms(xn.Left, terms);
                 CollectTerms(xn.Right, terms);
                 break;
+            case NandExpression nd:
+                CollectTerms(nd.Left, terms);
+                CollectTerms(nd.Right, terms);
+                break;
+            case NorExpression nr:
+                CollectTerms(nr.Left, terms);
+                CollectTerms(nr.Right, terms);
+                break;
             case ImpliesExpression im:
                 CollectTerms(im.Antecedent, terms);
                 CollectTerms(im.Consequent, terms);
@@ -123,6 +131,18 @@ internal static class Analyzer
     private static DualRail Or(BddManager bdd, DualRail x, DualRail y)
     {
         return new DualRail(bdd.Or(x.Definite, y.Definite), bdd.Or(x.Possible, y.Possible));
+    }
+
+    /// <summary>NAND as its primitive definition <c>NOT (x AND y)</c>.</summary>
+    private static DualRail Nand(BddManager bdd, DualRail x, DualRail y)
+    {
+        return Not(bdd, And(bdd, x, y));
+    }
+
+    /// <summary>NOR as its primitive definition <c>NOT (x OR y)</c>.</summary>
+    private static DualRail Nor(BddManager bdd, DualRail x, DualRail y)
+    {
+        return Not(bdd, Or(bdd, x, y));
     }
 
     /// <summary>Material implication as its primitive definition <c>NOT x OR y</c>.</summary>
@@ -259,6 +279,20 @@ internal static class Analyzer
                 rail = Not(
                     bdd,
                     Xor(bdd, Build(xn.Left, bdd, variableIndex, diagnostics), Build(xn.Right, bdd, variableIndex, diagnostics))
+                );
+                break;
+            case NandExpression nd:
+                rail = Nand(
+                    bdd,
+                    Build(nd.Left, bdd, variableIndex, diagnostics),
+                    Build(nd.Right, bdd, variableIndex, diagnostics)
+                );
+                break;
+            case NorExpression nr:
+                rail = Nor(
+                    bdd,
+                    Build(nr.Left, bdd, variableIndex, diagnostics),
+                    Build(nr.Right, bdd, variableIndex, diagnostics)
                 );
                 break;
             case ImpliesExpression im:

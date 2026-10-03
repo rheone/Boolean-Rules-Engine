@@ -7,7 +7,7 @@ using TruthWeaver.Ast;
 /// parenthesized for clarity wherever an operator is mixed with a different one, even where
 /// precedence alone would make the meaning unambiguous (e.g. <c>a AND b OR c</c> prints as
 /// <c>(a AND b) OR c</c>) — the point is to make a large nested rule easy for a human to read at a
-/// glance, not merely to avoid a parser error. <c>XOR</c>/<c>EQUIVALENT</c>/<c>IMPLIES</c> are always parenthesized
+/// glance, not merely to avoid a parser error. <c>XOR</c>/<c>EQUIVALENT</c>/<c>IMPLIES</c>/<c>NAND</c>/<c>NOR</c> are always parenthesized
 /// regardless of context. This is the exact form <c>parse</c> reproduces a structurally equal tree
 /// from (ticket 06).
 /// </summary>
@@ -37,6 +37,8 @@ internal static class CanonicalPrinter
             (XorExpression, _) => true,
             (EquivalentExpression, _) => true,
             (ImpliesExpression, _) => true,
+            (NandExpression, _) => true,
+            (NorExpression, _) => true,
             (
                 AndExpression,
                 PrintContext.AndOperand
@@ -73,6 +75,12 @@ internal static class CanonicalPrinter
             ImpliesExpression im => PrintNode(im.Antecedent, PrintContext.InfixOperand)
                 + " IMPLIES "
                 + PrintNode(im.Consequent, PrintContext.InfixOperand),
+            NandExpression nd => PrintNode(nd.Left, PrintContext.InfixOperand)
+                + " NAND "
+                + PrintNode(nd.Right, PrintContext.InfixOperand),
+            NorExpression nr => PrintNode(nr.Left, PrintContext.InfixOperand)
+                + " NOR "
+                + PrintNode(nr.Right, PrintContext.InfixOperand),
             ExactlyOneExpression => $"ExactlyOne({JoinOperands(node, ", ", PrintContext.Top)})",
             ThresholdExpression th => $"{th.Comparison}({th.K}, {JoinOperands(node, ", ", PrintContext.Top)})",
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),

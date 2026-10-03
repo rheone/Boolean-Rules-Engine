@@ -44,6 +44,8 @@ internal static class ExpressionShape
             OrExpression o => new NodeShape("Or", null, o.Operands),
             XorExpression x => new NodeShape("Xor", null, [x.Left, x.Right]),
             EquivalentExpression eq => new NodeShape("Equivalent", null, [eq.Left, eq.Right]),
+            NandExpression nd => new NodeShape("Nand", null, [nd.Left, nd.Right]),
+            NorExpression nr => new NodeShape("Nor", null, [nr.Left, nr.Right]),
             ImpliesExpression i => new NodeShape("Implies", null, [i.Antecedent, i.Consequent]),
             ExactlyOneExpression e => new NodeShape("ExactlyOne", null, e.Operands),
             ThresholdExpression th => new NodeShape(th.Comparison.ToString(), th.K, th.Operands),

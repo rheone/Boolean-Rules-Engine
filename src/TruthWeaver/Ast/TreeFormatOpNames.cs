@@ -20,6 +20,8 @@ internal static class TreeFormatOpNames
         ["Xor"] = "xor",
         ["Equivalent"] = "equivalent",
         ["Implies"] = "implies",
+        ["Nand"] = "nand",
+        ["Nor"] = "nor",
         ["ExactlyOne"] = "exactlyOne",
         ["AtLeast"] = "atLeast",
         ["AtMost"] = "atMost",

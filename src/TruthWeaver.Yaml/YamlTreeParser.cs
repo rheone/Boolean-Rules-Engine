@@ -223,6 +223,10 @@ internal static class YamlTreeParser
                 return new EquivalentNode(operands, SourceSpan.None);
             case "Implies":
                 return new ImpliesNode(operands, SourceSpan.None);
+            case "Nand":
+                return new NandNode(operands, SourceSpan.None);
+            case "Nor":
+                return new NorNode(operands, SourceSpan.None);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":

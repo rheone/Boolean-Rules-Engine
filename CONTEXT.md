@@ -30,7 +30,7 @@ an authorization layer is intentionally out of scope.
 | **Expression** | The boolean tree: operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasTopping` or `lovesPineapple`. The *function*, not any particular call to it. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
-| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT` (aliases `IFF`, legacy `XNOR`), `IMPLIES`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `True`/`False`/`Unknown` (case-insensitive; printed upper camel). Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
+| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT` (aliases `IFF`, legacy `XNOR`), `IMPLIES`, `NAND`, `NOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `True`/`False`/`Unknown` (case-insensitive; printed upper camel). Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
 | **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |
 | **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. A predicate that simply returns `Unknown` is a normal answer and records no fault. |
@@ -62,6 +62,8 @@ classDiagram
     class XorExpression
     class EquivalentExpression
     class ImpliesExpression
+    class NandExpression
+    class NorExpression
     class ExactlyOneExpression
     class ThresholdExpression {
         +int K
@@ -83,6 +85,8 @@ classDiagram
     Expression <|-- XorExpression
     Expression <|-- EquivalentExpression
     Expression <|-- ImpliesExpression
+    Expression <|-- NandExpression
+    Expression <|-- NorExpression
     Expression <|-- ExactlyOneExpression
     Expression <|-- ThresholdExpression
     Expression <|-- ConstantExpression
@@ -92,6 +96,8 @@ classDiagram
     XorExpression "1" o-- "2" Expression : operands
     EquivalentExpression "1" o-- "2" Expression : operands
     ImpliesExpression "1" o-- "2" Expression : antecedent, consequent
+    NandExpression "1" o-- "2" Expression : operands
+    NorExpression "1" o-- "2" Expression : operands
     ExactlyOneExpression "1" o-- "2..*" Expression : operands
     ThresholdExpression "1" o-- "2..*" Expression : operands
     Term "1" --> "1" Predicate : bound to
@@ -110,6 +116,8 @@ Expression =
     | XOR(Expression, Expression)          // binary only
     | EQUIVALENT(Expression, Expression)   // binary only; NOT(XOR(...)); aliases IFF, XNOR
     | IMPLIES(Expression, Expression)      // binary only; OR(NOT(antecedent), consequent)
+    | NAND(Expression, Expression)         // binary only; NOT(AND(...))
+    | NOR(Expression, Expression)          // binary only; NOT(OR(...))
     | ExactlyOne(Expression, Expression, ...)
     | AtLeast(k, Expression, Expression, ...)
     | AtMost(k, Expression, Expression, ...)
@@ -153,6 +161,8 @@ with an operator that would just be a synonym for one of these:
 | `Exactly(1, ...)` | `ExactlyOne(...)` |
 | `EQUIVALENT(a, b)` (`IFF`, legacy `XNOR`) | `NOT(XOR(a, b))` |
 | `IMPLIES(a, b)` | `OR(NOT(a), b)` |
+| `NAND(a, b)` | `NOT(AND(a, b))` |
+| `NOR(a, b)` | `NOT(OR(a, b))` |
 | `GreaterThan(0, ...)` | `OR(...)` |
 | `LessThan(n, ...)`, where `n` is the operand count | `NOT(AND(...))` |
 

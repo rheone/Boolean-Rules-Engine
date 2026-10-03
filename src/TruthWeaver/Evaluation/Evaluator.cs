@@ -64,6 +64,8 @@ internal sealed class Evaluator<TContext>(
             "Xor" => "XOR",
             "Equivalent" => "EQUIVALENT",
             "Implies" => "IMPLIES",
+            "Nand" => "NAND",
+            "Nor" => "NOR",
             "ExactlyOne" => "ExactlyOne",
             _ => $"{shape.OpName}({shape.K})",
         };
@@ -114,6 +116,18 @@ internal sealed class Evaluator<TContext>(
     private static TruthValue KleeneEquivalent(TruthValue left, TruthValue right)
     {
         return KleeneNot(KleeneXor(left, right));
+    }
+
+    /// <summary>Strong Kleene negated conjunction: <c>NOT (left AND right)</c>.</summary>
+    private static TruthValue KleeneNand(TruthValue left, TruthValue right)
+    {
+        return KleeneNot(KleeneAnd(left, right));
+    }
+
+    /// <summary>Strong Kleene negated disjunction: <c>NOT (left OR right)</c>.</summary>
+    private static TruthValue KleeneNor(TruthValue left, TruthValue right)
+    {
+        return KleeneNot(KleeneOr(left, right));
     }
 
     /// <summary>Strong Kleene material implication: <c>NOT antecedent OR consequent</c>.</summary>
@@ -248,6 +262,22 @@ internal sealed class Evaluator<TContext>(
                 IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
                 TruthValue value = KleeneImplies(results[0].Value, results[1].Value);
                 return new EvalResult(value, new EvaluatedNode("IMPLIES", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NandExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneNand(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("NAND", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NorExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneNor(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("NOR", value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ExactlyOneExpression:

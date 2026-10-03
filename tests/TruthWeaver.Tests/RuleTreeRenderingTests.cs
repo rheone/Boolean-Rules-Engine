@@ -215,6 +215,18 @@ public sealed class RuleTreeRenderingTests
     }
 
     [Theory]
+    [InlineData(OperatorStyle.Word, "NAND", "NOR")]
+    [InlineData(OperatorStyle.Symbolic, "↑", "↓")]
+    [InlineData(OperatorStyle.CStyle, "NAND", "NOR")]
+    public void PlainText_and_Mermaid_render_nand_and_nor_in_the_requested_style(OperatorStyle style, string nand, string nor)
+    {
+        Assert.Contains(nand, PlainTextTreePrinter.Print(BinaryNode("NAND"), style));
+        Assert.Contains(nand, MermaidTreePrinter.Print(BinaryNode("NAND"), style));
+        Assert.Contains(nor, PlainTextTreePrinter.Print(BinaryNode("NOR"), style));
+        Assert.Contains(nor, MermaidTreePrinter.Print(BinaryNode("NOR"), style));
+    }
+
+    [Theory]
     [InlineData(OperatorStyle.Word, "IMPLIES")]
     [InlineData(OperatorStyle.Symbolic, "→")]
     [InlineData(OperatorStyle.CStyle, "IMPLIES")]

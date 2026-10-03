@@ -129,6 +129,10 @@ public sealed class AnalyzerTests
     [InlineData("(a AND FALSE) IMPLIES b", true)]
     [InlineData("a IMPLIES (b OR TRUE)", true)]
     [InlineData("(a OR TRUE) IMPLIES (b AND FALSE)", false)]
+    [InlineData("(a AND FALSE) NAND b", true)]
+    [InlineData("(a OR TRUE) NAND (b OR TRUE)", false)]
+    [InlineData("(a OR TRUE) NOR b", false)]
+    [InlineData("(a AND FALSE) NOR (b AND FALSE)", true)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -157,6 +161,10 @@ public sealed class AnalyzerTests
     [InlineData("a EQUIVALENT a")]
     [InlineData("a IMPLIES a")]
     [InlineData("a IMPLIES NOT a")]
+    [InlineData("a NAND NOT a")]
+    [InlineData("a NOR NOT a")]
+    [InlineData("a NAND a")]
+    [InlineData("a NOR a")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
     [InlineData("AtMost(1, a, NOT a)")]
@@ -329,7 +337,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(9))
+        switch (random.Next(11))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -368,6 +376,14 @@ public sealed class AnalyzerTests
                     v => K3Oracle.Implies(il.Eval(v), ir.Eval(v)),
                     [il, ir]
                 );
+            case 9:
+                GeneratedRule nl = Child();
+                GeneratedRule nr = Child();
+                return new GeneratedRule($"({nl.Text} NAND {nr.Text})", v => K3Oracle.Nand(nl.Eval(v), nr.Eval(v)), [nl, nr]);
+            case 10:
+                GeneratedRule rl = Child();
+                GeneratedRule rr = Child();
+                return new GeneratedRule($"({rl.Text} NOR {rr.Text})", v => K3Oracle.Nor(rl.Eval(v), rr.Eval(v)), [rl, rr]);
             case 6:
                 GeneratedRule[] exactlyOne = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];
                 return new GeneratedRule(

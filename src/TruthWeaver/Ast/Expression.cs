@@ -89,6 +89,24 @@ public sealed record EquivalentExpression(Expression Left, Expression Right) : E
 /// <param name="Consequent">The "then" operand.</param>
 public sealed record ImpliesExpression(Expression Antecedent, Expression Consequent) : Expression;
 
+/// <summary>
+/// Strong Kleene negated conjunction, <c>NOT (left AND right)</c> (ADR-0005). A first-class binary node so it
+/// round-trips as written; <c>False</c> if both operands are <c>True</c>, <c>True</c> if either is <c>False</c>,
+/// otherwise <c>Unknown</c>. Both operands are always evaluated (no short-circuit).
+/// </summary>
+/// <param name="Left">The left operand.</param>
+/// <param name="Right">The right operand.</param>
+public sealed record NandExpression(Expression Left, Expression Right) : Expression;
+
+/// <summary>
+/// Strong Kleene negated disjunction, <c>NOT (left OR right)</c> (ADR-0005). A first-class binary node so it
+/// round-trips as written; <c>True</c> if both operands are <c>False</c>, <c>False</c> if either is <c>True</c>,
+/// otherwise <c>Unknown</c>. Both operands are always evaluated (no short-circuit).
+/// </summary>
+/// <param name="Left">The left operand.</param>
+/// <param name="Right">The right operand.</param>
+public sealed record NorExpression(Expression Left, Expression Right) : Expression;
+
 /// <summary>N-ary "exactly one of these operands is true".</summary>
 /// <param name="Operands">The operands (at least two).</param>
 public sealed record ExactlyOneExpression(EquatableArray<Expression> Operands) : Expression;

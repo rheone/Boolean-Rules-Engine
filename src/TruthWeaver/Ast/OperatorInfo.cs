@@ -52,6 +52,14 @@ public static class OperatorInfo
                 "IMPLIES",
                 "Material implication (NOT antecedent OR consequent). True if the antecedent is False or the consequent is True; otherwise Unknown if either operand is Unknown."
             ),
+            "Nand" => new OperatorDescriptor(
+                "NAND",
+                "Negated conjunction, NOT (left AND right). False only when both operands are True; True if either is False; otherwise Unknown."
+            ),
+            "Nor" => new OperatorDescriptor(
+                "NOR",
+                "Negated disjunction, NOT (left OR right). True only when both operands are False; False if either is True; otherwise Unknown."
+            ),
             "ExactlyOne" => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
             _ => new OperatorDescriptor($"{shape.OpName}({shape.K})", ThresholdDescription(shape)),
         };

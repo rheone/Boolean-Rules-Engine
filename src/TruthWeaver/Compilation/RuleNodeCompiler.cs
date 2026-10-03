@@ -133,6 +133,8 @@ internal sealed class RuleNodeCompiler<TContext>
             XorNode x => this.BuildXor(x, depth),
             EquivalentNode eq => this.BuildEquivalent(eq, depth),
             ImpliesNode i => this.BuildImplies(i, depth),
+            NandNode nd => this.BuildNegatedBinary(nd.Operands, nd.Span, "NAND", depth, (l, r) => new NandExpression(l, r)),
+            NorNode nr => this.BuildNegatedBinary(nr.Operands, nr.Span, "NOR", depth, (l, r) => new NorExpression(l, r)),
             ExactlyOneNode e => this.BuildVariadic(
                 e.Operands,
                 depth,
@@ -207,6 +209,32 @@ internal sealed class RuleNodeCompiler<TContext>
         Expression left = this.Build(node.Operands[0], depth + 1);
         Expression right = this.Build(node.Operands[1], depth + 1);
         return new EquivalentExpression(left, right);
+    }
+
+    /// <summary>
+    /// Builds a strictly binary infix operator (<c>NAND</c>/<c>NOR</c>). Anything but two operands (a DSL chain or a
+    /// malformed JSON/YAML node) is an <see cref="DiagnosticCodes.XorArityViolation"/> with a parentheses hint.
+    /// </summary>
+    private Expression BuildNegatedBinary(
+        IReadOnlyList<RuleNode> operands,
+        SourceSpan span,
+        string name,
+        int depth,
+        Func<Expression, Expression, Expression> construct
+    )
+    {
+        if (operands.Count != 2)
+        {
+            string message =
+                $"{name} is binary only; found {operands.Count} operands. "
+                + $"Add parentheses (or nest {name} nodes) to say how chained operations group.";
+            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, span));
+            return FailedNode.Placeholder;
+        }
+
+        Expression left = this.Build(operands[0], depth + 1);
+        Expression right = this.Build(operands[1], depth + 1);
+        return construct(left, right);
     }
 
     private Expression BuildImplies(ImpliesNode node, int depth)
