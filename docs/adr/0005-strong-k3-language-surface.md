@@ -83,6 +83,14 @@ the aliases are cheap once the canonical form stays single.
    close '(' at offset 4 but found ']'."), end of input is reported at the
    opener ("Unclosed '(' ..."), and a closer with nothing open is reported as
    "Unexpected closing ..." at the closer.
+   Implemented (k3-conformance 21): `CompiledRule.PrintText(GroupingStyle)`
+   with `GroupingStyle.Parentheses` (identical to `CanonicalText`, the default
+   and persisted form) and `GroupingStyle.DepthCycling`. The cycle is by group
+   depth: outermost group `(`, then `[`, then `{`, then repeating (the
+   reference example `A AND (B OR [C AND {D OR (E AND [F OR G])}])`). Only
+   groups the printer wraps count as depth; function-call argument lists stay
+   `(` and do not deepen it. The reference material's "option to convert all
+   delimiter pairs to parens" is the default, so it needs no flag.
 10. **Expression mutation** (primitive/NAND/NOR expansion, compression,
     simplification, canonicalization, whitespace normalization) all ship in
     this effort. Every rewrite must be K3-sound, verified exhaustively against

@@ -55,6 +55,21 @@ public sealed class CompiledRule<TContext>
     /// </summary>
     internal Expression Root { get; }
 
+    /// <summary>
+    /// Prints this rule as DSL text with the chosen grouping delimiters. <see cref="GroupingStyle.Parentheses"/> returns
+    /// exactly <see cref="CanonicalText"/>; <see cref="GroupingStyle.DepthCycling"/> varies the delimiter by nesting depth
+    /// for readability. Every style re-parses to a tree equal to this rule's, because the DSL treats <c>()</c>, <c>[]</c>
+    /// and <c>{}</c> as the same grouping.
+    /// </summary>
+    /// <param name="grouping">The grouping delimiters to print with.</param>
+    /// <returns>The DSL text.</returns>
+    public string PrintText(GroupingStyle grouping)
+    {
+        return grouping == GroupingStyle.Parentheses
+            ? this.CanonicalText
+            : CanonicalPrinter.Print(this.Root, this.CollapsePolicy, grouping);
+    }
+
     /// <summary>Prints this rule to the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
     /// <returns>The JSON text.</returns>
     public string PrintJson()

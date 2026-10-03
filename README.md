@@ -414,6 +414,20 @@ Delimiter mistakes are `SyntaxError` diagnostics with the exact span:
 | Unclosed group | `a AND (b OR c` | `Unclosed '(' at offset 6: expected ')' before the end of the rule.` (the `(`) |
 | Closer with no opener | `a AND b)` | `Unexpected closing ')' with no matching opener.` (the `)`) |
 
+To print a rule with delimiters that vary by nesting depth, pass a `GroupingStyle` to `CompiledRule.PrintText`:
+
+```csharp
+CompiledRule<MyContext> rule = compiler.Compile("a AND (b OR (c AND (d OR (e AND (f OR g)))))").CompiledRule!;
+
+rule.CanonicalText;                                  // a AND (b OR (c AND (d OR (e AND (f OR g)))))  (parentheses only)
+rule.PrintText(GroupingStyle.Parentheses);           // same as CanonicalText
+rule.PrintText(GroupingStyle.DepthCycling);          // a AND (b OR [c AND {d OR (e AND [f OR g])}])
+```
+
+`DepthCycling` is opt-in and deterministic: the delimiter depends only on how many groups enclose it, cycling `(`,
+`[`, `{` and repeating. It is a readability aid for people; the output always re-parses to a tree equal to the
+original, so `CanonicalText` stays the form to persist. Function-call argument lists keep `(`.
+
 ### Binary vs. unary operators
 
 | Arity | Operators | Notes |

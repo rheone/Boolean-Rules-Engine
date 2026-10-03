@@ -288,7 +288,7 @@ when a sub-expression is `True` (resp. `False`) for every
 
 The string DSL (word operators, plus the symbol aliases `&&`, `||`, `!`, `∧`, `∨`,
 `¬`, `⊕`, `→` that compile to the same nodes and are never printed; `NOT > AND > OR` precedence, every infix operator other than `NOT`/`AND`/`OR`
-never mixed with `AND`/`OR` or with a different infix operator without parentheses; `()`, `[]` and `{}` are interchangeable grouping delimiters that the tree does not retain) is
+never mixed with `AND`/`OR` or with a different infix operator without parentheses; `()`, `[]` and `{}` are interchangeable grouping delimiters that the tree does not retain; `CanonicalText` prints parentheses only, `PrintText(GroupingStyle.DepthCycling)` is the opt-in depth-varying rendering) is
 canonical and is what gets persisted. JSON and YAML are interchange/tooling
 formats that compile to the same AST and round-trip losslessly with the DSL.
 A rule can also be assembled programmatically via `RuleBuilder`

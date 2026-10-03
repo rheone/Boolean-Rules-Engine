@@ -160,6 +160,29 @@ public sealed class DslRoundTripPropertyTests
         );
     }
 
+    /// <summary>
+    /// Ticket 21: the depth-cycling rendering, which mixes <c>()</c>, <c>[]</c> and <c>{}</c>, parses back to the same
+    /// tree as the parentheses-only form for any generated tree (delimiters never change the compiled tree).
+    /// </summary>
+    [Fact]
+    public void Parsing_the_depth_cycled_form_of_a_generated_tree_reproduces_a_structurally_equal_tree()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(BuildRegistry());
+
+        GenExpressionTree.Sample(
+            tree =>
+            {
+                string printed = CanonicalPrinter.Print(tree, null, GroupingStyle.DepthCycling);
+                CompilationResult<RuleTestContext> result = compiler.Compile(printed);
+                string diagnosticMessages = string.Join("; ", result.Diagnostics.Select(d => d.Message));
+
+                Assert.True(result.Succeeded, $"Expected '{printed}' to compile cleanly but got: {diagnosticMessages}");
+                Assert.Equal(tree, result.CompiledRule!.Root);
+            },
+            iter: SampleIterations
+        );
+    }
+
     private static Gen<LiteralValue> GenLiteralValue(LiteralKind kind)
     {
         return kind switch
