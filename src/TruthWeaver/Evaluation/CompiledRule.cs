@@ -95,6 +95,51 @@ public sealed class CompiledRule<TContext>
         return new CompiledRule<TContext>(PrimitiveExpander.Expand(this.Root), this.registry, this.logger, this.CollapsePolicy);
     }
 
+    /// <summary>
+    /// Rewrites this rule so its only logical operator is <c>NAND</c>, and returns it as a new rule (ADR-0005 decision 10):
+    /// <c>NOT a</c> becomes <c>a NAND a</c>, <c>a AND b</c> becomes <c>(a NAND b) NAND (a NAND b)</c> and <c>a OR b</c>
+    /// becomes <c>(a NAND a) NAND (b NAND b)</c>; every other operator is first expanded to the primitive kernel (see
+    /// <see cref="ExpandToPrimitives"/>).
+    /// </summary>
+    /// <remarks>
+    /// The result evaluates to the same <see cref="TruthValue"/> for every assignment of its terms; this rule is not
+    /// changed and the declared <see cref="CollapsePolicy"/> is carried over. <b>One documented boundary:</b>
+    /// <c>COALESCE</c> (and therefore <c>Project</c> and the inspections <c>IsTrue</c>, <c>IsFalse</c>, <c>IsUnknown</c>,
+    /// <c>IsKnown</c>, which expand to it) cannot be written with <c>NAND</c>, because every <c>NAND</c> circuit is monotone
+    /// in the information order and <c>COALESCE</c> is not. Such nodes stay as <c>COALESCE</c> with their operands rewritten,
+    /// so a rule without them is <c>NAND</c>-only. Thresholds become a disjunction over operand subsets, so wide
+    /// thresholds grow combinatorially.
+    /// </remarks>
+    /// <returns>A new rule over the same predicates whose logic is <c>NAND</c> (plus any <c>COALESCE</c> boundary).</returns>
+    public CompiledRule<TContext> ExpandToNand()
+    {
+        return new CompiledRule<TContext>(
+            UniversalGateExpander.ToNand(this.Root),
+            this.registry,
+            this.logger,
+            this.CollapsePolicy
+        );
+    }
+
+    /// <summary>
+    /// Rewrites this rule so its only logical operator is <c>NOR</c>, and returns it as a new rule (ADR-0005 decision 10):
+    /// <c>NOT a</c> becomes <c>a NOR a</c>, <c>a OR b</c> becomes <c>(a NOR b) NOR (a NOR b)</c> and <c>a AND b</c>
+    /// becomes <c>(a NOR a) NOR (b NOR b)</c>; every other operator is first expanded to the primitive kernel.
+    /// </summary>
+    /// <remarks>
+    /// Same guarantees, cost and <c>COALESCE</c> boundary as <see cref="ExpandToNand"/>.
+    /// </remarks>
+    /// <returns>A new rule over the same predicates whose logic is <c>NOR</c> (plus any <c>COALESCE</c> boundary).</returns>
+    public CompiledRule<TContext> ExpandToNor()
+    {
+        return new CompiledRule<TContext>(
+            UniversalGateExpander.ToNor(this.Root),
+            this.registry,
+            this.logger,
+            this.CollapsePolicy
+        );
+    }
+
     /// <summary>Prints this rule to the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
     /// <returns>The JSON text.</returns>
     public string PrintJson()

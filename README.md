@@ -600,7 +600,34 @@ Kleene logic (`a OR NOT a` is not `True`, and `If(Unknown, t, t)` is `t`, which 
 `If` row's third term preserves). Nothing is left unexpanded: even the inspections
 are expressible with `COALESCE`, which is the primitive that can see `Unknown`.
 
-Things to know:
+### NAND-only and NOR-only
+
+`ExpandToNand()` and `ExpandToNor()` rewrite a rule so the only logical operator is
+one universal gate. They expand to the primitive kernel first, then rewrite it:
+
+| Primitive | `ExpandToNand()` | `ExpandToNor()` |
+| --- | --- | --- |
+| `NOT a` | `a NAND a` | `a NOR a` |
+| `a AND b` | `(a NAND b) NAND (a NAND b)` | `(a NOR a) NOR (b NOR b)` |
+| `a OR b` | `(a NAND a) NAND (b NAND b)` | `(a NOR b) NOR (a NOR b)` |
+| `AtLeast(k, ...)` | `OR` over every k-subset of the `AND` of that subset | same, with the gate's `AND`/`OR` |
+| `AtMost(k, ...)` | `NOT AtLeast(k + 1, ...)` | same |
+| `Exactly(k, ...)` | `AtLeast(k) AND AtMost(k)` (a vacuous side is dropped) | same |
+
+Longer `AND`/`OR` chains fold left (both are associative in K3). The threshold
+rewrite is monotone, so it is exact for `Unknown` operands too, but it has `C(n, k)`
+subsets: very wide thresholds produce very large trees.
+
+**`COALESCE` is the one boundary.** Every circuit built from `NAND`, `NOR`,
+`NOT`, `AND` and `OR` is monotone in the information order (`Unknown` below `True`
+and `False`), while `COALESCE(x, True)` turns `Unknown` into `True` and `False` into
+`False`, which no monotone function can do. So `COALESCE`, and `Project` and the
+inspections (`IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`) that expand to it, stay as
+`COALESCE` nodes with their operands rewritten. A rule without them is purely
+`NAND` (or `NOR`). Same guarantees as above: a new rule, the original untouched, the
+`Collapse` policy carried over, identical results and faults.
+
+Things to know for `ExpandToPrimitives`:
 
 - **Size.** Operators whose definition mentions an operand twice (`XOR`,
   `EQUIVALENT`, `If`, the inspections) repeat that operand's text, so a deeply

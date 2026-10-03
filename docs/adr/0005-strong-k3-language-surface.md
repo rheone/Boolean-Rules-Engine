@@ -132,6 +132,21 @@ the aliases are cheap once the canonical form stays single.
     Operands a definition repeats are one shared, already-expanded node (a DAG in
     memory; the printed text repeats them), so a deeply nested expansion can
     exceed the default compile node limit when recompiled.
+
+    Implemented in k3-conformance 24 (universal gates):
+    `CompiledRule<TContext>.ExpandToNand()` and `ExpandToNor()` expand to the
+    kernel and then rewrite it with a single gate: `NOT a` = `a GATE a`; for NAND,
+    `a AND b` = `(a NAND b) NAND (a NAND b)` and `a OR b` = `(a NAND a) NAND (b NAND
+    b)`, and for NOR the duals; longer chains fold left. `AtLeast(k)` is the
+    disjunction over every k-subset of the subset's conjunction (a monotone
+    formula, so exact under the interval semantics), `AtMost(k)` = `NOT
+    AtLeast(k + 1)`, `Exactly(k)` = `AtLeast(k) AND AtMost(k)` with a vacuous side
+    dropped; the subset count is `C(n, k)`. **`COALESCE` is a documented semantic
+    boundary:** every `NAND`/`NOR`/`AND`/`OR`/`NOT` circuit is monotone in the
+    information order and `COALESCE` is not (`COALESCE(Unknown, True)` = `True` but
+    `COALESCE(False, True)` = `False`), so it has no gate-only form and stays in
+    place with its operands rewritten, as do `Project` and the inspections that
+    expand to it. A rule without them is purely `NAND` (or `NOR`).
 11. **Validation messages are structured**: code, message, span (or
     JSON/YAML path), optional "did you mean" suggestion, and an
     expected-vs-found pair, with a plain-text rendering.
