@@ -169,6 +169,43 @@ public sealed class CompiledRule<TContext>
         return new CompiledRule<TContext>(Compressor.Compress(this.Root), this.registry, this.logger, this.CollapsePolicy);
     }
 
+    /// <summary>
+    /// Rewrites this rule into its canonical form (ADR-0005 decision 10): one deterministic representation shared by every
+    /// rule that is equivalent under a fixed set of Strong Kleene-sound rewrites, so rules can be compared and de-duplicated
+    /// by their <see cref="CanonicalText"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The rewrites, applied bottom-up and repeated until stable, are: (1) exact aliases collapse to one spelling
+    /// (<c>ANY</c> and <c>AtLeast(1)</c> become <c>OR</c>, <c>ALL</c> and <c>AtLeast(n)</c> become <c>AND</c>,
+    /// <c>GreaterThan(k)</c> becomes <c>AtLeast(k + 1)</c>, <c>LessThan(k)</c> becomes <c>AtMost(k - 1)</c>,
+    /// <c>ExactlyOne</c> becomes <c>Exactly(1)</c>); (2) <c>NOT (NOT x)</c> becomes <c>x</c>; (3) an <c>AND</c> directly
+    /// inside an <c>AND</c>, an <c>OR</c> inside an <c>OR</c> and a <c>COALESCE</c> inside a <c>COALESCE</c> are flattened; (4) the operands of the
+    /// commutative operators (<c>AND</c>, <c>OR</c>, <c>XOR</c>, <c>EQUIVALENT</c>, <c>NAND</c>, <c>NOR</c>, <c>NXOR</c> and
+    /// the threshold family including <c>BETWEEN</c>) are sorted by their canonical text, ordinally; (5) repeated operands of
+    /// <c>AND</c>/<c>OR</c> are removed (idempotence). Operators whose operand order carries meaning (<c>COALESCE</c>,
+    /// <c>IMPLIES</c>, <c>If</c>) keep it. Nothing is folded and no complement law is used: <c>a OR NOT a</c> is not
+    /// <c>True</c> in Strong Kleene logic, so it stays a two-operand <c>OR</c>.
+    /// </para>
+    /// <para>
+    /// The result evaluates to the same value as this rule for every <c>True</c>/<c>False</c>/<c>Unknown</c> assignment, is
+    /// never larger than this rule, and canonicalising it again changes nothing. <b>Evaluation order is not preserved.</b>
+    /// Reordering, deduplicating and flattening operands can change which predicate runs first, which predicates run at all
+    /// once a short-circuit applies, and therefore which faults are reported; the value never changes. Because the order is
+    /// text-based, a canonical rule is for comparison and storage keys, not for performance tuning.
+    /// </para>
+    /// </remarks>
+    /// <returns>A new rule over the same predicates in canonical form.</returns>
+    public CompiledRule<TContext> Canonicalize()
+    {
+        return new CompiledRule<TContext>(
+            Canonicalizer.Canonicalize(this.Root),
+            this.registry,
+            this.logger,
+            this.CollapsePolicy
+        );
+    }
+
     /// <summary>Prints this rule to the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
     /// <returns>The JSON text.</returns>
     public string PrintJson()

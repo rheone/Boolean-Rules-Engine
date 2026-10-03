@@ -671,6 +671,42 @@ written `Project(x, False)` rather than `IsTrue(x)` (they are the same value;
 differ from the original, which changes the order predicates are invoked in but
 never a result.
 
+### Canonical form
+
+`Canonicalize()` gives rules that are equivalent under a fixed set of Strong
+Kleene-sound rewrites one deterministic representation, so rules can be compared,
+cached and de-duplicated by their `CanonicalText`. It is deterministic,
+idempotent (`Canonicalize()` of a canonical rule is the same rule), evaluates
+like the original for every `True`/`False`/`Unknown` assignment, and is never
+larger than the original.
+
+The rewrites, in the order they are applied (bottom-up, repeated until stable):
+
+1. **Aliases collapse.** `ANY(...)` and `AtLeast(1, ...)` become `OR`; `ALL(...)`
+   and `AtLeast(n, ...)` become `AND`; `GreaterThan(k)` becomes `AtLeast(k + 1)`;
+   `LessThan(k)` becomes `AtMost(k - 1)`; `ExactlyOne(...)` becomes `Exactly(1, ...)`.
+2. **Double negation.** `NOT NOT x` becomes `x` (holds in K3).
+3. **Flatten.** `AND` inside `AND`, `OR` inside `OR` and `COALESCE` inside
+   `COALESCE` are spliced into the parent (all associative).
+4. **Sort.** The operands of the commutative operators (`AND`, `OR`, `XOR`,
+   `EQUIVALENT`, `NAND`, `NOR`, `NXOR`, `ExactlyOne`, the threshold family,
+   `BETWEEN`) are sorted by their canonical text, ordinally.
+5. **Deduplicate.** Repeated operands of `AND`/`OR` are removed (`a AND a` is `a`;
+   idempotence holds in K3). Counting operators keep repeats, since they count.
+
+`COALESCE`, `IMPLIES` and `If` keep their operand order because it carries
+meaning. **Nothing is folded and no complement law is used:** `a OR NOT a` is not
+`True` in Strong Kleene logic (it is `Unknown` when `a` is), so it stays as a
+two-operand `OR`; constant folding and the other cost-reducing rewrites are the
+job of `Simplify()`.
+
+> [!IMPORTANT]
+> The canonical rule has the same *value* as the original but not the same
+> *evaluation order*. Reordering, flattening and removing duplicates can change
+> which predicate is invoked first, which are invoked at all once a short-circuit
+> applies, and so which faults are reported. Use a canonical rule as a comparison
+> or storage key; keep evaluating the rule as written if invocation order matters.
+
 ## Choosing a rule format
 
 DSL, JSON, and YAML compile to the exact same tree through the exact same

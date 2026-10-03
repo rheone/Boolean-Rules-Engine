@@ -163,6 +163,21 @@ the aliases are cheap once the canonical form stays single.
     compression is idempotent. It recovers an equivalent derived form, not
     necessarily the original (`COALESCE(x, False)` reads back as `Project`, not
     `IsTrue`). Shared operands and the declared `Collapse` policy are preserved.
+
+    Implemented in k3-conformance 26 (canonicalisation):
+    `CompiledRule<TContext>.Canonicalize()` applies an ordered, K3-sound rule set
+    bottom-up until stable: (1) exact aliases collapse (`ANY`/`AtLeast(1)` to `OR`,
+    `ALL`/`AtLeast(n)` to `AND`, `GreaterThan(k)` to `AtLeast(k + 1)`, `LessThan(k)`
+    to `AtMost(k - 1)`, `ExactlyOne` to `Exactly(1)`); (2) `NOT NOT x` to `x`; (3)
+    nested `AND`/`OR`/`COALESCE` flatten; (4) operands of the commutative
+    operators sort by canonical text (ordinal); (5) repeated `AND`/`OR` operands
+    are removed. `IMPLIES`, `NAND`, `NOR`, `Project`, `NONE` and the inspections keep
+    their spelling (rewriting them to primitives would grow the tree, and the
+    canonical form is never larger than its input); `COALESCE`, `IMPLIES` and `If`
+    keep operand order. No complement law and no constant folding. It is
+    idempotent and deterministic, and, because it reorders and deduplicates
+    operands, it does not preserve evaluation order, short-circuiting or which
+    faults are reported, only the value; this is stated in the API remarks.
 11. **Validation messages are structured**: code, message, span (or
     JSON/YAML path), optional "did you mean" suggestion, and an
     expected-vs-found pair, with a plain-text rendering.
