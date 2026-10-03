@@ -1,6 +1,7 @@
 namespace TruthWeaver.Json;
 
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json;
 using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
@@ -17,7 +18,9 @@ using TruthWeaver.Parsing;
 /// <see cref="RuleNode"/> tree the DSL parser produces, so both front ends funnel through identical
 /// validation (ticket 07). A node is discriminated by which key is present: <c>const</c>,
 /// <c>predicate</c>, or <c>op</c>. Never throws for malformed input — it reports a
-/// <see cref="DiagnosticCodes.MalformedTree"/> diagnostic instead.
+/// <see cref="DiagnosticCodes.MalformedTree"/> diagnostic instead. Every diagnostic is located by its path from the
+/// document root (<c>$.operands[1].op</c>), because a <see cref="JsonElement"/> does not keep source positions; only
+/// invalid JSON syntax also carries the parser's position.
 /// </summary>
 internal static class JsonTreeParser
 {
@@ -38,10 +41,7 @@ internal static class JsonTreeParser
         }
         catch (JsonException ex)
         {
-            List<Diagnostic> diagnostics =
-            [
-                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Malformed JSON: {ex.Message}", SourceSpan.None),
-            ];
+            List<Diagnostic> diagnostics = [SyntaxError(json, ex)];
             return (null, diagnostics);
         }
 
@@ -60,11 +60,130 @@ internal static class JsonTreeParser
     public static (RuleNode? Root, IReadOnlyList<Diagnostic> Diagnostics) Parse(JsonElement element)
     {
         List<Diagnostic> diagnostics = [];
-        RuleNode? root = ParseNode(element, diagnostics);
+        RuleNode? root = ParseNode(element, TreePath.Root, diagnostics);
         return (root, diagnostics);
     }
 
-    private static RuleNode? ParseNode(JsonElement element, List<Diagnostic> diagnostics)
+    /// <summary>Names a JSON value's type for a diagnostic's <c>Found</c>: <c>a string</c>, <c>a number</c>, <c>an array</c>.</summary>
+    private static string Describe(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => "a string",
+            JsonValueKind.Number => "a number",
+            JsonValueKind.True or JsonValueKind.False => "a boolean",
+            JsonValueKind.Array => "an array",
+            JsonValueKind.Object => "an object",
+            _ => "null",
+        };
+    }
+
+    /// <summary>Like <see cref="Describe"/>, but quotes a string's value, for fields where the value is what is wrong.</summary>
+    private static string DescribeValue(JsonElement element)
+    {
+        return element.ValueKind == JsonValueKind.String ? $"\"{element.GetString()}\"" : Describe(element);
+    }
+
+    private static string FoundOperands(int count)
+    {
+        return count == 1 ? "1 operand" : $"{count} operands";
+    }
+
+    /// <summary>Builds the diagnostic for text that is not JSON at all: the reader's message, its position, and the nearest valid ancestor.</summary>
+    private static Diagnostic SyntaxError(string json, JsonException ex)
+    {
+        string reason = ex.Message;
+        int detail = reason.IndexOf(" Path:", StringComparison.Ordinal);
+        if (detail >= 0)
+        {
+            reason = reason[..detail];
+        }
+
+        SourceSpan span = ex is { LineNumber: { } line, BytePositionInLine: { } column }
+            ? new SourceSpan(OffsetOf(json, line, column), 1)
+            : SourceSpan.None;
+        return Diagnostic.Error(
+            DiagnosticCodes.MalformedTree,
+            $"Malformed JSON: {ex.Message}",
+            span,
+            expected: "well-formed JSON",
+            found: reason,
+            path: ContainerPathAt(json)
+        );
+    }
+
+    // JsonException reports a 0-based line and a byte (not character) offset within it; convert to a character offset.
+    private static int OffsetOf(string json, long line, long bytePosition)
+    {
+        int lineStart = 0;
+        for (long current = 0; current < line; current++)
+        {
+            int next = json.IndexOf('\n', lineStart);
+            if (next < 0)
+            {
+                return json.Length;
+            }
+
+            lineStart = next + 1;
+        }
+
+        int offset = lineStart;
+        long bytes = 0;
+        while (offset < json.Length && bytes < bytePosition && json[offset] != '\n')
+        {
+            bytes += Encoding.UTF8.GetByteCount(json.AsSpan(offset, char.IsHighSurrogate(json[offset]) ? 2 : 1));
+            offset += char.IsHighSurrogate(json[offset]) ? 2 : 1;
+        }
+
+        return Math.Min(offset, json.Length);
+    }
+
+    /// <summary>Reads the text token by token until the reader gives up, and returns the path of the innermost container still open.</summary>
+    private static string ContainerPathAt(string json)
+    {
+        TreePathTracker tracker = new();
+        Utf8JsonReader reader = new(Encoding.UTF8.GetBytes(json));
+        try
+        {
+            while (reader.Read())
+            {
+                switch (reader.TokenType)
+                {
+                    case JsonTokenType.StartObject:
+                        tracker.Enter(isArray: false);
+                        break;
+                    case JsonTokenType.StartArray:
+                        tracker.Enter(isArray: true);
+                        break;
+                    case JsonTokenType.EndObject or JsonTokenType.EndArray:
+                        tracker.Exit();
+                        break;
+                    case JsonTokenType.PropertyName:
+                        tracker.Key(reader.GetString() ?? string.Empty);
+                        break;
+                    case JsonTokenType.Comment or JsonTokenType.None:
+                        break;
+                    default:
+                        tracker.Scalar();
+                        break;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // The reader stopping is the point: the tracker now holds the last good position.
+        }
+
+        return tracker.ContainerPath;
+    }
+
+    private static RuleNode? ParseNode(JsonElement element, string path, List<Diagnostic> diagnostics)
+    {
+        RuleNode? node = ParseNodeCore(element, path, diagnostics);
+        return node is null ? null : node with { Path = path };
+    }
+
+    private static RuleNode? ParseNodeCore(JsonElement element, string path, List<Diagnostic> diagnostics)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -72,7 +191,10 @@ internal static class JsonTreeParser
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"Expected a JSON object node but found {element.ValueKind}.",
-                    SourceSpan.None
+                    SourceSpan.None,
+                    expected: "a JSON object",
+                    found: Describe(element),
+                    path: path
                 )
             );
             return null;
@@ -99,7 +221,10 @@ internal static class JsonTreeParser
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     "'const' must be a JSON boolean or one of \"true\", \"false\", \"unknown\".",
-                    SourceSpan.None
+                    SourceSpan.None,
+                    expected: "a JSON boolean or one of \"true\", \"false\", \"unknown\"",
+                    found: Describe(constElement),
+                    path: TreePath.Property(path, "const")
                 )
             );
             return null;
@@ -107,30 +232,60 @@ internal static class JsonTreeParser
 
         if (element.TryGetProperty("predicate", out JsonElement predicateElement))
         {
-            return ParseTerm(element, predicateElement, diagnostics);
+            return ParseTerm(element, predicateElement, path, diagnostics);
         }
 
-        if (element.TryGetProperty("op", out JsonElement opElement) && opElement.ValueKind == JsonValueKind.String)
+        if (element.TryGetProperty("op", out JsonElement opElement))
         {
-            return ParseOperator(element, opElement.GetString()!, diagnostics);
+            if (opElement.ValueKind == JsonValueKind.String)
+            {
+                return ParseOperator(element, opElement.GetString()!, path, diagnostics);
+            }
+
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    "'op' must be a JSON string naming an operator.",
+                    SourceSpan.None,
+                    expected: "a JSON string",
+                    found: Describe(opElement),
+                    path: TreePath.Property(path, "op")
+                )
+            );
+            return null;
         }
 
         diagnostics.Add(
             Diagnostic.Error(
                 DiagnosticCodes.MalformedTree,
                 "A tree node must have a 'const', 'predicate', or 'op' key.",
-                SourceSpan.None
+                SourceSpan.None,
+                expected: "a 'const', 'predicate' or 'op' key",
+                found: "no such key",
+                path: path
             )
         );
         return null;
     }
 
-    private static RuleNode? ParseTerm(JsonElement element, JsonElement predicateElement, List<Diagnostic> diagnostics)
+    private static RuleNode? ParseTerm(
+        JsonElement element,
+        JsonElement predicateElement,
+        string path,
+        List<Diagnostic> diagnostics
+    )
     {
         if (predicateElement.ValueKind != JsonValueKind.String)
         {
             diagnostics.Add(
-                Diagnostic.Error(DiagnosticCodes.MalformedTree, "'predicate' must be a JSON string.", SourceSpan.None)
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    "'predicate' must be a JSON string.",
+                    SourceSpan.None,
+                    expected: "a JSON string",
+                    found: Describe(predicateElement),
+                    path: TreePath.Property(path, "predicate")
+                )
             );
             return null;
         }
@@ -138,62 +293,99 @@ internal static class JsonTreeParser
         List<ArgumentNode> arguments = [];
         if (element.TryGetProperty("args", out JsonElement argsElement))
         {
+            string argsPath = TreePath.Property(path, "args");
             if (argsElement.ValueKind != JsonValueKind.Object)
             {
                 diagnostics.Add(
-                    Diagnostic.Error(DiagnosticCodes.MalformedTree, "'args' must be a JSON object.", SourceSpan.None)
+                    Diagnostic.Error(
+                        DiagnosticCodes.MalformedTree,
+                        "'args' must be a JSON object.",
+                        SourceSpan.None,
+                        expected: "a JSON object",
+                        found: Describe(argsElement),
+                        path: argsPath
+                    )
                 );
                 return null;
             }
 
             foreach (JsonProperty property in argsElement.EnumerateObject())
             {
-                RawLiteral? literal = ParseLiteral(property.Value, diagnostics);
+                string argumentPath = TreePath.Property(argsPath, property.Name);
+                RawLiteral? literal = ParseLiteral(property.Value, argumentPath, diagnostics);
                 if (literal is null)
                 {
                     return null;
                 }
 
-                arguments.Add(new ArgumentNode(property.Name, literal, SourceSpan.None));
+                arguments.Add(new ArgumentNode(property.Name, literal, SourceSpan.None) { Path = argumentPath });
             }
         }
 
         return new TermNode(predicateElement.GetString()!, arguments, SourceSpan.None);
     }
 
-    private static RuleNode? ParseOperator(JsonElement element, string op, List<Diagnostic> diagnostics)
+    private static RuleNode? ParseOperator(JsonElement element, string op, string path, List<Diagnostic> diagnostics)
     {
-        if (
-            !element.TryGetProperty("operands", out JsonElement operandsElement)
-            || operandsElement.ValueKind != JsonValueKind.Array
-        )
+        // The operator name is checked before its operands so a typo is reported on its own, with its suggestion.
+        if (!TreeFormatOpNames.TryFromTreeFormat(op, out string? canonicalOpName))
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"Unknown operator '{op}'.",
+                    SourceSpan.None,
+                    expected: "a known operator",
+                    found: $"'{op}'",
+                    suggestion: NameSuggester.Suggest(op, TreeFormatOpNames.ReadableNames),
+                    path: TreePath.Property(path, "op")
+                )
+            );
+            return null;
+        }
+
+        string operandsPath = TreePath.Property(path, "operands");
+        if (!element.TryGetProperty("operands", out JsonElement operandsElement))
         {
             diagnostics.Add(
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"Operator node '{op}' requires an 'operands' array.",
-                    SourceSpan.None
+                    SourceSpan.None,
+                    expected: "an 'operands' array",
+                    found: "no 'operands' property",
+                    path: path
+                )
+            );
+            return null;
+        }
+
+        if (operandsElement.ValueKind != JsonValueKind.Array)
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"Operator node '{op}' requires an 'operands' array.",
+                    SourceSpan.None,
+                    expected: "an 'operands' array",
+                    found: Describe(operandsElement),
+                    path: operandsPath
                 )
             );
             return null;
         }
 
         List<RuleNode> operands = [];
+        int index = 0;
         foreach (JsonElement operandElement in operandsElement.EnumerateArray())
         {
-            RuleNode? operand = ParseNode(operandElement, diagnostics);
+            RuleNode? operand = ParseNode(operandElement, TreePath.Index(operandsPath, index++), diagnostics);
             if (operand is null)
             {
                 return null;
             }
 
             operands.Add(operand);
-        }
-
-        if (!TreeFormatOpNames.TryFromTreeFormat(op, out string? canonicalOpName))
-        {
-            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MalformedTree, $"Unknown operator '{op}'.", SourceSpan.None));
-            return null;
         }
 
         switch (canonicalOpName)
@@ -206,7 +398,14 @@ internal static class JsonTreeParser
                 if (operands.Count != 1)
                 {
                     diagnostics.Add(
-                        Diagnostic.Error(DiagnosticCodes.MalformedTree, "'not' requires exactly one operand.", SourceSpan.None)
+                        Diagnostic.Error(
+                            DiagnosticCodes.MalformedTree,
+                            "'not' requires exactly one operand.",
+                            SourceSpan.None,
+                            expected: "1 operand",
+                            found: FoundOperands(operands.Count),
+                            path: operandsPath
+                        )
                     );
                     return null;
                 }
@@ -243,23 +442,23 @@ internal static class JsonTreeParser
             case "IsKnown":
                 return new InspectionNode(InspectionKind.IsKnown, operands, SourceSpan.None);
             case "Project":
-                return ParseProject(element, op, operands, diagnostics);
+                return ParseProject(element, op, path, operands, diagnostics);
             case "Collapse":
-                return ParseCollapse(element, op, operands, diagnostics);
+                return ParseCollapse(element, op, path, operands, diagnostics);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":
-                return ParseThreshold(element, op, ThresholdComparison.AtLeast, operands, diagnostics);
+                return ParseThreshold(element, op, path, ThresholdComparison.AtLeast, operands, diagnostics);
             case "AtMost":
-                return ParseThreshold(element, op, ThresholdComparison.AtMost, operands, diagnostics);
+                return ParseThreshold(element, op, path, ThresholdComparison.AtMost, operands, diagnostics);
             case "GreaterThan":
-                return ParseThreshold(element, op, ThresholdComparison.GreaterThan, operands, diagnostics);
+                return ParseThreshold(element, op, path, ThresholdComparison.GreaterThan, operands, diagnostics);
             case "LessThan":
-                return ParseThreshold(element, op, ThresholdComparison.LessThan, operands, diagnostics);
+                return ParseThreshold(element, op, path, ThresholdComparison.LessThan, operands, diagnostics);
             case "Exactly":
-                return ParseThreshold(element, op, ThresholdComparison.Exactly, operands, diagnostics);
+                return ParseThreshold(element, op, path, ThresholdComparison.Exactly, operands, diagnostics);
             case "Between":
-                return ParseBetween(element, op, operands, diagnostics);
+                return ParseBetween(element, op, path, operands, diagnostics);
             default:
                 throw new InvalidOperationException($"Unhandled canonical op-name '{canonicalOpName}'.");
         }
@@ -268,20 +467,30 @@ internal static class JsonTreeParser
     private static RuleNode? ParseThreshold(
         JsonElement element,
         string op,
+        string path,
         ThresholdComparison comparison,
         List<RuleNode> operands,
         List<Diagnostic> diagnostics
     )
     {
-        if (!element.TryGetProperty("k", out JsonElement kElement) || kElement.ValueKind != JsonValueKind.Number)
+        // TryGetInt32 (not GetInt32) so a fractional or oversized k is a diagnostic instead of an exception.
+        bool present = element.TryGetProperty("k", out JsonElement kElement);
+        if (!present || kElement.ValueKind != JsonValueKind.Number || !kElement.TryGetInt32(out int k))
         {
             diagnostics.Add(
-                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"'{op}' requires a numeric 'k'.", SourceSpan.None)
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"'{op}' requires a numeric 'k'.",
+                    SourceSpan.None,
+                    expected: "an integer",
+                    found: present ? Describe(kElement) : "no 'k' property",
+                    path: present ? TreePath.Property(path, "k") : path
+                )
             );
             return null;
         }
 
-        return new ThresholdNode(comparison, kElement.GetInt32(), operands, SourceSpan.None);
+        return new ThresholdNode(comparison, k, operands, SourceSpan.None);
     }
 
     /// <summary>
@@ -291,6 +500,7 @@ internal static class JsonTreeParser
     private static RuleNode? ParseCollapse(
         JsonElement element,
         string op,
+        string path,
         List<RuleNode> operands,
         List<Diagnostic> diagnostics
     )
@@ -301,11 +511,20 @@ internal static class JsonTreeParser
             || !CollapsePolicyText.TryParse(policyElement.GetString(), out CollapsePolicy policy)
         )
         {
+            bool present = element.TryGetProperty("policy", out policyElement);
+            DiagnosticSuggestion? suggestion =
+                present && policyElement.ValueKind == JsonValueKind.String
+                    ? NameSuggester.Suggest(policyElement.GetString()!, CollapsePolicyText.TreeFormatNames)
+                    : null;
             diagnostics.Add(
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"'{op}' requires 'policy' to be one of {string.Join(", ", CollapsePolicyText.Names)}.",
-                    SourceSpan.None
+                    SourceSpan.None,
+                    expected: $"one of {string.Join(", ", CollapsePolicyText.TreeFormatNames)}",
+                    found: present ? DescribeValue(policyElement) : "no 'policy' property",
+                    suggestion: suggestion,
+                    path: present ? TreePath.Property(path, "policy") : path
                 )
             );
             return null;
@@ -318,10 +537,17 @@ internal static class JsonTreeParser
     /// Reads <c>Project</c>'s <c>unknownAs</c>: a JSON boolean or the string <c>"true"</c>/<c>"false"</c> in any letter
     /// case (like <c>const</c>). <c>Unknown</c> is rejected because projecting <c>Unknown</c> to itself is no projection.
     /// </summary>
-    private static RuleNode? ParseProject(JsonElement element, string op, List<RuleNode> operands, List<Diagnostic> diagnostics)
+    private static RuleNode? ParseProject(
+        JsonElement element,
+        string op,
+        string path,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
     {
+        bool present = element.TryGetProperty("unknownAs", out JsonElement valueElement);
         bool? unknownAs = null;
-        if (element.TryGetProperty("unknownAs", out JsonElement valueElement))
+        if (present)
         {
             if (valueElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
             {
@@ -343,7 +569,10 @@ internal static class JsonTreeParser
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"'{op}' requires 'unknownAs' to be true or false (a JSON boolean or the string \"true\"/\"false\").",
-                    SourceSpan.None
+                    SourceSpan.None,
+                    expected: "true or false",
+                    found: present ? DescribeValue(valueElement) : "no 'unknownAs' property",
+                    path: present ? TreePath.Property(path, "unknownAs") : path
                 )
             );
             return null;
@@ -352,28 +581,56 @@ internal static class JsonTreeParser
         return new ProjectNode(operands, value, SourceSpan.None);
     }
 
-    private static RuleNode? ParseBetween(JsonElement element, string op, List<RuleNode> operands, List<Diagnostic> diagnostics)
+    private static RuleNode? ParseBetween(
+        JsonElement element,
+        string op,
+        string path,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
     {
-        if (!TryGetInteger(element, "min", out int min) || !TryGetInteger(element, "max", out int max))
+        if (
+            !TryGetBound(element, op, "min", path, diagnostics, out int min)
+            || !TryGetBound(element, op, "max", path, diagnostics, out int max)
+        )
         {
-            diagnostics.Add(
-                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"'{op}' requires integer 'min' and 'max'.", SourceSpan.None)
-            );
             return null;
         }
 
         return new BetweenNode(min, max, operands, SourceSpan.None);
     }
 
-    private static bool TryGetInteger(JsonElement element, string property, out int value)
+    // Reports the first bound that is missing or not an integer, at that bound's own path.
+    private static bool TryGetBound(
+        JsonElement element,
+        string op,
+        string property,
+        string path,
+        List<Diagnostic> diagnostics,
+        out int value
+    )
     {
         value = 0;
-        return element.TryGetProperty(property, out JsonElement child)
-            && child.ValueKind == JsonValueKind.Number
-            && child.TryGetInt32(out value);
+        bool present = element.TryGetProperty(property, out JsonElement child);
+        if (present && child.ValueKind == JsonValueKind.Number && child.TryGetInt32(out value))
+        {
+            return true;
+        }
+
+        diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.MalformedTree,
+                $"'{op}' requires integer 'min' and 'max'.",
+                SourceSpan.None,
+                expected: "an integer",
+                found: present ? Describe(child) : $"no '{property}' property",
+                path: present ? TreePath.Property(path, property) : path
+            )
+        );
+        return false;
     }
 
-    private static RawLiteral? ParseLiteral(JsonElement element, List<Diagnostic> diagnostics)
+    private static RawLiteral? ParseLiteral(JsonElement element, string path, List<Diagnostic> diagnostics)
     {
         switch (element.ValueKind)
         {
@@ -387,9 +644,10 @@ internal static class JsonTreeParser
                 return RawLiteral.OfBoolean(false, SourceSpan.None);
             case JsonValueKind.Array:
                 List<RawLiteral> items = [];
+                int index = 0;
                 foreach (JsonElement item in element.EnumerateArray())
                 {
-                    RawLiteral? converted = ParseLiteral(item, diagnostics);
+                    RawLiteral? converted = ParseLiteral(item, TreePath.Index(path, index++), diagnostics);
                     if (converted is null)
                     {
                         return null;
@@ -404,7 +662,10 @@ internal static class JsonTreeParser
                     Diagnostic.Error(
                         DiagnosticCodes.MalformedTree,
                         $"Unsupported literal JSON value kind '{element.ValueKind}'.",
-                        SourceSpan.None
+                        SourceSpan.None,
+                        expected: "a string, number, boolean or array",
+                        found: Describe(element),
+                        path: path
                     )
                 );
                 return null;

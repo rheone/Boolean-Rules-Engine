@@ -222,6 +222,26 @@ the aliases are cheap once the canonical form stays single.
     no-mixing "add parentheses" advice is now also a `Hint` suggestion that
     quotes the operand wrapped in parentheses where there is one.
 
+    Implemented for JSON and YAML in k3-conformance 29. The same `Diagnostic`
+    carries a `Path` alongside `Span`: `$` is the document root, `.name` a key,
+    `[n]` a 0-based sequence item, `['key']` for a key that is not a plain
+    identifier; JSON and YAML share the syntax. Raw parse nodes (and arguments)
+    carry the path (an internal `Path` init property), and the compiler copies it
+    onto its own diagnostics, so a validation error found after parsing is
+    located the same way. A wrong field is located at the field (`.k`, `.policy`,
+    `.unknownAs`, `.min`, `.max`, `.const`, `.op`, `.predicate`, `.args.name`), a
+    wrong operand count at `.operands`, and a missing key at the node that should
+    have held it. `Unknown operator` is checked before the operands are read and
+    is answered with the nearest tree-format op name (including the read-only
+    `xnor`/`iff` aliases) or, for `Collapse` policies, in the tree spelling; an
+    unknown predicate in a tree is only ever answered with a registered predicate
+    name, never a DSL operator word. YAML diagnostics also carry the `Span` of the
+    offending node (from YamlDotNet's marks); JSON diagnostics have none, because
+    `JsonElement` keeps no positions, except invalid-syntax diagnostics, which use
+    the reader's line and byte position. For invalid syntax the path is the
+    innermost container still open when the reader stopped. `FormatDiagnostics`
+    prints `at $.path` (plus ` (line L, column C)` when there is a span).
+
 12. **`Project(expr, unknown)`** is an in-tree node that keeps `True`/`False`
     and replaces `Unknown` with the chosen `True` or `False`
     (`.tmp/ProjectAndCollapse.md`). It always yields a definite `TruthValue`

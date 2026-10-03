@@ -45,6 +45,9 @@ internal static class TreeFormatOpNames
 
     private static readonly IReadOnlyDictionary<string, string> TreeFormatToCanonical = BuildReadTable();
 
+    /// <summary>Gets every op string a tree may use when reading, aliases included: the candidates for a "did you mean" suggestion.</summary>
+    public static IEnumerable<string> ReadableNames => TreeFormatToCanonical.Keys;
+
     /// <summary>Gets the tree-format op string for a node's canonical op-name (a <see cref="NodeShape.OpName"/> value).</summary>
     /// <param name="opName">The canonical op-name, e.g. <c>"And"</c> or, for a threshold, <c>"AtLeast"</c>.</param>
     /// <returns>The tree-format op string, e.g. <c>"and"</c> or <c>"atLeast"</c>.</returns>

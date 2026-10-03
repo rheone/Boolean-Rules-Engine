@@ -58,7 +58,8 @@ internal sealed class RuleNodeCompiler<TContext>
                         $"Collapse requires exactly 1 operand but found {outermost.Operands.Count}.",
                         outermost.Span,
                         expected: "1 operand",
-                        found: CountText(outermost.Operands.Count)
+                        found: CountText(outermost.Operands.Count),
+                        path: PathOf(outermost, "operands")
                     )
                 );
                 return (null, null, compiler.diagnostics);
@@ -71,6 +72,12 @@ internal sealed class RuleNodeCompiler<TContext>
         Expression tree = compiler.Build(body, depth: 1);
         bool hasErrors = compiler.diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error);
         return (hasErrors ? null : tree, collapse, compiler.diagnostics);
+    }
+
+    /// <summary>Gets the path of a property of a JSON/YAML node, or <see langword="null"/> for a DSL node.</summary>
+    private static string? PathOf(RuleNode node, string property)
+    {
+        return node.Path is null ? null : TreePath.Property(node.Path, property);
     }
 
     /// <summary>Phrases an operand count for a diagnostic's expected/found pair: <c>1 operand</c>, <c>3 operands</c>.</summary>
@@ -142,7 +149,8 @@ internal sealed class RuleNodeCompiler<TContext>
                         $"Rule exceeds the maximum node count of {this.options.MaxNodeCount}.",
                         node.Span,
                         expected: $"at most {this.options.MaxNodeCount} nodes",
-                        found: "more nodes than that"
+                        found: "more nodes than that",
+                        path: node.Path
                     )
                 );
             }
@@ -158,7 +166,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"Rule exceeds the maximum tree depth of {this.options.MaxDepth}.",
                     node.Span,
                     expected: $"nesting at most {this.options.MaxDepth} deep",
-                    found: "deeper nesting"
+                    found: "deeper nesting",
+                    path: node.Path
                 )
             );
             return FailedNode.Placeholder;
@@ -173,54 +182,54 @@ internal sealed class RuleNodeCompiler<TContext>
             AndNode a => this.BuildVariadic(
                 a.Operands,
                 depth,
-                a.Span,
+                a,
                 2,
                 operands => new AndExpression(new EquatableArray<Expression>(operands))
             ),
             OrNode o => this.BuildVariadic(
                 o.Operands,
                 depth,
-                o.Span,
+                o,
                 2,
                 operands => new OrExpression(new EquatableArray<Expression>(operands))
             ),
             XorNode x => this.BuildXor(x, depth),
             EquivalentNode eq => this.BuildEquivalent(eq, depth),
             ImpliesNode i => this.BuildImplies(i, depth),
-            NandNode nd => this.BuildNegatedBinary(nd.Operands, nd.Span, "NAND", depth, (l, r) => new NandExpression(l, r)),
-            NorNode nr => this.BuildNegatedBinary(nr.Operands, nr.Span, "NOR", depth, (l, r) => new NorExpression(l, r)),
+            NandNode nd => this.BuildNegatedBinary(nd.Operands, nd, "NAND", depth, (l, r) => new NandExpression(l, r)),
+            NorNode nr => this.BuildNegatedBinary(nr.Operands, nr, "NOR", depth, (l, r) => new NorExpression(l, r)),
             NxorNode nx => this.BuildVariadic(
                 nx.Operands,
                 depth,
-                nx.Span,
+                nx,
                 2,
                 operands => new NxorExpression(new EquatableArray<Expression>(operands))
             ),
             AnyNode an => this.BuildVariadic(
                 an.Operands,
                 depth,
-                an.Span,
+                an,
                 2,
                 operands => new AnyExpression(new EquatableArray<Expression>(operands))
             ),
             AllNode al => this.BuildVariadic(
                 al.Operands,
                 depth,
-                al.Span,
+                al,
                 2,
                 operands => new AllExpression(new EquatableArray<Expression>(operands))
             ),
             NoneNode no => this.BuildVariadic(
                 no.Operands,
                 depth,
-                no.Span,
+                no,
                 2,
                 operands => new NoneExpression(new EquatableArray<Expression>(operands))
             ),
             ExactlyOneNode e => this.BuildVariadic(
                 e.Operands,
                 depth,
-                e.Span,
+                e,
                 2,
                 operands => new ExactlyOneExpression(new EquatableArray<Expression>(operands))
             ),
@@ -229,7 +238,7 @@ internal sealed class RuleNodeCompiler<TContext>
             CoalesceNode co => this.BuildVariadic(
                 co.Operands,
                 depth,
-                co.Span,
+                co,
                 2,
                 operands => new CoalesceExpression(new EquatableArray<Expression>(operands))
             ),
@@ -252,7 +261,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"If requires exactly 3 operands (condition, whenTrue, whenFalse) but found {node.Operands.Count}.",
                     node.Span,
                     expected: "3 operands",
-                    found: CountText(node.Operands.Count)
+                    found: CountText(node.Operands.Count),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -276,7 +286,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"{node.Kind} requires exactly 1 operand but found {node.Operands.Count}.",
                     node.Span,
                     expected: "1 operand",
-                    found: CountText(node.Operands.Count)
+                    found: CountText(node.Operands.Count),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -301,7 +312,8 @@ internal sealed class RuleNodeCompiler<TContext>
                 suggestion: new DiagnosticSuggestion(
                     DiagnosticSuggestionKind.Hint,
                     "Move Collapse to the outside of the whole rule, or use Project(expr, True) or Project(expr, False) to resolve Unknown inside the rule."
-                )
+                ),
+                path: node.Path
             )
         );
         return node.Operands.Count == 1 ? this.Build(node.Operands[0], depth + 1) : FailedNode.Placeholder;
@@ -318,7 +330,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"Project requires exactly 1 operand but found {node.Operands.Count}.",
                     node.Span,
                     expected: "1 operand",
-                    found: CountText(node.Operands.Count)
+                    found: CountText(node.Operands.Count),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -330,7 +343,7 @@ internal sealed class RuleNodeCompiler<TContext>
     private Expression BuildVariadic(
         IReadOnlyList<RuleNode> operands,
         int depth,
-        SourceSpan span,
+        RuleNode owner,
         int minOperands,
         Func<IReadOnlyList<Expression>, Expression> construct
     )
@@ -341,9 +354,10 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"This operator requires at least {minOperands} operands but found {operands.Count}.",
-                    span,
+                    owner.Span,
                     expected: $"at least {minOperands} operands",
-                    found: CountText(operands.Count)
+                    found: CountText(operands.Count),
+                    path: PathOf(owner, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -375,7 +389,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     suggestion: new DiagnosticSuggestion(
                         DiagnosticSuggestionKind.Hint,
                         "Use NXOR(...) for n-ary parity (an odd number of True operands) or ExactlyOne(...) for n-ary 'exactly one'."
-                    )
+                    ),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -400,7 +415,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span,
                     expected: "2 operands",
                     found: CountText(node.Operands.Count),
-                    suggestion: NestingHint("EQUIVALENT")
+                    suggestion: NestingHint("EQUIVALENT"),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -417,7 +433,7 @@ internal sealed class RuleNodeCompiler<TContext>
     /// </summary>
     private Expression BuildNegatedBinary(
         IReadOnlyList<RuleNode> operands,
-        SourceSpan span,
+        RuleNode owner,
         string name,
         int depth,
         Func<Expression, Expression, Expression> construct
@@ -432,10 +448,11 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.XorArityViolation,
                     message,
-                    span,
+                    owner.Span,
                     expected: "2 operands",
                     found: CountText(operands.Count),
-                    suggestion: NestingHint(name)
+                    suggestion: NestingHint(name),
+                    path: PathOf(owner, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -460,7 +477,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span,
                     expected: "2 operands",
                     found: CountText(node.Operands.Count),
-                    suggestion: NestingHint("IMPLIES")
+                    suggestion: NestingHint("IMPLIES"),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -481,7 +499,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"{node.Comparison} requires at least one operand.",
                     node.Span,
                     expected: "at least 1 operand",
-                    found: CountText(0)
+                    found: CountText(0),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -496,7 +515,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"{node.Comparison}'s threshold k={node.K} must satisfy {minK} <= k <= {maxK} for {node.Operands.Count} operand(s) (any value outside that range makes the result a structural constant).",
                     node.Span,
                     expected: $"{minK} <= k <= {maxK}",
-                    found: $"k={node.K}"
+                    found: $"k={node.K}",
+                    path: PathOf(node, "k")
                 )
             );
             return FailedNode.Placeholder;
@@ -527,7 +547,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"BETWEEN requires at least 2 operands but found {operandCount}.",
                     node.Span,
                     expected: "at least 2 operands",
-                    found: CountText(operandCount)
+                    found: CountText(operandCount),
+                    path: PathOf(node, "operands")
                 )
             );
             return FailedNode.Placeholder;
@@ -545,7 +566,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     $"BETWEEN's bounds min={node.Min}, max={node.Max} are invalid: {reason}.",
                     node.Span,
                     expected: $"0 <= min <= max <= {operandCount}, excluding the full range",
-                    found: $"min={node.Min}, max={node.Max}"
+                    found: $"min={node.Min}, max={node.Max}",
+                    path: node.Path
                 )
             );
             return FailedNode.Placeholder;
@@ -558,6 +580,16 @@ internal sealed class RuleNodeCompiler<TContext>
         }
 
         return new BetweenExpression(node.Min, node.Max, new EquatableArray<Expression>(built));
+    }
+
+    /// <summary>
+    /// The names a misspelt predicate could have meant: the registered predicates, plus the DSL's operator words when the
+    /// rule is DSL text (a JSON/YAML tree names operators in its own <c>op</c> field, so an operator word there would
+    /// mislead).
+    /// </summary>
+    private IEnumerable<string> NamesToSuggest(RuleNode node)
+    {
+        return node.Path is null ? this.registry.Names.Concat(DslVocabulary.Keywords) : this.registry.Names;
     }
 
     private Expression BuildTerm(TermNode node)
@@ -576,7 +608,8 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span,
                     expected: "a registered predicate name or an operator",
                     found: $"'{node.PredicateName}'",
-                    suggestion: NameSuggester.Suggest(node.PredicateName, this.registry.Names.Concat(DslVocabulary.Keywords))
+                    suggestion: NameSuggester.Suggest(node.PredicateName, this.NamesToSuggest(node)),
+                    path: PathOf(node, "predicate")
                 )
             );
             return FailedNode.Placeholder;
@@ -602,7 +635,8 @@ internal sealed class RuleNodeCompiler<TContext>
                         arg.Span,
                         expected: expectedArguments,
                         found: $"'{arg.Name}'",
-                        suggestion: NameSuggester.Suggest(arg.Name, declared)
+                        suggestion: NameSuggester.Suggest(arg.Name, declared),
+                        path: arg.Path
                     )
                 );
                 continue;
@@ -616,7 +650,8 @@ internal sealed class RuleNodeCompiler<TContext>
                         $"Argument '{arg.Name}' of predicate '{schema.Name}' must be of kind '{argSchema.Type}'.",
                         arg.Value.Span,
                         expected: $"a value of kind '{argSchema.Type}'",
-                        found: DescribeLiteral(arg.Value)
+                        found: DescribeLiteral(arg.Value),
+                        path: arg.Path
                     )
                 );
                 continue;
@@ -644,7 +679,8 @@ internal sealed class RuleNodeCompiler<TContext>
                         $"Predicate '{schema.Name}' requires argument '{argSchema.Name}'.",
                         node.Span,
                         expected: $"argument '{argSchema.Name}'",
-                        found: supplied
+                        found: supplied,
+                        path: node.Path
                     )
                 );
             }

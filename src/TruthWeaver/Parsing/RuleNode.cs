@@ -19,7 +19,15 @@ using TruthWeaver.Diagnostics;
 /// something tested for and hoped to remain true.
 /// </summary>
 /// <param name="Span">This node's location in the source it was parsed from.</param>
-internal abstract record RuleNode(SourceSpan Span);
+internal abstract record RuleNode(SourceSpan Span)
+{
+    /// <summary>
+    /// Gets where this node sits in the JSON or YAML document it came from, such as <c>$.operands[1]</c>, or
+    /// <see langword="null"/> for DSL text (which is located by <see cref="Span"/>). The tree front ends set it, and the
+    /// compiler copies it onto the diagnostics it raises for the node.
+    /// </summary>
+    public string? Path { get; init; }
+}
 
 /// <summary>The literal K3 constant: <c>True</c>, <c>False</c> or <c>Unknown</c>.</summary>
 internal sealed record ConstantNode(TruthValue Value, SourceSpan Span) : RuleNode(Span);
@@ -28,7 +36,11 @@ internal sealed record ConstantNode(TruthValue Value, SourceSpan Span) : RuleNod
 internal sealed record TermNode(string PredicateName, IReadOnlyList<ArgumentNode> Arguments, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>One raw named argument of a <see cref="TermNode"/>.</summary>
-internal sealed record ArgumentNode(string Name, RawLiteral Value, SourceSpan Span);
+internal sealed record ArgumentNode(string Name, RawLiteral Value, SourceSpan Span)
+{
+    /// <summary>Gets the argument's JSON or YAML path, such as <c>$.args.role</c>, or <see langword="null"/> for DSL text.</summary>
+    public string? Path { get; init; }
+}
 
 /// <summary>Logical negation.</summary>
 internal sealed record NotNode(RuleNode Operand, SourceSpan Span) : RuleNode(Span);

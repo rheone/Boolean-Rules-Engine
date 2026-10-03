@@ -1815,6 +1815,45 @@ suggestion rather than a bad guess. They cover unknown predicate and operator
 names, misspelt `Collapse` policies, undeclared predicate argument names, and a
 lone `&` or `|`.
 
+### JSON and YAML rules
+
+A malformed JSON or YAML rule is located by `Path` instead of by line and
+column: the route from the document root to the offending key, written the
+same way for both formats (`$` is the root, `.name` a key, `[n]` a 0-based
+sequence item). A YAML diagnostic also carries the `Span` of the offending node,
+so `FormatDiagnostics(yaml)` adds the line and column and the source line; a JSON
+diagnostic has no span, because `System.Text.Json` keeps no positions, except for
+invalid JSON syntax, which carries the parser's position.
+
+```csharp
+const string json = """{"op":"and","operands":[{"const":true},{"op":"orr","operands":[]}]}""";
+Console.WriteLine(compiler.CompileJson(json).FormatDiagnostics(json));
+```
+
+```text
+BRE0014 error at $.operands[1].op: Unknown operator 'orr'.
+  Expected: a known operator
+  Found: 'orr'
+  Did you mean: or
+```
+
+Unknown `op` names are answered with the nearest operator in the tree's own
+spelling (`atLeast`, not `AtLeast`) and unknown predicate names with the nearest
+registered predicate. Where a field is wrong the path points at the field
+(`$.k`, `$.policy`, `$.unknownAs`, `$.min`, `$.args.role`, `$.predicate`, `$.op`,
+`$.const`); a wrong operand count points at `.operands`; a missing key is
+reported at the node that should have held it. Invalid JSON or YAML syntax
+reports the nearest valid ancestor (the innermost object or array still open) and
+the parser's position:
+
+```text
+BRE0014 error at $.operands (line 1, column 38): Malformed JSON: ...
+  {"op":"and","operands":[{"const":true},
+                                        ^
+  Expected: well-formed JSON
+  Found: ...
+```
+
 The classes of malformed rule text each report as follows.
 
 | Problem | Code | Expected / found | Suggestion |

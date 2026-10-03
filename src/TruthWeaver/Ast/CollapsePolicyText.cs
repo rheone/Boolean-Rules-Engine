@@ -14,6 +14,9 @@ internal static class CollapsePolicyText
     public static IReadOnlyList<string> Names { get; } =
     [nameof(CollapsePolicy.UnknownAsFalse), nameof(CollapsePolicy.UnknownAsTrue), nameof(CollapsePolicy.UnknownIsError)];
 
+    /// <summary>Gets the policy names as JSON and YAML trees spell them (lower camel), in declaration order.</summary>
+    public static IReadOnlyList<string> TreeFormatNames { get; } = [.. Enum.GetValues<CollapsePolicy>().Select(TreeFormat)];
+
     /// <summary>Gets the canonical (upper camel) spelling used by the DSL printer and descriptions.</summary>
     /// <param name="policy">The policy.</param>
     /// <returns><c>UnknownAsFalse</c>, <c>UnknownAsTrue</c> or <c>UnknownIsError</c>.</returns>
