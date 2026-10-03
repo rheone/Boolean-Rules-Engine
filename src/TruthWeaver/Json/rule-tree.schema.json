@@ -79,10 +79,10 @@
       "additionalProperties": false
     },
     "naryOperatorNode": {
-      "description": "AND, OR, XOR, EQUIVALENT, IMPLIES, NAND, NOR, ExactlyOne: an operand list ('iff' and the legacy 'xnor' are accepted aliases of 'equivalent'; XOR/EQUIVALENT/IMPLIES/NAND/NOR are compile-time restricted to exactly two operands, IMPLIES as [antecedent, consequent]; that restriction is not expressible as JSON structure).",
+      "description": "AND, OR, XOR, EQUIVALENT, IMPLIES, NAND, NOR, NXOR, ExactlyOne: an operand list ('iff' and the legacy 'xnor' are accepted aliases of 'equivalent'; XOR/EQUIVALENT/IMPLIES/NAND/NOR are compile-time restricted to exactly two operands, IMPLIES as [antecedent, consequent]; that restriction is not expressible as JSON structure).",
       "type": "object",
       "properties": {
-        "op": { "enum": ["and", "or", "xor", "equivalent", "iff", "xnor", "implies", "nand", "nor", "exactlyOne"] },
+        "op": { "enum": ["and", "or", "xor", "equivalent", "iff", "xnor", "implies", "nand", "nor", "nxor", "exactlyOne"] },
         "operands": {
           "type": "array",
           "items": { "$ref": "#/$defs/node" }

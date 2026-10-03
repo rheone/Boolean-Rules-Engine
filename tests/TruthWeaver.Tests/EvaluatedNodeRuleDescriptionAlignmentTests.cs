@@ -25,6 +25,7 @@ public sealed class EvaluatedNodeRuleDescriptionAlignmentTests
     [InlineData("d IMPLIES a")]
     [InlineData("d NAND a")]
     [InlineData("d NOR a")]
+    [InlineData("NXOR(d, a, c)")]
     [InlineData("ExactlyOne(d, a, c)")]
     [InlineData("AtLeast(2, d, a, c)")]
     [InlineData("(d AND a) OR (ExactlyOne(c, d, a) XOR (NOT c))")]

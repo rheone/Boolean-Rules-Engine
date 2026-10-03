@@ -130,6 +130,21 @@ the aliases are cheap once the canonical form stays single.
     `rule-tree.schema.json` lists `nand` and `nor`. `RuleBuilder.Nand` and
     `RuleBuilder.Nor` are new.
 
+    Implemented in k3-conformance 12: `NXOR` is a first-class
+    `NxorExpression` function-call node (no precedence, so it needs no
+    parentheses next to infix operators) with `{"op": "nxor", "operands":
+    [...]}` in JSON and YAML (case-insensitive on read). It takes **two or more**
+    operands (fewer is `MalformedTree`, like `AND`/`OR`/`ExactlyOne`), and the
+    DSL spelling is `NXOR(a, b, ...)` (reserved word, any case). It is
+    `Unknown` whenever any operand is `Unknown`, otherwise `True` for an odd
+    number of `True` operands; evaluation folds binary XOR and the analyzer rail
+    is the same fold of the XOR rail. The canonical printer writes
+    `NXOR(a, b, ...)`; every tree-printer style keeps the word (no symbol or
+    C-family spelling). The `XOR` arity message (still `XorArityViolation`) now
+    names `NXOR` and `ExactlyOne`. `ExactlyOne` is unchanged and differs from
+    `NXOR` from three operands on. `rule-tree.schema.json` lists `nxor`.
+    `RuleBuilder.Nxor` is new.
+
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,
     `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a

@@ -29,6 +29,7 @@ internal sealed class DslParser
         "TRUE",
         "FALSE",
         "UNKNOWN",
+        "NXOR",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -300,6 +301,11 @@ internal sealed class DslParser
             return this.ParseExactlyOne();
         }
 
+        if (this.IsKeyword("NXOR"))
+        {
+            return this.ParseNxor();
+        }
+
         if (this.IsKeyword("ATLEAST"))
         {
             return this.ParseThreshold(ThresholdComparison.AtLeast);
@@ -443,6 +449,14 @@ internal sealed class DslParser
         this.position++;
         List<RuleNode> operands = this.ParseParenthesizedOperandList();
         return new ExactlyOneNode(operands, SpanCovering(start, this.tokens[this.position - 1].Span.End));
+    }
+
+    private RuleNode ParseNxor()
+    {
+        int start = this.Current.Span.Start;
+        this.position++;
+        List<RuleNode> operands = this.ParseParenthesizedOperandList();
+        return new NxorNode(operands, SpanCovering(start, this.tokens[this.position - 1].Span.End));
     }
 
     private RuleNode ParseThreshold(ThresholdComparison comparison)

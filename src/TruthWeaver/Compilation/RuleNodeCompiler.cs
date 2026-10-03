@@ -135,6 +135,13 @@ internal sealed class RuleNodeCompiler<TContext>
             ImpliesNode i => this.BuildImplies(i, depth),
             NandNode nd => this.BuildNegatedBinary(nd.Operands, nd.Span, "NAND", depth, (l, r) => new NandExpression(l, r)),
             NorNode nr => this.BuildNegatedBinary(nr.Operands, nr.Span, "NOR", depth, (l, r) => new NorExpression(l, r)),
+            NxorNode nx => this.BuildVariadic(
+                nx.Operands,
+                depth,
+                nx.Span,
+                2,
+                operands => new NxorExpression(new EquatableArray<Expression>(operands))
+            ),
             ExactlyOneNode e => this.BuildVariadic(
                 e.Operands,
                 depth,
@@ -180,13 +187,10 @@ internal sealed class RuleNodeCompiler<TContext>
     {
         if (node.Operands.Count != 2)
         {
-            this.diagnostics.Add(
-                Diagnostic.Error(
-                    DiagnosticCodes.XorArityViolation,
-                    $"XOR is binary only; found {node.Operands.Count} operands. Use ExactlyOne(...) for n-ary 'exactly one'.",
-                    node.Span
-                )
-            );
+            string message =
+                $"XOR is binary only; found {node.Operands.Count} operands. "
+                + "Use NXOR(...) for n-ary parity (an odd number of True operands) or ExactlyOne(...) for n-ary 'exactly one'.";
+            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, node.Span));
             return FailedNode.Placeholder;
         }
 

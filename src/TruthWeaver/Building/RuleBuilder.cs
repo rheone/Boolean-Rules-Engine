@@ -138,6 +138,14 @@ public abstract class RuleBuilder
         return new OperatorBuilder("nor", [left, right]);
     }
 
+    /// <summary>Creates a builder for n-ary parity (<c>NXOR(a, b, ...)</c>): <c>Unknown</c> if any operand is <c>Unknown</c>, otherwise <c>True</c> for an odd number of <c>True</c> operands.</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>NXOR</c> expression.</returns>
+    public static RuleBuilder Nxor(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("nxor", operands);
+    }
+
     /// <summary>Creates a builder for the n-ary "exactly one of these is true" operator.</summary>
     /// <param name="operands">The operands (at least two).</param>
     /// <returns>A builder for the <c>ExactlyOne</c> expression.</returns>

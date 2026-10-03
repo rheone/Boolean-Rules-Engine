@@ -71,6 +71,12 @@ internal sealed record NandNode(IReadOnlyList<RuleNode> Operands, SourceSpan Spa
 /// <summary>A raw <c>NOR</c> reference (negated disjunction); validated exactly like <see cref="NandNode"/>.</summary>
 internal sealed record NorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
+/// <summary>
+/// N-ary parity reference (<c>NXOR(a, b, ...)</c>). Operand count (at least two) is validated by <c>RuleNodeCompiler</c>
+/// like the other n-ary operators.
+/// </summary>
+internal sealed record NxorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
 /// <summary>N-ary "exactly one of these is true".</summary>
 internal sealed record ExactlyOneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 

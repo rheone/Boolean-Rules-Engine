@@ -66,6 +66,7 @@ internal sealed class Evaluator<TContext>(
             "Implies" => "IMPLIES",
             "Nand" => "NAND",
             "Nor" => "NOR",
+            "Nxor" => "NXOR",
             "ExactlyOne" => "ExactlyOne",
             _ => $"{shape.OpName}({shape.K})",
         };
@@ -134,6 +135,20 @@ internal sealed class Evaluator<TContext>(
     private static TruthValue KleeneImplies(TruthValue antecedent, TruthValue consequent)
     {
         return KleeneOr(KleeneNot(antecedent), consequent);
+    }
+
+    /// <summary>
+    /// Strong Kleene n-ary parity: <c>Unknown</c> if any operand is <c>Unknown</c> (the fold of binary XOR, which is
+    /// <c>Unknown</c> whenever either side is), otherwise <c>True</c> for an odd number of <c>True</c> operands.
+    /// </summary>
+    private static TruthValue EvaluateNxor(IReadOnlyList<TruthValue> operandValues)
+    {
+        if (operandValues.Any(v => v == TruthValue.Unknown))
+        {
+            return TruthValue.Unknown;
+        }
+
+        return operandValues.Count(v => v == TruthValue.True) % 2 == 1 ? TruthValue.True : TruthValue.False;
     }
 
     private static TruthValue EvaluateExactlyOne(IReadOnlyList<TruthValue> operandValues)
@@ -278,6 +293,14 @@ internal sealed class Evaluator<TContext>(
                 IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
                 TruthValue value = KleeneNor(results[0].Value, results[1].Value);
                 return new EvalResult(value, new EvaluatedNode("NOR", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NxorExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateNxor([.. results.Select(r => r.Value)]);
+                return new EvalResult(value, new EvaluatedNode("NXOR", value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ExactlyOneExpression:

@@ -64,7 +64,7 @@ public sealed record AndExpression(EquatableArray<Expression> Operands) : Expres
 /// <param name="Operands">The disjuncts, in source order (at least two).</param>
 public sealed record OrExpression(EquatableArray<Expression> Operands) : Expression;
 
-/// <summary>Binary exclusive-or — deliberately not generalized to n-ary parity (ADR-0003).</summary>
+/// <summary>Binary exclusive-or. Three or more operands are a compile error; <see cref="NxorExpression"/> is the n-ary parity operator (ADR-0005 decisions 4 and 7).</summary>
 /// <param name="Left">The left operand.</param>
 /// <param name="Right">The right operand.</param>
 public sealed record XorExpression(Expression Left, Expression Right) : Expression;
@@ -106,6 +106,15 @@ public sealed record NandExpression(Expression Left, Expression Right) : Express
 /// <param name="Left">The left operand.</param>
 /// <param name="Right">The right operand.</param>
 public sealed record NorExpression(Expression Left, Expression Right) : Expression;
+
+/// <summary>
+/// N-ary Strong Kleene parity (<c>NXOR(a, b, ...)</c>, ADR-0005 decision 4): <c>True</c> when an odd number of
+/// operands are <c>True</c> and none is <c>Unknown</c>, <c>False</c> when an even number are <c>True</c> and none is
+/// <c>Unknown</c>, and <c>Unknown</c> whenever any operand is <c>Unknown</c>. Not the same as <c>ExactlyOne</c>
+/// (which differs from parity for three or more operands). All operands are always evaluated.
+/// </summary>
+/// <param name="Operands">The operands (at least two).</param>
+public sealed record NxorExpression(EquatableArray<Expression> Operands) : Expression;
 
 /// <summary>N-ary "exactly one of these operands is true".</summary>
 /// <param name="Operands">The operands (at least two).</param>

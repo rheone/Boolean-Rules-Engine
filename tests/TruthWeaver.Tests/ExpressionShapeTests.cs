@@ -106,6 +106,18 @@ public sealed class ExpressionShapeTests
     }
 
     [Fact]
+    public void Nxor_shape_carries_its_operands_in_order()
+    {
+        NxorExpression node = new(new([TermA, TermB, TermA]));
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Nxor", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Equal([TermA, TermB, TermA], shape.Operands);
+    }
+
+    [Fact]
     public void ExactlyOne_shape_carries_its_operands_in_order()
     {
         ExactlyOneExpression node = new(new([TermA, TermB]));

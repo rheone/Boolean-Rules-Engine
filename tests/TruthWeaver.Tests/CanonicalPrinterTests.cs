@@ -79,6 +79,7 @@ public sealed class CanonicalPrinterTests
     [InlineData("isManager OR isDepartmentHead")]
     [InlineData("NOT isManager")]
     [InlineData("(isManager XOR isDepartmentHead)")]
+    [InlineData("NXOR(isManager, isDepartmentHead, isManager)")]
     [InlineData("ExactlyOne(isManager, isDepartmentHead, isManager)")]
     [InlineData("AtLeast(2, isManager, isDepartmentHead, isManager)")]
     [InlineData("AtMost(1, isManager, isDepartmentHead, isManager)")]

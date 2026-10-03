@@ -81,6 +81,7 @@ internal static class CanonicalPrinter
             NorExpression nr => PrintNode(nr.Left, PrintContext.InfixOperand)
                 + " NOR "
                 + PrintNode(nr.Right, PrintContext.InfixOperand),
+            NxorExpression => $"NXOR({JoinOperands(node, ", ", PrintContext.Top)})",
             ExactlyOneExpression => $"ExactlyOne({JoinOperands(node, ", ", PrintContext.Top)})",
             ThresholdExpression th => $"{th.Comparison}({th.K}, {JoinOperands(node, ", ", PrintContext.Top)})",
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),

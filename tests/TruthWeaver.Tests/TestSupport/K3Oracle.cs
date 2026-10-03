@@ -100,6 +100,22 @@ public static class K3Oracle
         return Or([And([left, Not(right)]), And([Not(left), right])]);
     }
 
+    /// <summary>
+    /// N-ary parity: <c>Unknown</c> whenever any operand is <c>Unknown</c>, otherwise <c>True</c> for an odd number of
+    /// <c>True</c> operands. Built by folding <see cref="Xor"/>, which is itself defined from the primitives.
+    /// </summary>
+    /// <param name="operands">The operand values (at least one).</param>
+    public static TruthValue Nxor(IReadOnlyList<TruthValue> operands)
+    {
+        TruthValue result = operands[0];
+        for (int i = 1; i < operands.Count; i++)
+        {
+            result = Xor(result, operands[i]);
+        }
+
+        return result;
+    }
+
     /// <summary>Strong Kleene material implication, defined from the primitives as <c>NOT left OR right</c>.</summary>
     public static TruthValue Implies(TruthValue left, TruthValue right)
     {

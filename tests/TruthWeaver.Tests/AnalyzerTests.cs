@@ -133,6 +133,8 @@ public sealed class AnalyzerTests
     [InlineData("(a OR TRUE) NAND (b OR TRUE)", false)]
     [InlineData("(a OR TRUE) NOR b", false)]
     [InlineData("(a AND FALSE) NOR (b AND FALSE)", true)]
+    [InlineData("NXOR((a AND FALSE), (b AND FALSE), (c AND FALSE))", false)]
+    [InlineData("NXOR((a OR TRUE), (b AND FALSE), (c AND FALSE))", true)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -165,6 +167,8 @@ public sealed class AnalyzerTests
     [InlineData("a NOR NOT a")]
     [InlineData("a NAND a")]
     [InlineData("a NOR a")]
+    [InlineData("NXOR(a, NOT a)")]
+    [InlineData("NXOR(a, b, NOT b)")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
     [InlineData("AtMost(1, a, NOT a)")]
@@ -337,7 +341,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(11))
+        switch (random.Next(12))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -384,6 +388,13 @@ public sealed class AnalyzerTests
                 GeneratedRule rl = Child();
                 GeneratedRule rr = Child();
                 return new GeneratedRule($"({rl.Text} NOR {rr.Text})", v => K3Oracle.Nor(rl.Eval(v), rr.Eval(v)), [rl, rr]);
+            case 11:
+                GeneratedRule[] nxor = [.. Enumerable.Range(0, random.Next(2, 5)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"NXOR({string.Join(", ", nxor.Select(o => o.Text))})",
+                    v => K3Oracle.Nxor([.. nxor.Select(o => o.Eval(v))]),
+                    nxor
+                );
             case 6:
                 GeneratedRule[] exactlyOne = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];
                 return new GeneratedRule(

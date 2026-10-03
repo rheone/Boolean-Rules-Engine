@@ -95,6 +95,13 @@ internal static class Analyzer
                 CollectTerms(im.Antecedent, terms);
                 CollectTerms(im.Consequent, terms);
                 break;
+            case NxorExpression nx:
+                foreach (Expression o in nx.Operands)
+                {
+                    CollectTerms(o, terms);
+                }
+
+                break;
             case ExactlyOneExpression e:
                 foreach (Expression o in e.Operands)
                 {
@@ -158,6 +165,21 @@ internal static class Analyzer
     private static DualRail Xor(BddManager bdd, DualRail x, DualRail y)
     {
         return Or(bdd, And(bdd, x, Not(bdd, y)), And(bdd, Not(bdd, x), y));
+    }
+
+    /// <summary>
+    /// N-ary parity as the left fold of binary <see cref="Xor"/>. Since XOR is <c>Unknown</c> whenever either side
+    /// is, the fold is <c>Unknown</c> whenever any operand is, and otherwise true for an odd number of true operands.
+    /// </summary>
+    private static DualRail Nxor(BddManager bdd, IReadOnlyList<DualRail> operands)
+    {
+        DualRail result = operands[0];
+        for (int i = 1; i < operands.Count; i++)
+        {
+            result = Xor(bdd, result, operands[i]);
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -301,6 +323,9 @@ internal static class Analyzer
                     Build(im.Antecedent, bdd, variableIndex, diagnostics),
                     Build(im.Consequent, bdd, variableIndex, diagnostics)
                 );
+                break;
+            case NxorExpression nx:
+                rail = Nxor(bdd, BuildOperands(nx.Operands, bdd, variableIndex, diagnostics));
                 break;
             case ExactlyOneExpression e:
                 rail = Exactly(bdd, BuildOperands(e.Operands, bdd, variableIndex, diagnostics), 1);
