@@ -638,6 +638,39 @@ Things to know for `ExpandToPrimitives`:
 - **Collapse.** A declared outermost `Collapse(expr, policy)` is the evaluation
   boundary, not an operator, so it is carried over unchanged.
 
+### Compress to derived operators
+
+`CompressToDerived()` goes the other way: it recognises primitive shapes and
+writes them as readable derived operators. The usual input is an expanded rule,
+but any rule is accepted. It does not promise to recover the exact rule that was
+expanded, only an equivalent one that is **never larger** (counted in nodes) and
+that compresses to itself.
+
+| Primitive shape | Becomes |
+| --- | --- |
+| `NOT a OR b` (either order) | `a IMPLIES b` |
+| `NOT (a AND b)` / `NOT a OR NOT b` | `a NAND b` |
+| `NOT (a OR b)` / `NOT a AND NOT b` | `a NOR b` |
+| `(a AND NOT b) OR (NOT a AND b)` | `a XOR b` |
+| `(a AND b) OR (NOT a AND NOT b)` | `a EQUIVALENT b` |
+| `(c AND t) OR (NOT c AND f) OR (t AND f)` | `If(c, t, f)` |
+| `Exactly(1, ...) OR Exactly(3, ...) OR ...` (every odd count, 3+ operands) | `NXOR(...)` |
+| `AtLeast(1, ...)` / `AtLeast(n, ...)` / `AtMost(0, ...)` / `Exactly(1, ...)` | `ANY` / `ALL` / `NONE` / `ExactlyOne` |
+| `NOT AtLeast(k, ...)` / `NOT AtMost(k, ...)` | `AtMost(k - 1, ...)` / `AtLeast(k + 1, ...)` |
+| `AtLeast(m, ...) AND AtMost(M, ...)` over the same operands | `BETWEEN(m, M, ...)` |
+| `COALESCE(x, True)` / `COALESCE(x, False)` | `Project(x, True)` / `Project(x, False)` |
+| `COALESCE(NOT x, False)` | `IsFalse(x)` |
+| `COALESCE(x, True) AND COALESCE(NOT x, True)` | `IsUnknown(x)` |
+| `COALESCE(x, False) OR COALESCE(NOT x, False)` | `IsKnown(x)` |
+
+Every row is an identity of Strong Kleene logic, checked against the truth-table
+oracle for every `True`/`False`/`Unknown` assignment. `COALESCE(x, False)` is
+written `Project(x, False)` rather than `IsTrue(x)` (they are the same value;
+`Project` is the form the ticket names). Classical-only shapes are never matched:
+`a OR NOT a` stays as written. Operand order inside a matched `OR`/`AND` can
+differ from the original, which changes the order predicates are invoked in but
+never a result.
+
 ## Choosing a rule format
 
 DSL, JSON, and YAML compile to the exact same tree through the exact same

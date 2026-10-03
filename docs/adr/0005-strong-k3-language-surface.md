@@ -147,6 +147,22 @@ the aliases are cheap once the canonical form stays single.
     `COALESCE(False, True)` = `False`), so it has no gate-only form and stays in
     place with its operands rewritten, as do `Project` and the inspections that
     expand to it. A rule without them is purely `NAND` (or `NOR`).
+
+    Implemented in k3-conformance 25 (compression):
+    `CompiledRule<TContext>.CompressToDerived()` is the opt-in inverse of
+    expansion. It matches primitive shapes top-down and rewrites them to derived
+    operators: `OR(NOT a, b)` to `IMPLIES`; `NOT(AND(a, b))` and `OR(NOT a, NOT b)`
+    to `NAND`; `NOT(OR(a, b))` and `AND(NOT a, NOT b)` to `NOR`; the exact
+    `XOR`, `EQUIVALENT`, `If` and `NXOR` shapes the expander emits; the
+    threshold-to-alias rows (`AtLeast(1)` `ANY`, `AtLeast(n)` `ALL`, `AtMost(0)`
+    `NONE`, `Exactly(1)` `ExactlyOne`, `NOT AtLeast(k)` `AtMost(k - 1)`);
+    `AND(AtLeast(m), AtMost(M))` over the same operands to `BETWEEN`; and the
+    `COALESCE` forms to `Project` (`COALESCE(NOT x, False)` to `IsFalse`, the
+    two-sided pairs to `IsUnknown` and `IsKnown`). Each rewrite never adds nodes, so
+    the result is never larger than the input; passes repeat until stable, so
+    compression is idempotent. It recovers an equivalent derived form, not
+    necessarily the original (`COALESCE(x, False)` reads back as `Project`, not
+    `IsTrue`). Shared operands and the declared `Collapse` policy are preserved.
 11. **Validation messages are structured**: code, message, span (or
     JSON/YAML path), optional "did you mean" suggestion, and an
     expected-vs-found pair, with a plain-text rendering.

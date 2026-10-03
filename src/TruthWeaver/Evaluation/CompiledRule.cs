@@ -140,6 +140,35 @@ public sealed class CompiledRule<TContext>
         );
     }
 
+    /// <summary>
+    /// Rewrites this rule into readable derived operators wherever a Strong Kleene-sound pattern matches, and returns it as a
+    /// new rule (ADR-0005 decision 10). It is the inverse direction of <see cref="ExpandToPrimitives"/>: the usual input is
+    /// an expanded rule, but any rule is accepted.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The recognised patterns are <c>OR(NOT a, b)</c> to <c>IMPLIES</c>; <c>NOT(AND(a, b))</c> and <c>OR(NOT a, NOT b)</c>
+    /// to <c>NAND</c>; <c>NOT(OR(a, b))</c> and <c>AND(NOT a, NOT b)</c> to <c>NOR</c>; the exact <c>XOR</c>,
+    /// <c>EQUIVALENT</c>, <c>If</c> and <c>NXOR</c> shapes <see cref="ExpandToPrimitives"/> produces; <c>AtLeast(1)</c> to
+    /// <c>ANY</c>, <c>AtLeast(n)</c> to <c>ALL</c>, <c>AtMost(0)</c> to <c>NONE</c> and <c>Exactly(1)</c> to
+    /// <c>ExactlyOne</c>; a matching <c>AtLeast</c>/<c>AtMost</c> pair under <c>AND</c> to <c>BETWEEN</c>; and
+    /// <c>COALESCE(x, True/False)</c> to <c>Project</c> (or <c>IsFalse</c> for <c>COALESCE(NOT x, False)</c>), with the
+    /// <c>IsUnknown</c>/<c>IsKnown</c> pairs of those. Every pattern is an identity in Strong Kleene logic, checked against a
+    /// truth-table oracle; classical-only shortcuts are never used.
+    /// </para>
+    /// <para>
+    /// The result evaluates to the same value as this rule for every <c>True</c>/<c>False</c>/<c>Unknown</c> assignment, is
+    /// never larger (in nodes) than this rule, and compressing it again changes nothing. It is not guaranteed to recover the
+    /// exact rule that was expanded, only an equivalent, no larger one that uses derived operators. Operand order inside an
+    /// <c>OR</c>/<c>AND</c> pattern may change, so the order predicates are invoked in may differ; results do not.
+    /// </para>
+    /// </remarks>
+    /// <returns>A new rule over the same predicates, with derived operators where patterns matched.</returns>
+    public CompiledRule<TContext> CompressToDerived()
+    {
+        return new CompiledRule<TContext>(Compressor.Compress(this.Root), this.registry, this.logger, this.CollapsePolicy);
+    }
+
     /// <summary>Prints this rule to the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
     /// <returns>The JSON text.</returns>
     public string PrintJson()
