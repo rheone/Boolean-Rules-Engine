@@ -20,11 +20,17 @@ internal enum TokenKind
     /// <summary>')'.</summary>
     RParen,
 
-    /// <summary>'['.</summary>
+    /// <summary>'['. A grouping opener like '(' and '{', and the opener of an array argument value.</summary>
     LBracket,
 
     /// <summary>']'.</summary>
     RBracket,
+
+    /// <summary>'{'. A grouping opener like '(' and '[' (ADR-0005 decision 9).</summary>
+    LBrace,
+
+    /// <summary>'}'.</summary>
+    RBrace,
 
     /// <summary>','.</summary>
     Comma,

@@ -63,6 +63,12 @@ internal sealed class Lexer(string source)
             case ']':
                 this.position++;
                 return new Token(TokenKind.RBracket, "]", new SourceSpan(start, 1));
+            case '{':
+                this.position++;
+                return new Token(TokenKind.LBrace, "{", new SourceSpan(start, 1));
+            case '}':
+                this.position++;
+                return new Token(TokenKind.RBrace, "}", new SourceSpan(start, 1));
             case ',':
                 this.position++;
                 return new Token(TokenKind.Comma, ",", new SourceSpan(start, 1));

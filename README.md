@@ -366,7 +366,8 @@ disambiguates explicitly (see [below](#choosing-a-rule-format)), so a
 persisted or printed rule never depends on a reader holding this table in
 their head.
 
-1. **Parentheses** (`(...)`) — always evaluated first, exactly as written.
+1. **Grouping** — `(...)`, `[...]` and `{...}` are interchangeable and always evaluated first, exactly as written
+   (see [Grouping delimiters](#grouping-delimiters)).
 2. **`NOT`** — binds tightest of the operators; right-associative (`NOT NOT
    a` is valid, if odd).
 3. **`AND`** — binds tighter than `OR`.
@@ -395,6 +396,23 @@ no-mixing rule too: its condition and each branch must be a single operand or a 
 Function-call-style operators (`NXOR(...)`, `ANY(...)`, `ALL(...)`, `NONE(...)`, `BETWEEN(...)`, `COALESCE(...)`, `If(...)`, `IsTrue(...)`, `IsFalse(...)`, `IsUnknown(...)`, `IsKnown(...)`, `Project(...)`, `ExactlyOne(...)` and the threshold
 family) are self-delimiting — their parentheses are part of the call syntax,
 not grouping, so they never participate in precedence at all.
+
+### Grouping delimiters
+
+`()`, `[]` and `{}` all group a sub-expression and mean exactly the same thing, so
+`a AND (b OR c)`, `a AND [b OR c]` and `a AND {b OR c}` compile to equal trees and print identically
+(`CanonicalText` always uses parentheses). The tree does not remember which delimiter you wrote. Delimiters must
+nest and each closer must match its opener, so `(a AND b]` is an error. Function calls (`ANY(...)`, `Role(name: "x")`)
+keep `(` as their own argument-list syntax; only a grouped *sub-expression* may use `[` or `{`. Brackets and braces
+inside a quoted string are ordinary text.
+
+Delimiter mistakes are `SyntaxError` diagnostics with the exact span:
+
+| Mistake | Example | Message (span) |
+| ------- | ------- | -------------- |
+| Mismatched closer | `a AND (b OR c]` | `Expected ')' to close '(' at offset 6 but found ']'.` (the `]`) |
+| Unclosed group | `a AND (b OR c` | `Unclosed '(' at offset 6: expected ')' before the end of the rule.` (the `(`) |
+| Closer with no opener | `a AND b)` | `Unexpected closing ')' with no matching opener.` (the `)`) |
 
 ### Binary vs. unary operators
 

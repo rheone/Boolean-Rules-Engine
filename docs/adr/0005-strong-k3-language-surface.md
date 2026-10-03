@@ -74,6 +74,15 @@ the aliases are cheap once the canonical form stays single.
 9. **Delimiters.** `()`, `[]`, `{}` are interchangeable grouping; the AST does
    not retain which was written. Printing normalizes to parentheses by
    default, with an optional deterministic depth-cycling renderer.
+   Implemented (k3-conformance 20): the lexer has `{`/`}` tokens and every
+   grouping site accepts any of the three pairs, but the argument list of a
+   function-call operator or term (`ANY(...)`, `Role(name: "x")`) is still
+   `(` only, because the decision says "grouping" and the reference material
+   only shows delimiters around sub-expressions. A closer must match its
+   opener: a wrong closer is a `SyntaxError` at that closer ("Expected ')' to
+   close '(' at offset 4 but found ']'."), end of input is reported at the
+   opener ("Unclosed '(' ..."), and a closer with nothing open is reported as
+   "Unexpected closing ..." at the closer.
 10. **Expression mutation** (primitive/NAND/NOR expansion, compression,
     simplification, canonicalization, whitespace normalization) all ship in
     this effort. Every rewrite must be K3-sound, verified exhaustively against

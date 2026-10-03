@@ -95,7 +95,18 @@ internal sealed class DslParser
         List<Diagnostic> diagnostics = [.. lexer.Diagnostics];
         DslParser parser = new(tokens, diagnostics);
         RuleNode root = parser.ParseExpression();
-        if (parser.Current.Kind != TokenKind.Eof)
+        if (IsGroupCloser(parser.Current.Kind))
+        {
+            // Nothing is open at the top level, so a closer here never had an opener.
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.SyntaxError,
+                    $"Unexpected closing '{parser.Current.Text}' with no matching opener.",
+                    parser.Current.Span
+                )
+            );
+        }
+        else if (parser.Current.Kind != TokenKind.Eof)
         {
             diagnostics.Add(
                 Diagnostic.Error(
@@ -107,6 +118,37 @@ internal sealed class DslParser
         }
 
         return (root, diagnostics);
+    }
+
+    private static bool IsGroupOpener(TokenKind kind)
+    {
+        return kind is TokenKind.LParen or TokenKind.LBracket or TokenKind.LBrace;
+    }
+
+    private static bool IsGroupCloser(TokenKind kind)
+    {
+        return kind is TokenKind.RParen or TokenKind.RBracket or TokenKind.RBrace;
+    }
+
+    /// <summary>Gets the closing delimiter that pairs with an opening one.</summary>
+    private static char ClosingFor(TokenKind opener)
+    {
+        return opener switch
+        {
+            TokenKind.LBracket => ']',
+            TokenKind.LBrace => '}',
+            _ => ')',
+        };
+    }
+
+    private static TokenKind ExpectedCloserKind(TokenKind opener)
+    {
+        return opener switch
+        {
+            TokenKind.LBracket => TokenKind.RBracket,
+            TokenKind.LBrace => TokenKind.RBrace,
+            _ => TokenKind.RParen,
+        };
     }
 
     private static SourceSpan SpanCovering(int start, int end)
@@ -260,12 +302,13 @@ internal sealed class DslParser
     }
 
     /// <summary>
-    /// Whether the tokens from <paramref name="startToken"/> up to the cursor are one parenthesized group: they open with
-    /// '(' whose matching ')' is the last token consumed (so <c>(a) AND (b)</c> is not wrapped).
+    /// Whether the tokens from <paramref name="startToken"/> up to the cursor are one grouped expression: they open with
+    /// '(', '[' or '{' whose matching closer is the last token consumed (so <c>(a) AND (b)</c> is not wrapped). Any
+    /// delimiter kind counts, because the three are interchangeable.
     /// </summary>
     private bool IsWrappedInParentheses(int startToken)
     {
-        if (this.tokens[startToken].Kind != TokenKind.LParen)
+        if (!IsGroupOpener(this.tokens[startToken].Kind))
         {
             return false;
         }
@@ -275,8 +318,8 @@ internal sealed class DslParser
         {
             depth += this.tokens[i].Kind switch
             {
-                TokenKind.LParen => 1,
-                TokenKind.RParen => -1,
+                TokenKind.LParen or TokenKind.LBracket or TokenKind.LBrace => 1,
+                TokenKind.RParen or TokenKind.RBracket or TokenKind.RBrace => -1,
                 _ => 0,
             };
             if (depth == 0)
@@ -419,11 +462,13 @@ internal sealed class DslParser
 
     private RuleNode ParsePrimary()
     {
-        if (this.Current.Kind == TokenKind.LParen)
+        if (IsGroupOpener(this.Current.Kind))
         {
+            // '(', '[' and '{' are interchangeable; the node keeps no trace of which was written (ADR-0005 decision 9).
+            Token opener = this.Current;
             this.position++;
             RuleNode inner = this.ParseExpression();
-            this.Expect(TokenKind.RParen, "')'");
+            this.ExpectClose(opener);
             return inner;
         }
 
@@ -555,6 +600,7 @@ internal sealed class DslParser
         int end = nameToken.Span.End;
         if (this.Current.Kind == TokenKind.LParen)
         {
+            Token opener = this.Current;
             this.position++;
             if (this.Current.Kind != TokenKind.RParen)
             {
@@ -567,7 +613,7 @@ internal sealed class DslParser
             }
 
             end = this.Current.Span.End;
-            this.Expect(TokenKind.RParen, "')'");
+            this.ExpectClose(opener);
         }
 
         return new TermNode(nameToken.Text, arguments, SpanCovering(nameToken.Span.Start, end));
@@ -662,7 +708,7 @@ internal sealed class DslParser
     {
         int start = this.Current.Span.Start;
         this.position++;
-        this.Expect(TokenKind.LParen, "'('");
+        Token opener = this.ExpectOpenParen();
         int k = 0;
         if (this.Current.Kind == TokenKind.NumberLiteral)
         {
@@ -688,7 +734,7 @@ internal sealed class DslParser
         }
 
         int end = this.Current.Span.End;
-        this.Expect(TokenKind.RParen, "')'");
+        this.ExpectClose(opener);
         return new ThresholdNode(comparison, k, operands, SpanCovering(start, end));
     }
 
@@ -700,7 +746,7 @@ internal sealed class DslParser
     {
         int start = this.Current.Span.Start;
         this.position++;
-        this.Expect(TokenKind.LParen, "'('");
+        Token opener = this.ExpectOpenParen();
         int min = this.ParseIntegerBound("minimum");
         this.Expect(TokenKind.Comma, "','");
         int max = this.ParseIntegerBound("maximum");
@@ -713,7 +759,7 @@ internal sealed class DslParser
         }
 
         int end = this.Current.Span.End;
-        this.Expect(TokenKind.RParen, "')'");
+        this.ExpectClose(opener);
         return new BetweenNode(min, max, operands, SpanCovering(start, end));
     }
 
@@ -726,7 +772,7 @@ internal sealed class DslParser
     {
         int start = this.Current.Span.Start;
         this.position++;
-        this.Expect(TokenKind.LParen, "'('");
+        Token opener = this.ExpectOpenParen();
 
         List<RuleNode> operands = [];
         bool unknownAs = false;
@@ -763,7 +809,7 @@ internal sealed class DslParser
         }
 
         int end = this.Current.Span.End;
-        this.Expect(TokenKind.RParen, "')'");
+        this.ExpectClose(opener);
         return new ProjectNode(operands, unknownAs, SpanCovering(start, end));
     }
 
@@ -777,7 +823,7 @@ internal sealed class DslParser
     {
         int start = this.Current.Span.Start;
         this.position++;
-        this.Expect(TokenKind.LParen, "'('");
+        Token opener = this.ExpectOpenParen();
 
         List<RuleNode> operands = [];
         CollapsePolicy policy = CollapsePolicy.UnknownAsFalse;
@@ -814,7 +860,7 @@ internal sealed class DslParser
         }
 
         int end = this.Current.Span.End;
-        this.Expect(TokenKind.RParen, "')'");
+        this.ExpectClose(opener);
         return new CollapseNode(operands, policy, SpanCovering(start, end));
     }
 
@@ -925,7 +971,7 @@ internal sealed class DslParser
 
     private List<RuleNode> ParseParenthesizedOperandList()
     {
-        this.Expect(TokenKind.LParen, "'('");
+        Token opener = this.ExpectOpenParen();
         List<RuleNode> operands = [];
         if (this.Current.Kind != TokenKind.RParen)
         {
@@ -937,8 +983,26 @@ internal sealed class DslParser
             }
         }
 
-        this.Expect(TokenKind.RParen, "')'");
+        this.ExpectClose(opener);
         return operands;
+    }
+
+    /// <summary>
+    /// Consumes the '(' that opens a function call's argument list and returns it, so the matching closer can be
+    /// checked against it. Only '(' opens a call: '[' and '{' are for grouping a sub-expression (ADR-0005 decision 9), so
+    /// <c>ANY[a, b]</c> stays an error. When the '(' is missing it is reported and a stand-in at the cursor is returned.
+    /// </summary>
+    private Token ExpectOpenParen()
+    {
+        Token opener = this.Current;
+        if (opener.Kind == TokenKind.LParen)
+        {
+            this.position++;
+            return opener;
+        }
+
+        this.Expect(TokenKind.LParen, "'('");
+        return new Token(TokenKind.LParen, "(", opener.Span);
     }
 
     private void Expect(TokenKind kind, string description)
@@ -956,6 +1020,46 @@ internal sealed class DslParser
                 this.Current.Span
             )
         );
+    }
+
+    /// <summary>
+    /// Consumes the delimiter that closes <paramref name="opener"/>, or reports exactly what is wrong: a closer of another
+    /// kind is reported at that closer (and consumed, as if it were the intended one, to limit follow-on errors); the
+    /// end of input is reported at the opener, which is the token that was never closed; any other token is reported at
+    /// itself.
+    /// </summary>
+    private void ExpectClose(Token opener)
+    {
+        char expected = ClosingFor(opener.Kind);
+        if (this.Current.Kind == ExpectedCloserKind(opener.Kind))
+        {
+            this.position++;
+            return;
+        }
+
+        if (this.Current.Kind == TokenKind.Eof)
+        {
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.SyntaxError,
+                    $"Unclosed '{opener.Text}' at offset {opener.Span.Start}: expected '{expected}' before the end of the rule.",
+                    opener.Span
+                )
+            );
+            return;
+        }
+
+        this.diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                $"Expected '{expected}' to close '{opener.Text}' at offset {opener.Span.Start} but found '{this.Current.Text}'.",
+                this.Current.Span
+            )
+        );
+        if (IsGroupCloser(this.Current.Kind))
+        {
+            this.position++;
+        }
     }
 
     private void ReportAmbiguousMixing(SourceSpan span, string message)

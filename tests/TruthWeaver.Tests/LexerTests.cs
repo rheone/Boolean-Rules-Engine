@@ -11,6 +11,8 @@ public sealed class LexerTests
     [InlineData(")", nameof(TokenKind.RParen))]
     [InlineData("[", nameof(TokenKind.LBracket))]
     [InlineData("]", nameof(TokenKind.RBracket))]
+    [InlineData("{", nameof(TokenKind.LBrace))]
+    [InlineData("}", nameof(TokenKind.RBrace))]
     [InlineData(",", nameof(TokenKind.Comma))]
     [InlineData(":", nameof(TokenKind.Colon))]
     public void Every_punctuation_token_produces_the_correct_kind_and_a_one_character_span(
