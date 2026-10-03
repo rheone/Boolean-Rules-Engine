@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** done
+**Status:** ready-for-agent
 
-- [x] OperatorStyle XML docs and README state the divergence for Unknown
-- [x] Issues-log rows 8 and 10 closed as 'keep'
+- [x] OperatorStyle XML docs state the divergence for Unknown (the README does not mention OperatorStyle, so no README change is needed)
+- [ ] Issues-log rows 8 and 10 closed as 'keep' (left for ticket 18, which reconciles the log)
 - [x] Built test-first where code changes; the full validation set in CLAUDE.md passes (build, test, csharpier check src tests benchmarks, format --verify-no-changes with no new diagnostics in touched files, roslynator per project)
 
 Source: [research findings](../../k3-conformance/research-findings.md). See also [spec](../spec.md) and [ADR-0005](../../../docs/adr/0005-strong-k3-language-surface.md).
