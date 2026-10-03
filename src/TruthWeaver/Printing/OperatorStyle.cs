@@ -16,6 +16,6 @@ public enum OperatorStyle
     /// <summary>Mathematical logic notation: <c>∧</c>, <c>∨</c>, <c>¬</c>, <c>⊕</c>, <c>↔</c>, <c>→</c>, <c>↑</c>, <c>↓</c>, <c>??</c>.</summary>
     Symbolic,
 
-    /// <summary>C-family operator notation: <c>&amp;&amp;</c>, <c>||</c>, <c>!</c>, <c>^</c>, <c>==</c>; <c>??</c> for <c>COALESCE</c>; <c>IMPLIES</c>, <c>NAND</c> and <c>NOR</c> have no C-family spelling and keep their word forms.</summary>
+    /// <summary>C-family operator notation: <c>&amp;&amp;</c>, <c>||</c>, <c>!</c>, <c>^</c>, <c>==</c>; <c>??</c> for <c>COALESCE</c>; <c>IMPLIES</c>, <c>NAND</c> and <c>NOR</c> have no C-family spelling and keep their word forms. Caveat: <c>==</c> for <c>EQUIVALENT</c> follows C only for known values; in C# <c>null == null</c> is <see langword="true"/>, but <c>Unknown EQUIVALENT Unknown</c> is <c>Unknown</c>, so treat this style as a rendering aid, not as C# semantics.</summary>
     CStyle,
 }
