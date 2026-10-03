@@ -64,6 +64,18 @@ public static class OperatorInfo
                 "NXOR",
                 "N-ary parity. True iff an odd number of operands are true and none is Unknown; False iff an even number are true and none is Unknown; Unknown whenever any operand is Unknown."
             ),
+            "Any" => new OperatorDescriptor(
+                "ANY",
+                "True iff at least one operand is true (AtLeast(1, ...)). False iff every operand is false; Unknown when no operand is true yet some are Unknown."
+            ),
+            "All" => new OperatorDescriptor(
+                "ALL",
+                "True iff every operand is true (AtLeast(n, ...)). False iff any operand is false; Unknown when no operand is false yet some are Unknown."
+            ),
+            "None" => new OperatorDescriptor(
+                "NONE",
+                "True iff no operand is true (AtMost(0, ...)). False iff any operand is true; Unknown when no operand is true yet some are Unknown."
+            ),
             "ExactlyOne" => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
             _ => new OperatorDescriptor($"{shape.OpName}({shape.K})", ThresholdDescription(shape)),
         };

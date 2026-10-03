@@ -118,6 +118,42 @@ public sealed class ExpressionShapeTests
     }
 
     [Fact]
+    public void Any_shape_carries_its_operands_in_order()
+    {
+        AnyExpression node = new(new([TermA, TermB]));
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Any", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Equal([TermA, TermB], shape.Operands);
+    }
+
+    [Fact]
+    public void All_shape_carries_its_operands_in_order()
+    {
+        AllExpression node = new(new([TermA, TermB]));
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("All", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Equal([TermA, TermB], shape.Operands);
+    }
+
+    [Fact]
+    public void None_shape_carries_its_operands_in_order()
+    {
+        NoneExpression node = new(new([TermA, TermB]));
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("None", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Equal([TermA, TermB], shape.Operands);
+    }
+
+    [Fact]
     public void ExactlyOne_shape_carries_its_operands_in_order()
     {
         ExactlyOneExpression node = new(new([TermA, TermB]));

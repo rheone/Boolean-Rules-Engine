@@ -145,6 +145,24 @@ the aliases are cheap once the canonical form stays single.
     `NXOR` from three operands on. `rule-tree.schema.json` lists `nxor`.
     `RuleBuilder.Nxor` is new.
 
+    Implemented in k3-conformance 13: `ANY`, `ALL` and `NONE` are first-class
+    `AnyExpression` / `AllExpression` / `NoneExpression` function-call nodes (no
+    precedence) with `{"op": "any" | "all" | "none", "operands": [...]}` in JSON
+    and YAML (case-insensitive on read) and the DSL spellings `ANY(...)`,
+    `ALL(...)`, `NONE(...)` (reserved words, any case). They take **two or more**
+    operands, the same minimum as `AND`/`OR`/`ExactlyOne`/`NXOR` (fewer is
+    `MalformedTree`); the threshold family's one-operand allowance is not
+    inherited because a single-operand `ANY`/`ALL`/`NONE` is just the operand
+    or its negation. Semantics are the cardinality interval over the
+    definitely-true / possibly-true counts: `ANY` = `AtLeast(1, ...)`, `ALL` =
+    `AtLeast(n, ...)`, `NONE` = `AtMost(0, ...)` (evaluation reuses the
+    threshold evaluator; the analyzer rail reuses `AtLeast`, with `NONE` as its
+    negation). The canonical printer writes `ANY(a, b, ...)` etc.; every
+    tree-printer style keeps the word (no symbol or C-family spelling) and the
+    evaluated/description label is `ANY`/`ALL`/`NONE`. `rule-tree.schema.json`
+    lists `any`, `all` and `none`. `RuleBuilder.Any`, `All` and `None` are new.
+    `BETWEEN` is a separate ticket.
+
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,
     `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a

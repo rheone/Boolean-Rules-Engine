@@ -67,6 +67,9 @@ internal sealed class Evaluator<TContext>(
             "Nand" => "NAND",
             "Nor" => "NOR",
             "Nxor" => "NXOR",
+            "Any" => "ANY",
+            "All" => "ALL",
+            "None" => "NONE",
             "ExactlyOne" => "ExactlyOne",
             _ => $"{shape.OpName}({shape.K})",
         };
@@ -301,6 +304,37 @@ internal sealed class Evaluator<TContext>(
                 IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
                 TruthValue value = EvaluateNxor([.. results.Select(r => r.Value)]);
                 return new EvalResult(value, new EvaluatedNode("NXOR", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case AnyExpression:
+            {
+                // ANY is AtLeast(1, ...) over the definitely-true / possibly-true interval (ADR-0005 decision 6).
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateThreshold(ThresholdComparison.AtLeast, 1, [.. results.Select(r => r.Value)]);
+                return new EvalResult(value, new EvaluatedNode("ANY", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case AllExpression:
+            {
+                // ALL is AtLeast(n, ...) for the n operands.
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateThreshold(
+                    ThresholdComparison.AtLeast,
+                    results.Count,
+                    [.. results.Select(r => r.Value)]
+                );
+                return new EvalResult(value, new EvaluatedNode("ALL", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NoneExpression:
+            {
+                // NONE is AtMost(0, ...).
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateThreshold(ThresholdComparison.AtMost, 0, [.. results.Select(r => r.Value)]);
+                return new EvalResult(value, new EvaluatedNode("NONE", value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ExactlyOneExpression:

@@ -77,6 +77,18 @@ internal sealed record NorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span
 /// </summary>
 internal sealed record NxorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
+/// <summary>
+/// N-ary <c>ANY(...)</c> reference (at least one operand is true). Operand count (at least two) is validated by
+/// <c>RuleNodeCompiler</c> like the other n-ary operators.
+/// </summary>
+internal sealed record AnyNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>N-ary <c>ALL(...)</c> reference (every operand is true); validated like <see cref="AnyNode"/>.</summary>
+internal sealed record AllNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>N-ary <c>NONE(...)</c> reference (no operand is true); validated like <see cref="AnyNode"/>.</summary>
+internal sealed record NoneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
 /// <summary>N-ary "exactly one of these is true".</summary>
 internal sealed record ExactlyOneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 

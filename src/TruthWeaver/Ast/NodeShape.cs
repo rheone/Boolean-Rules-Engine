@@ -48,6 +48,9 @@ internal static class ExpressionShape
             NorExpression nr => new NodeShape("Nor", null, [nr.Left, nr.Right]),
             ImpliesExpression i => new NodeShape("Implies", null, [i.Antecedent, i.Consequent]),
             NxorExpression nx => new NodeShape("Nxor", null, nx.Operands),
+            AnyExpression an => new NodeShape("Any", null, an.Operands),
+            AllExpression al => new NodeShape("All", null, al.Operands),
+            NoneExpression no => new NodeShape("None", null, no.Operands),
             ExactlyOneExpression e => new NodeShape("ExactlyOne", null, e.Operands),
             ThresholdExpression th => new NodeShape(th.Comparison.ToString(), th.K, th.Operands),
             ConstantExpression or TermExpression => throw new ArgumentException(

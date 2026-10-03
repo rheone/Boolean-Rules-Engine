@@ -146,6 +146,30 @@ public abstract class RuleBuilder
         return new OperatorBuilder("nxor", operands);
     }
 
+    /// <summary>Creates a builder for <c>ANY(...)</c>: at least one operand is true (<c>AtLeast(1, ...)</c>).</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>ANY</c> expression.</returns>
+    public static RuleBuilder Any(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("any", operands);
+    }
+
+    /// <summary>Creates a builder for <c>ALL(...)</c>: every operand is true (<c>AtLeast(n, ...)</c>).</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>ALL</c> expression.</returns>
+    public static RuleBuilder All(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("all", operands);
+    }
+
+    /// <summary>Creates a builder for <c>NONE(...)</c>: no operand is true (<c>AtMost(0, ...)</c>).</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>NONE</c> expression.</returns>
+    public static RuleBuilder None(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("none", operands);
+    }
+
     /// <summary>Creates a builder for the n-ary "exactly one of these is true" operator.</summary>
     /// <param name="operands">The operands (at least two).</param>
     /// <returns>A builder for the <c>ExactlyOne</c> expression.</returns>

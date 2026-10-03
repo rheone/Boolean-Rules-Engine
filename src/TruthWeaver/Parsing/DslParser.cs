@@ -30,6 +30,9 @@ internal sealed class DslParser
         "FALSE",
         "UNKNOWN",
         "NXOR",
+        "ANY",
+        "ALL",
+        "NONE",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -303,7 +306,22 @@ internal sealed class DslParser
 
         if (this.IsKeyword("NXOR"))
         {
-            return this.ParseNxor();
+            return this.ParseOperandCall((operands, span) => new NxorNode(operands, span));
+        }
+
+        if (this.IsKeyword("ANY"))
+        {
+            return this.ParseOperandCall((operands, span) => new AnyNode(operands, span));
+        }
+
+        if (this.IsKeyword("ALL"))
+        {
+            return this.ParseOperandCall((operands, span) => new AllNode(operands, span));
+        }
+
+        if (this.IsKeyword("NONE"))
+        {
+            return this.ParseOperandCall((operands, span) => new NoneNode(operands, span));
         }
 
         if (this.IsKeyword("ATLEAST"))
@@ -451,12 +469,16 @@ internal sealed class DslParser
         return new ExactlyOneNode(operands, SpanCovering(start, this.tokens[this.position - 1].Span.End));
     }
 
-    private RuleNode ParseNxor()
+    /// <summary>
+    /// Parses a keyword followed by a parenthesized, comma-separated operand list (<c>NXOR</c>, <c>ANY</c>, <c>ALL</c>,
+    /// <c>NONE</c>) and wraps it with <paramref name="create"/>. The operand count is checked later by the compiler.
+    /// </summary>
+    private RuleNode ParseOperandCall(Func<IReadOnlyList<RuleNode>, SourceSpan, RuleNode> create)
     {
         int start = this.Current.Span.Start;
         this.position++;
         List<RuleNode> operands = this.ParseParenthesizedOperandList();
-        return new NxorNode(operands, SpanCovering(start, this.tokens[this.position - 1].Span.End));
+        return create(operands, SpanCovering(start, this.tokens[this.position - 1].Span.End));
     }
 
     private RuleNode ParseThreshold(ThresholdComparison comparison)

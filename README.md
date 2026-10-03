@@ -44,7 +44,7 @@ anything else.
 
 `TruthWeaver` answers one question: *is this expression true right
 now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`,
-`NXOR`, `ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
+`NXOR`, `ANY`, `ALL`, `NONE`, `ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
 `LessThan`/`Exactly`), terms, and evaluation. It does not know about
 permissions, workflows, or policies — those are things you build *on top* of
 it. A permission check ("can the current user do X") is one consumer of this
@@ -56,7 +56,7 @@ engine, not what the engine itself is.
 | **Expression** | The boolean tree — operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation, e.g. `hasTopping`, `lovesPineapple`. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")` — the tree's leaf node. |
-| **Operator** | `AND` `OR` `NOT` `XOR` `EQUIVALENT` `IMPLIES` `NAND` `NOR` `NXOR` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
+| **Operator** | `AND` `OR` `NOT` `XOR` `EQUIVALENT` `IMPLIES` `NAND` `NOR` `NXOR` `ANY` `ALL` `NONE` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
 | **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
 
 Full vocabulary and the predicate-author contract: [CONTEXT.md](CONTEXT.md).
@@ -382,7 +382,7 @@ offending operator (or at the bare infix expression sitting next to
 `AND`/`OR`) and tells you to add parentheses — see
 [ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 8 (which
 extends [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)'s rule) for
-why. Function-call-style operators (`NXOR(...)`, `ExactlyOne(...)` and the threshold
+why. Function-call-style operators (`NXOR(...)`, `ANY(...)`, `ALL(...)`, `NONE(...)`, `ExactlyOne(...)` and the threshold
 family) are self-delimiting — their parentheses are part of the call syntax,
 not grouping, so they never participate in precedence at all.
 
@@ -392,7 +392,7 @@ not grouping, so they never participate in precedence at all.
 | --- | --- | --- |
 | **Unary** | `NOT` | Takes exactly one operand. |
 | **Binary only** | `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR` | Always exactly two operands — a compile error otherwise (`XorArityViolation`). `XOR` with three or more operands is an error whose message points at `NXOR` (n-ary parity) and `ExactlyOne` (see [ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 7); a chain such as `a IMPLIES b IMPLIES c` or `a NAND b NAND c` is rejected too — parenthesize it. |
-| **N-ary (≥ 2)** | `AND`, `OR`, `NXOR`, `ExactlyOne`, `AtLeast`, `AtMost`, `GreaterThan`, `LessThan`, `Exactly` | Take two or more operands. `AND`/`OR` are commonly thought of as "binary" from C-family languages, but this engine treats them as flat n-ary chains (`AND(a, b, c)`, not `AND(AND(a, b), c)`). |
+| **N-ary (≥ 2)** | `AND`, `OR`, `NXOR`, `ANY`, `ALL`, `NONE`, `ExactlyOne`, `AtLeast`, `AtMost`, `GreaterThan`, `LessThan`, `Exactly` | Take two or more operands. `AND`/`OR` are commonly thought of as "binary" from C-family languages, but this engine treats them as flat n-ary chains (`AND(a, b, c)`, not `AND(AND(a, b), c)`). |
 | **0-ary** | `True`, `False`, `Unknown` | Constants, not operators over operands. Written in any letter case; printed upper camel. |
 
 ### All operators
@@ -408,6 +408,9 @@ not grouping, so they never participate in precedence at all.
 | `NAND(a, b)` / `a ↑ b` | binary | Negated conjunction, `NOT (a AND b)`. `False` only when both operands are `True`; `True` if either is `False`; otherwise `Unknown`. Both operands are always evaluated. |
 | `NOR(a, b)` / `a ↓ b` | binary | Negated disjunction, `NOT (a OR b)`. `True` only when both operands are `False`; `False` if either is `True`; otherwise `Unknown`. Both operands are always evaluated. |
 | `NXOR(a, b, ...)` | n-ary | Parity: `True` iff an odd number of operands are `True`, `False` iff an even number are, and `Unknown` whenever any operand is `Unknown`. At two operands it equals `XOR`; from three operands it differs from `ExactlyOne` (`NXOR(a, b, c)` is `True` when all three are `True`). A function call, so it has no precedence and needs no parentheses next to other operators. |
+| `ANY(a, b, ...)` | n-ary | At least one operand is `True` (`AtLeast(1, ...)`): `True` if any operand is `True`, `False` if every operand is `False`, otherwise `Unknown`. |
+| `ALL(a, b, ...)` | n-ary | Every operand is `True` (`AtLeast(n, ...)`): `True` if all are `True`, `False` if any is `False`, otherwise `Unknown`. |
+| `NONE(a, b, ...)` | n-ary | No operand is `True` (`AtMost(0, ...)`): `True` if all are `False`, `False` if any is `True`, otherwise `Unknown`. |
 | `ExactlyOne(...)` | n-ary | True iff exactly one operand is true — the unambiguous name for what `XOR` only means at exactly two operands. |
 | `AtLeast(k, ...)` | n-ary | True iff at least `k` operands are true. |
 | `AtMost(k, ...)` | n-ary | True iff at most `k` operands are true. |
@@ -1262,6 +1265,7 @@ on `TruthWeaver.Building.RuleBuilder`:
 | `NAND` | `RuleBuilder.Nand(RuleBuilder left, RuleBuilder right)` |
 | `NOR` | `RuleBuilder.Nor(RuleBuilder left, RuleBuilder right)` |
 | `NXOR` | `RuleBuilder.Nxor(params RuleBuilder[] operands)` |
+| `ANY` / `ALL` / `NONE` | `RuleBuilder.Any(params RuleBuilder[] operands)` / `RuleBuilder.All(...)` / `RuleBuilder.None(...)` |
 | `ExactlyOne` | `RuleBuilder.ExactlyOne(params RuleBuilder[] operands)` |
 | `AtLeast(k)` / `AtMost(k)` / `GreaterThan(k)` / `LessThan(k)` / `Exactly(k)` | `RuleBuilder.AtLeast(int k, params RuleBuilder[] operands)` (and the four siblings, same shape) |
 
@@ -1469,6 +1473,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `Diagnostic` | One compile-time problem: a code, a `DiagnosticSeverity` (`Error`/`Warning`/`Info`), a message, and a source span. `Error` severity is what blocks `CompiledRule<TContext>` from being populated. |
 | `EvaluationOptions` | Per-call evaluation knobs: `FaultBudget` (abort after N faults), `Mode` (`Default` or `Exhaustive`), and an overall timeout. |
 | `NXOR(...)` | N-ary parity: true iff an odd number of operands are true; `Unknown` whenever any operand is `Unknown`. The unambiguous name for what `XOR` would mean past two operands. |
+| `ANY(...)` / `ALL(...)` / `NONE(...)` | N-ary cardinality operators over the definitely-true / possibly-true interval: `AtLeast(1, ...)`, `AtLeast(n, ...)` and `AtMost(0, ...)`, kept as their own nodes so a rule round-trips as written. They take two or more operands. |
 | `ExactlyOne(...)` | N-ary operator: true iff exactly one operand is true. The explicit name for "exactly one," so it's never confused with `XOR`'s binary-only meaning or `NXOR`'s parity. |
 | Expression | The boolean tree itself — operators over terms and sub-expressions. What a `CompiledRule<TContext>` wraps. |
 | `Fault` | A record of one predicate failing to produce an answer during one evaluation: the faulting term's identity plus the exception. Faults are absorbed as `Unknown`, never rethrown. |
@@ -1622,6 +1627,22 @@ exactly when an odd number of operands are `True`. Two operands give the
 | T | T | ? | ? |
 | F | F | ? | ? |
 | T | ? | F | ? |
+
+### N-ary: `ANY`, `ALL`, `NONE` (three operands)
+
+Each is a count of `True` operands compared over the interval
+`[definitely true, definitely true + Unknown]`: the result is certain only when
+every reachable count agrees.
+
+| a | b | c | `ANY` | `ALL` | `NONE` |
+| :-: | :-: | :-: | :-: | :-: | :-: |
+| T | F | F | T | F | F |
+| F | F | F | F | F | T |
+| T | T | T | T | T | F |
+| T | ? | F | T | F | F |
+| F | ? | F | ? | F | ? |
+| T | ? | T | T | ? | F |
+| ? | ? | ? | ? | ? | ? |
 
 `ExactlyOne(...)` and the threshold family don't get their own table here —
 they're n-ary counting operators over the *number* of `True` operands, not

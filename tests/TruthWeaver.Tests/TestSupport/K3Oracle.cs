@@ -169,6 +169,24 @@ public static class K3Oracle
         return anySatisfies ? TruthValue.Unknown : TruthValue.False;
     }
 
+    /// <summary><c>ANY</c>: <c>AtLeast(1, ...)</c> over the interval semantics.</summary>
+    public static TruthValue Any(IReadOnlyList<TruthValue> operands)
+    {
+        return Cardinality(c => c >= 1, operands);
+    }
+
+    /// <summary><c>ALL</c>: <c>AtLeast(n, ...)</c> for the <c>n</c> operands, over the interval semantics.</summary>
+    public static TruthValue All(IReadOnlyList<TruthValue> operands)
+    {
+        return Cardinality(c => c >= operands.Count, operands);
+    }
+
+    /// <summary><c>NONE</c>: <c>AtMost(0, ...)</c> over the interval semantics.</summary>
+    public static TruthValue None(IReadOnlyList<TruthValue> operands)
+    {
+        return Cardinality(c => c <= 0, operands);
+    }
+
     /// <summary>Exactly-one-true over the interval semantics (not parity).</summary>
     public static TruthValue ExactlyOne(IReadOnlyList<TruthValue> operands)
     {

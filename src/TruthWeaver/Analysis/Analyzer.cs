@@ -102,6 +102,27 @@ internal static class Analyzer
                 }
 
                 break;
+            case AnyExpression an:
+                foreach (Expression o in an.Operands)
+                {
+                    CollectTerms(o, terms);
+                }
+
+                break;
+            case AllExpression al:
+                foreach (Expression o in al.Operands)
+                {
+                    CollectTerms(o, terms);
+                }
+
+                break;
+            case NoneExpression no:
+                foreach (Expression o in no.Operands)
+                {
+                    CollectTerms(o, terms);
+                }
+
+                break;
             case ExactlyOneExpression e:
                 foreach (Expression o in e.Operands)
                 {
@@ -326,6 +347,17 @@ internal static class Analyzer
                 break;
             case NxorExpression nx:
                 rail = Nxor(bdd, BuildOperands(nx.Operands, bdd, variableIndex, diagnostics));
+                break;
+            case AnyExpression an:
+                rail = AtLeast(bdd, BuildOperands(an.Operands, bdd, variableIndex, diagnostics), 1);
+                break;
+            case AllExpression al:
+                List<DualRail> allOperands = BuildOperands(al.Operands, bdd, variableIndex, diagnostics);
+                rail = AtLeast(bdd, allOperands, allOperands.Count);
+                break;
+            case NoneExpression no:
+                // AtMost(0, ...) is "not even one operand is true": the negation of AtLeast(1, ...).
+                rail = Not(bdd, AtLeast(bdd, BuildOperands(no.Operands, bdd, variableIndex, diagnostics), 1));
                 break;
             case ExactlyOneExpression e:
                 rail = Exactly(bdd, BuildOperands(e.Operands, bdd, variableIndex, diagnostics), 1);

@@ -135,6 +135,12 @@ public sealed class AnalyzerTests
     [InlineData("(a AND FALSE) NOR (b AND FALSE)", true)]
     [InlineData("NXOR((a AND FALSE), (b AND FALSE), (c AND FALSE))", false)]
     [InlineData("NXOR((a OR TRUE), (b AND FALSE), (c AND FALSE))", true)]
+    [InlineData("ANY((a AND FALSE), (b AND FALSE))", false)]
+    [InlineData("ANY((a OR TRUE), (b AND FALSE))", true)]
+    [InlineData("ALL((a AND FALSE), (b OR TRUE))", false)]
+    [InlineData("ALL((a OR TRUE), (b OR TRUE))", true)]
+    [InlineData("NONE((a OR TRUE), (b AND FALSE))", false)]
+    [InlineData("NONE((a AND FALSE), (b AND FALSE))", true)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -169,6 +175,9 @@ public sealed class AnalyzerTests
     [InlineData("a NOR a")]
     [InlineData("NXOR(a, NOT a)")]
     [InlineData("NXOR(a, b, NOT b)")]
+    [InlineData("ANY(a, NOT a)")]
+    [InlineData("ALL(a, NOT a)")]
+    [InlineData("NONE(a, NOT a)")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
     [InlineData("AtMost(1, a, NOT a)")]
@@ -341,7 +350,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(12))
+        switch (random.Next(15))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -394,6 +403,27 @@ public sealed class AnalyzerTests
                     $"NXOR({string.Join(", ", nxor.Select(o => o.Text))})",
                     v => K3Oracle.Nxor([.. nxor.Select(o => o.Eval(v))]),
                     nxor
+                );
+            case 12:
+                GeneratedRule[] anys = [.. Enumerable.Range(0, random.Next(2, 5)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"ANY({string.Join(", ", anys.Select(o => o.Text))})",
+                    v => K3Oracle.Any([.. anys.Select(o => o.Eval(v))]),
+                    anys
+                );
+            case 13:
+                GeneratedRule[] alls = [.. Enumerable.Range(0, random.Next(2, 5)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"ALL({string.Join(", ", alls.Select(o => o.Text))})",
+                    v => K3Oracle.All([.. alls.Select(o => o.Eval(v))]),
+                    alls
+                );
+            case 14:
+                GeneratedRule[] nones = [.. Enumerable.Range(0, random.Next(2, 5)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"NONE({string.Join(", ", nones.Select(o => o.Text))})",
+                    v => K3Oracle.None([.. nones.Select(o => o.Eval(v))]),
+                    nones
                 );
             case 6:
                 GeneratedRule[] exactlyOne = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];

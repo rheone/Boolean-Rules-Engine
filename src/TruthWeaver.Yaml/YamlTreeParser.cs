@@ -229,6 +229,12 @@ internal static class YamlTreeParser
                 return new NorNode(operands, SourceSpan.None);
             case "Nxor":
                 return new NxorNode(operands, SourceSpan.None);
+            case "Any":
+                return new AnyNode(operands, SourceSpan.None);
+            case "All":
+                return new AllNode(operands, SourceSpan.None);
+            case "None":
+                return new NoneNode(operands, SourceSpan.None);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":

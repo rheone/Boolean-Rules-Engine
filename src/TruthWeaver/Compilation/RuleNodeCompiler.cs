@@ -142,6 +142,27 @@ internal sealed class RuleNodeCompiler<TContext>
                 2,
                 operands => new NxorExpression(new EquatableArray<Expression>(operands))
             ),
+            AnyNode an => this.BuildVariadic(
+                an.Operands,
+                depth,
+                an.Span,
+                2,
+                operands => new AnyExpression(new EquatableArray<Expression>(operands))
+            ),
+            AllNode al => this.BuildVariadic(
+                al.Operands,
+                depth,
+                al.Span,
+                2,
+                operands => new AllExpression(new EquatableArray<Expression>(operands))
+            ),
+            NoneNode no => this.BuildVariadic(
+                no.Operands,
+                depth,
+                no.Span,
+                2,
+                operands => new NoneExpression(new EquatableArray<Expression>(operands))
+            ),
             ExactlyOneNode e => this.BuildVariadic(
                 e.Operands,
                 depth,

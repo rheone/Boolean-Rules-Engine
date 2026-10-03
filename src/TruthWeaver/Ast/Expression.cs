@@ -116,6 +116,27 @@ public sealed record NorExpression(Expression Left, Expression Right) : Expressi
 /// <param name="Operands">The operands (at least two).</param>
 public sealed record NxorExpression(EquatableArray<Expression> Operands) : Expression;
 
+/// <summary>
+/// <c>ANY(...)</c>: at least one operand is <c>True</c>, defined as <c>AtLeast(1, ...)</c> over the
+/// definitely-true / possibly-true interval (ADR-0005 decision 6) but kept as its own node so it round-trips as written.
+/// </summary>
+/// <param name="Operands">The operands (at least two).</param>
+public sealed record AnyExpression(EquatableArray<Expression> Operands) : Expression;
+
+/// <summary>
+/// <c>ALL(...)</c>: every operand is <c>True</c>, defined as <c>AtLeast(n, ...)</c> for <c>n</c> operands
+/// (ADR-0005 decision 6) but kept as its own node so it round-trips as written.
+/// </summary>
+/// <param name="Operands">The operands (at least two).</param>
+public sealed record AllExpression(EquatableArray<Expression> Operands) : Expression;
+
+/// <summary>
+/// <c>NONE(...)</c>: no operand is <c>True</c>, defined as <c>AtMost(0, ...)</c> (ADR-0005 decision 6) but kept as
+/// its own node so it round-trips as written.
+/// </summary>
+/// <param name="Operands">The operands (at least two).</param>
+public sealed record NoneExpression(EquatableArray<Expression> Operands) : Expression;
+
 /// <summary>N-ary "exactly one of these operands is true".</summary>
 /// <param name="Operands">The operands (at least two).</param>
 public sealed record ExactlyOneExpression(EquatableArray<Expression> Operands) : Expression;
