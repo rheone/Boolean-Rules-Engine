@@ -1,5 +1,7 @@
 namespace TruthWeaver.Ast;
 
+using TruthWeaver.Abstractions;
+
 /// <summary>
 /// Looks up the <see cref="OperatorDescriptor"/> (label + description) for any operator node in a
 /// compiled expression tree. Every operator in the closed set (ADR-0004) has one; a
@@ -111,6 +113,28 @@ public static class OperatorInfo
             "ExactlyOne" => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
             _ => new OperatorDescriptor($"{shape.OpName}({shape.K})", ThresholdDescription(shape)),
         };
+    }
+
+    /// <summary>
+    /// Gets the label and description for the outermost <c>Collapse</c> boundary a rule declared. It is not an
+    /// <see cref="Expression"/> node, so it is described here rather than through <see cref="Describe"/>.
+    /// </summary>
+    /// <param name="policy">The declared policy.</param>
+    /// <returns>The boundary's label (<c>Collapse(UnknownAsFalse)</c>, ...) and description.</returns>
+    internal static OperatorDescriptor DescribeCollapse(CollapsePolicy policy)
+    {
+        string meaning = policy switch
+        {
+            CollapsePolicy.UnknownAsFalse => "Unknown becomes False, so only a definite True is accepted.",
+            CollapsePolicy.UnknownAsTrue => "Unknown becomes True, so only a definite False is refused.",
+            CollapsePolicy.UnknownIsError =>
+                "Unknown becomes a rejected-unresolved outcome (not a fault): the rule could not be resolved either way.",
+            _ => throw new ArgumentOutOfRangeException(nameof(policy), policy, "Unhandled collapse policy."),
+        };
+        return new OperatorDescriptor(
+            $"Collapse({CollapsePolicyText.Canonical(policy)})",
+            $"Final boundary: turns the three-valued result of the rule into a two-valued answer. True and False pass through; {meaning}"
+        );
     }
 
     private static string ThresholdDescription(NodeShape threshold)

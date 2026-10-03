@@ -21,13 +21,29 @@ public sealed class CompiledRule<TContext>
     private readonly ILogger logger;
     private readonly Lazy<string> canonicalText;
 
-    internal CompiledRule(Expression root, PredicateRegistry<TContext> registry, ILogger? logger = null)
+    internal CompiledRule(
+        Expression root,
+        PredicateRegistry<TContext> registry,
+        ILogger? logger = null,
+        CollapsePolicy? collapsePolicy = null
+    )
     {
         this.Root = root;
         this.registry = registry;
         this.logger = logger ?? NullLogger.Instance;
-        this.canonicalText = new Lazy<string>(() => CanonicalPrinter.Print(this.Root));
+        this.CollapsePolicy = collapsePolicy;
+        this.canonicalText = new Lazy<string>(() => CanonicalPrinter.Print(this.Root, this.CollapsePolicy));
     }
+
+    /// <summary>
+    /// Gets the policy of the outermost <c>Collapse(expr, policy)</c> this rule was written with, or
+    /// <see langword="null"/> if it declared none (ADR-0005 decision 14). When set, <see cref="EvaluateAsync"/> applies it
+    /// to produce <see cref="Decision.Outcome"/> (and, for the two lenient policies, a definite <see cref="Decision.Result"/>).
+    /// A policy is not part of the expression tree: it is the evaluation boundary around it, so the analyzer and the
+    /// operators see only the inner expression, while <see cref="Describe"/> and the evaluated tree show the boundary as
+    /// their root.
+    /// </summary>
+    public CollapsePolicy? CollapsePolicy { get; }
 
     /// <summary>Gets this rule's canonical printed DSL text — the form <c>RuleCompiler.Compile</c> reproduces a structurally equal tree from.</summary>
     public string CanonicalText => this.canonicalText.Value;
@@ -43,7 +59,7 @@ public sealed class CompiledRule<TContext>
     /// <returns>The JSON text.</returns>
     public string PrintJson()
     {
-        return JsonTreePrinter.Print(this.Root);
+        return JsonTreePrinter.Print(this.Root, this.CollapsePolicy);
     }
 
     /// <summary>
@@ -55,7 +71,15 @@ public sealed class CompiledRule<TContext>
     /// <returns>The root node's description, with every operand described the same way.</returns>
     public RuleDescription Describe()
     {
-        return DescribeNode(this.Root, this.registry);
+        RuleDescription inner = DescribeNode(this.Root, this.registry);
+        if (this.CollapsePolicy is not { } policy)
+        {
+            return inner;
+        }
+
+        // A declared collapse is the root of the described tree, so it mirrors the evaluated tree EvaluateAsync returns.
+        OperatorDescriptor boundary = OperatorInfo.DescribeCollapse(policy);
+        return new RuleDescription(boundary.Label, boundary.Description, [inner]);
     }
 
     /// <summary>Renders this rule's structure as Mermaid <c>flowchart</c> text, for a diagram UI.</summary>
@@ -139,11 +163,11 @@ public sealed class CompiledRule<TContext>
                 timeoutSource.Token,
                 this.logger
             );
-            return await timedEvaluator.EvaluateAsync(this.Root).ConfigureAwait(false);
+            return this.ApplyCollapse(await timedEvaluator.EvaluateAsync(this.Root).ConfigureAwait(false));
         }
 
         Evaluator<TContext> evaluator = new(context, services, this.registry, effectiveOptions, cancellationToken, this.logger);
-        return await evaluator.EvaluateAsync(this.Root).ConfigureAwait(false);
+        return this.ApplyCollapse(await evaluator.EvaluateAsync(this.Root).ConfigureAwait(false));
     }
 
     /// <inheritdoc />
@@ -209,5 +233,32 @@ public sealed class CompiledRule<TContext>
                 "This decision has no EvaluatedTree to render — it must come from EvaluateAsync on this same rule.",
                 nameof(decision)
             );
+    }
+
+    /// <summary>
+    /// Applies this rule's declared collapse, if any, to a finished evaluation. The inner result stays reachable as the
+    /// single child of the wrapped evaluated tree, faults are never touched (a rejected outcome is not a fault), and
+    /// <see cref="CollapseOutcome.RejectedUnresolved"/> leaves <see cref="Decision.Result"/> as the three-valued
+    /// <see cref="TruthValue.Unknown"/> so <see cref="Decision.IsSatisfied"/> stays fail-closed.
+    /// </summary>
+    private Decision ApplyCollapse(Decision decision)
+    {
+        if (this.CollapsePolicy is not { } policy)
+        {
+            return decision;
+        }
+
+        CollapseOutcome outcome = decision.Collapse(policy);
+        TruthValue result = outcome switch
+        {
+            CollapseOutcome.True => TruthValue.True,
+            CollapseOutcome.False => TruthValue.False,
+            _ => TruthValue.Unknown,
+        };
+
+        EvaluatedNode? tree = decision.EvaluatedTree is { } inner
+            ? new EvaluatedNode(OperatorInfo.DescribeCollapse(policy).Label, result, false, [inner])
+            : null;
+        return decision with { Result = result, EvaluatedTree = tree, Outcome = outcome };
     }
 }

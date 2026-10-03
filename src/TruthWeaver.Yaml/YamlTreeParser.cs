@@ -249,6 +249,8 @@ internal static class YamlTreeParser
                 return new InspectionNode(InspectionKind.IsKnown, operands, SourceSpan.None);
             case "Project":
                 return ParseProject(mapping, op, operands, diagnostics);
+            case "Collapse":
+                return ParseCollapse(mapping, op, operands, diagnostics);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":
@@ -289,6 +291,36 @@ internal static class YamlTreeParser
         }
 
         return new ThresholdNode(comparison, k, operands, SourceSpan.None);
+    }
+
+    /// <summary>
+    /// Reads <c>Collapse</c>'s <c>policy</c>: one of the three policy names (case-insensitive). Whether the node is the
+    /// outermost one is the compiler's rule, not the parser's, so a nested node parses and is rejected there.
+    /// </summary>
+    private static RuleNode? ParseCollapse(
+        YamlMappingNode mapping,
+        string op,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
+    {
+        if (
+            !TryGetChild(mapping, "policy", out YamlNode? policyNode)
+            || policyNode is not YamlScalarNode { Value: { } policyText }
+            || !CollapsePolicyText.TryParse(policyText, out CollapsePolicy policy)
+        )
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"'{op}' requires 'policy' to be one of {string.Join(", ", CollapsePolicyText.Names)}.",
+                    SourceSpan.None
+                )
+            );
+            return null;
+        }
+
+        return new CollapseNode(operands, policy, SourceSpan.None);
     }
 
     /// <summary>

@@ -12,10 +12,25 @@ internal static class JsonTreePrinter
 {
     /// <summary>Prints an expression tree to JSON tree text.</summary>
     /// <param name="root">The tree to print.</param>
+    /// <param name="collapse">
+    /// The outermost <c>Collapse</c> policy the rule declared, or <see langword="null"/>. When present the tree is wrapped
+    /// in <c>{"op": "collapse", "policy": ..., "operands": [root]}</c>, the only position the compiler accepts it.
+    /// </param>
     /// <returns>The JSON text.</returns>
-    public static string Print(Expression root)
+    public static string Print(Expression root, CollapsePolicy? collapse = null)
     {
-        return ToNode(root).ToJsonString();
+        JsonNode node = ToNode(root);
+        if (collapse is { } policy)
+        {
+            node = new JsonObject
+            {
+                ["op"] = TreeFormatOpNames.ToTreeFormat("Collapse"),
+                ["policy"] = CollapsePolicyText.TreeFormat(policy),
+                ["operands"] = new JsonArray(node),
+            };
+        }
+
+        return node.ToJsonString();
     }
 
     private static JsonNode ToNode(Expression node)

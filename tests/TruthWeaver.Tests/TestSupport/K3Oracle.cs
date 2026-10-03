@@ -269,6 +269,30 @@ public static class K3Oracle
         return Coalesce([value, unknownAs]);
     }
 
+    /// <summary>
+    /// The collapse boundary (ADR-0005 decision 14), defined from the inspections: <c>UnknownAsFalse</c> accepts only a
+    /// <c>True</c>, <c>UnknownAsTrue</c> refuses only a <c>False</c>, and <c>UnknownIsError</c> rejects exactly the
+    /// <c>Unknown</c> case.
+    /// </summary>
+    /// <param name="value">The K3 result being collapsed.</param>
+    /// <param name="policy">The collapse policy.</param>
+    public static CollapseOutcome Collapse(TruthValue value, CollapsePolicy policy)
+    {
+        if (IsUnknown(value) == TruthValue.True)
+        {
+            return policy switch
+            {
+                CollapsePolicy.UnknownAsFalse => CollapseOutcome.False,
+                CollapsePolicy.UnknownAsTrue => CollapseOutcome.True,
+                CollapsePolicy.UnknownIsError => CollapseOutcome.RejectedUnresolved,
+                _ => throw new ArgumentOutOfRangeException(nameof(policy)),
+            };
+        }
+
+        // A known value maps to itself under every policy.
+        return IsTrue(value) == TruthValue.True ? CollapseOutcome.True : CollapseOutcome.False;
+    }
+
     /// <summary>Exactly-one-true over the interval semantics (not parity).</summary>
     public static TruthValue ExactlyOne(IReadOnlyList<TruthValue> operands)
     {

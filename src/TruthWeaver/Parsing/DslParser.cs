@@ -41,6 +41,7 @@ internal sealed class DslParser
         "ISUNKNOWN",
         "ISKNOWN",
         "PROJECT",
+        "COLLAPSE",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -485,6 +486,11 @@ internal sealed class DslParser
             return this.ParseProject();
         }
 
+        if (this.IsKeyword("COLLAPSE"))
+        {
+            return this.ParseCollapse();
+        }
+
         if (this.IsKeyword("IF"))
         {
             return this.ParseOperandCall((operands, span) => new IfNode(operands, span));
@@ -759,6 +765,96 @@ internal sealed class DslParser
         int end = this.Current.Span.End;
         this.Expect(TokenKind.RParen, "')'");
         return new ProjectNode(operands, unknownAs, SpanCovering(start, end));
+    }
+
+    /// <summary>
+    /// Parses <c>Collapse(expr, policy)</c>: one operand expression, then a policy name (any letter case). It parses
+    /// wherever a primary is allowed; that it may only be the rule's outermost expression is the compiler's check
+    /// (<see cref="DiagnosticCodes.NestedCollapse"/>), so a misplaced one gets a precise span rather than a syntax error.
+    /// A missing, extra or unrecognised argument is a <see cref="DiagnosticCodes.SyntaxError"/> at the offending token.
+    /// </summary>
+    private RuleNode ParseCollapse()
+    {
+        int start = this.Current.Span.Start;
+        this.position++;
+        this.Expect(TokenKind.LParen, "'('");
+
+        List<RuleNode> operands = [];
+        CollapsePolicy policy = CollapsePolicy.UnknownAsFalse;
+        if (this.Current.Kind == TokenKind.RParen)
+        {
+            this.ReportCollapseShape(this.Current.Span);
+        }
+        else
+        {
+            operands.Add(this.ParseExpression());
+            if (this.Current.Kind == TokenKind.Comma)
+            {
+                this.position++;
+                policy = this.ParseCollapsePolicy();
+            }
+            else
+            {
+                this.ReportCollapseShape(this.Current.Span);
+            }
+
+            // A third argument is a mistake, not a silent ignore; it is parsed (and dropped) so the closing ')' is found.
+            while (this.Current.Kind == TokenKind.Comma)
+            {
+                this.position++;
+                RuleNode extra = this.ParseExpression();
+                this.diagnostics.Add(
+                    Diagnostic.Error(
+                        DiagnosticCodes.SyntaxError,
+                        "Collapse takes exactly two arguments: an expression and a policy.",
+                        extra.Span
+                    )
+                );
+            }
+        }
+
+        int end = this.Current.Span.End;
+        this.Expect(TokenKind.RParen, "')'");
+        return new CollapseNode(operands, policy, SpanCovering(start, end));
+    }
+
+    /// <summary>
+    /// Reads <c>Collapse</c>'s policy name. Only an identifier spelling one of the three policies is accepted; the token
+    /// is consumed either way so parsing continues after a bad one.
+    /// </summary>
+    private CollapsePolicy ParseCollapsePolicy()
+    {
+        Token token = this.Current;
+        if (token.Kind == TokenKind.Identifier && CollapsePolicyText.TryParse(token.Text, out CollapsePolicy policy))
+        {
+            this.position++;
+            return policy;
+        }
+
+        this.diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                $"Collapse's policy must be one of {string.Join(", ", CollapsePolicyText.Names)}, but found '{token.Text}'.",
+                token.Span
+            )
+        );
+        if (token.Kind != TokenKind.Eof && token.Kind != TokenKind.RParen)
+        {
+            this.position++;
+        }
+
+        return CollapsePolicy.UnknownAsFalse;
+    }
+
+    private void ReportCollapseShape(SourceSpan at)
+    {
+        this.diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                $"Collapse requires two arguments: an expression and a policy, as in Collapse(expr, UnknownAsFalse) (found '{this.Current.Text}').",
+                at
+            )
+        );
     }
 
     /// <summary>

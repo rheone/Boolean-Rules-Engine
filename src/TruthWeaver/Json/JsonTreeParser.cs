@@ -244,6 +244,8 @@ internal static class JsonTreeParser
                 return new InspectionNode(InspectionKind.IsKnown, operands, SourceSpan.None);
             case "Project":
                 return ParseProject(element, op, operands, diagnostics);
+            case "Collapse":
+                return ParseCollapse(element, op, operands, diagnostics);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":
@@ -280,6 +282,36 @@ internal static class JsonTreeParser
         }
 
         return new ThresholdNode(comparison, kElement.GetInt32(), operands, SourceSpan.None);
+    }
+
+    /// <summary>
+    /// Reads <c>Collapse</c>'s <c>policy</c>: one of the three policy names (case-insensitive) as a JSON string. Whether the
+    /// node is the outermost one is the compiler's rule, not the parser's, so a nested node parses and is rejected there.
+    /// </summary>
+    private static RuleNode? ParseCollapse(
+        JsonElement element,
+        string op,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
+    {
+        if (
+            !element.TryGetProperty("policy", out JsonElement policyElement)
+            || policyElement.ValueKind != JsonValueKind.String
+            || !CollapsePolicyText.TryParse(policyElement.GetString(), out CollapsePolicy policy)
+        )
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"'{op}' requires 'policy' to be one of {string.Join(", ", CollapsePolicyText.Names)}.",
+                    SourceSpan.None
+                )
+            );
+            return null;
+        }
+
+        return new CollapseNode(operands, policy, SourceSpan.None);
     }
 
     /// <summary>

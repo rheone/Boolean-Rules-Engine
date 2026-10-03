@@ -64,4 +64,11 @@ public static class DiagnosticCodes
 
     /// <summary>A string literal in DSL rule text contains a <c>\</c> not followed by one of the supported escapes (<c>\"</c>, <c>\\</c>, <c>\n</c>, <c>\t</c>).</summary>
     public const string InvalidEscapeSequence = "BRE0015";
+
+    /// <summary>
+    /// A <c>Collapse(expr, policy)</c> appears anywhere other than as the outermost expression of a rule (ADR-0005 decision
+    /// 14). Collapse is the final evaluation boundary, so it cannot sit inside another operator, a <c>Project</c>, a branch
+    /// or another <c>Collapse</c>. The span is the nested collapse expression.
+    /// </summary>
+    public const string NestedCollapse = "BRE0016";
 }

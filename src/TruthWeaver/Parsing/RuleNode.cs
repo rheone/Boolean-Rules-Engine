@@ -112,6 +112,15 @@ internal sealed record BetweenNode(int Min, int Max, IReadOnlyList<RuleNode> Ope
 internal sealed record InspectionNode(InspectionKind Kind, IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>
+/// <c>Collapse(x, policy)</c> reference. Only valid as the outermost node of a rule (ADR-0005 decision 14):
+/// <c>RuleCompiler</c> peels a root collapse into the compiled rule's policy and reports every other occurrence as
+/// <see cref="Diagnostics.DiagnosticCodes.NestedCollapse"/>, so the parsers build it freely wherever the text puts it. The
+/// operand count (exactly one) is validated there too, so a malformed JSON/YAML node is rejected the same way as an
+/// inspection.
+/// </summary>
+internal sealed record CollapseNode(IReadOnlyList<RuleNode> Operands, CollapsePolicy Policy, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
 /// <c>Project(x, True|False)</c> reference: <see cref="UnknownAs"/> is the value <c>Unknown</c> becomes. The operand count
 /// (exactly one) is validated by <c>RuleNodeCompiler</c>, so a malformed JSON/YAML node is rejected the same way as an
 /// inspection; the DSL parser has already rejected a missing or non-constant value.

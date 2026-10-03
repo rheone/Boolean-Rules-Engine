@@ -84,6 +84,7 @@ public sealed class TreeFormatOpNameParityTests
     [InlineData("isUnknown")]
     [InlineData("isKnown")]
     [InlineData("project")]
+    [InlineData("collapse")]
     [InlineData("exactlyOne")]
     [InlineData("atLeast")]
     [InlineData("atMost")]

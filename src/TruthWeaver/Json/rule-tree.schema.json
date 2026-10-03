@@ -62,7 +62,8 @@
         { "$ref": "#/$defs/naryOperatorNode" },
         { "$ref": "#/$defs/thresholdOperatorNode" },
         { "$ref": "#/$defs/betweenOperatorNode" },
-        { "$ref": "#/$defs/projectOperatorNode" }
+        { "$ref": "#/$defs/projectOperatorNode" },
+        { "$ref": "#/$defs/collapseOperatorNode" }
       ]
     },
     "unaryOperatorNode": {
@@ -138,6 +139,22 @@
         }
       },
       "required": ["op", "operands", "unknownAs"],
+      "additionalProperties": false
+    },
+    "collapseOperatorNode": {
+      "description": "Collapse: the final boundary that turns the rule's three-valued result into a two-valued answer under 'policy' (unknownAsFalse, unknownAsTrue or unknownIsError; case-insensitive on read). Exactly one operand. It is valid only as the outermost node of a rule: a nested collapse validates as JSON but is rejected by the compiler (NestedCollapse), which is not expressible as JSON structure.",
+      "type": "object",
+      "properties": {
+        "op": { "const": "collapse" },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "policy": { "enum": ["unknownAsFalse", "unknownAsTrue", "unknownIsError"] }
+      },
+      "required": ["op", "operands", "policy"],
       "additionalProperties": false
     }
   }

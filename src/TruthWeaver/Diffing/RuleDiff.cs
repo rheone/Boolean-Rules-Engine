@@ -27,8 +27,26 @@ public static class RuleDiff
         ArgumentNullException.ThrowIfNull(after);
 
         List<RuleDiffEntry> entries = [];
-        DiffNode(before.Root, before.Describe(), after.Root, after.Describe(), [], entries);
+        if (before.CollapsePolicy != after.CollapsePolicy)
+        {
+            // The collapse is the boundary around the whole expression, not a node inside it, so a different (or added or
+            // removed) policy changes the rule as a whole: report it once at the root and do not also diff the inside.
+            entries.Add(new RuleDiffEntry(RuleDiffChangeKind.Changed, [], before.Describe(), after.Describe()));
+            return new RuleDiffResult(entries);
+        }
+
+        DiffNode(before.Root, InnerDescription(before), after.Root, InnerDescription(after), [], entries);
         return new RuleDiffResult(entries);
+    }
+
+    /// <summary>
+    /// Gets the description of a rule's expression tree. <see cref="CompiledRule{TContext}.Describe"/> roots a rule that
+    /// declared a collapse at the collapse boundary, but the diff walks the expression tree, so it needs the node below it.
+    /// </summary>
+    private static RuleDescription InnerDescription<TContext>(CompiledRule<TContext> rule)
+    {
+        RuleDescription description = rule.Describe();
+        return rule.CollapsePolicy is null ? description : description.Operands[0];
     }
 
     private static void DiffNode(
@@ -97,6 +115,17 @@ public static class RuleDiff
         if (before is BetweenExpression beforeBetween && after is BetweenExpression afterBetween)
         {
             return beforeBetween.Min == afterBetween.Min && beforeBetween.Max == afterBetween.Max;
+        }
+
+        // Like the threshold family, these differ only in what they test or substitute, so equal types are not enough.
+        if (before is InspectionExpression beforeInspection && after is InspectionExpression afterInspection)
+        {
+            return beforeInspection.Kind == afterInspection.Kind;
+        }
+
+        if (before is ProjectExpression beforeProject && after is ProjectExpression afterProject)
+        {
+            return beforeProject.UnknownAs == afterProject.UnknownAs;
         }
 
         return true;

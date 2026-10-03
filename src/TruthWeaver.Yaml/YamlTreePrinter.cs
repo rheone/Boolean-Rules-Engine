@@ -16,10 +16,22 @@ internal static class YamlTreePrinter
 {
     /// <summary>Prints an expression tree to YAML tree text.</summary>
     /// <param name="root">The tree to print.</param>
+    /// <param name="collapse">
+    /// The outermost <c>Collapse</c> policy the rule declared, or <see langword="null"/>. When present the tree is wrapped
+    /// in a <c>collapse</c> node carrying the <c>policy</c>, the only position the compiler accepts it.
+    /// </param>
     /// <returns>The YAML text.</returns>
-    public static string Print(Expression root)
+    public static string Print(Expression root, CollapsePolicy? collapse = null)
     {
-        YamlDocument document = new(ToNode(root));
+        YamlNode node = ToNode(root);
+        if (collapse is { } policy)
+        {
+            YamlMappingNode wrapper = OperatorNode(TreeFormatOpNames.ToTreeFormat("Collapse"), [node]);
+            wrapper.Add(new YamlScalarNode("policy"), Scalar(CollapsePolicyText.TreeFormat(policy), ScalarStyle.Plain));
+            node = wrapper;
+        }
+
+        YamlDocument document = new(node);
         YamlStream stream = new(document);
         using StringWriter writer = new();
         stream.Save(writer, assignAnchors: false);

@@ -40,6 +40,8 @@ public sealed class EvaluatedNodeRuleDescriptionAlignmentTests
     [InlineData("IsKnown(d) OR IsKnown(a)")]
     [InlineData("Project(d, True)")]
     [InlineData("Project(d AND a, False) OR c")]
+    [InlineData("Collapse(d, UnknownAsFalse)")]
+    [InlineData("Collapse(d AND (a OR c), UnknownIsError)")]
     [InlineData("ExactlyOne(d, a, c)")]
     [InlineData("AtLeast(2, d, a, c)")]
     [InlineData("(d AND a) OR (ExactlyOne(c, d, a) XOR (NOT c))")]

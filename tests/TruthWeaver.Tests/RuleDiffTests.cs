@@ -108,6 +108,97 @@ public sealed class RuleDiffTests
         Assert.Equal([1, 1], entry.Path);
     }
 
+    /// <summary>A different <c>Project</c> policy is a change of the node, not an identical rule.</summary>
+    [Fact]
+    public void A_changed_project_policy_produces_a_changed_entry_at_the_root()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> before = compiler.Compile("Project(isManager, True)").CompiledRule!;
+        CompiledRule<RuleTestContext> after = compiler.Compile("Project(isManager, False)").CompiledRule!;
+
+        RuleDiffResult diff = RuleDiff.Compare(before, after);
+
+        RuleDiffEntry entry = Assert.Single(diff.Entries);
+        Assert.Equal(RuleDiffChangeKind.Changed, entry.Kind);
+        Assert.Empty(entry.Path);
+        Assert.Equal("Project(True)", entry.Before!.Label);
+        Assert.Equal("Project(False)", entry.After!.Label);
+    }
+
+    /// <summary>A different inspection kind is a change of the node, not an identical rule.</summary>
+    [Fact]
+    public void A_changed_inspection_kind_produces_a_changed_entry_at_the_root()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> before = compiler.Compile("IsTrue(isManager)").CompiledRule!;
+        CompiledRule<RuleTestContext> after = compiler.Compile("IsFalse(isManager)").CompiledRule!;
+
+        RuleDiffResult diff = RuleDiff.Compare(before, after);
+
+        RuleDiffEntry entry = Assert.Single(diff.Entries);
+        Assert.Equal(RuleDiffChangeKind.Changed, entry.Kind);
+        Assert.Empty(entry.Path);
+    }
+
+    /// <summary>Changing only the declared collapse policy is a change of the rule, reported at the root.</summary>
+    [Fact]
+    public void A_changed_collapse_policy_produces_a_changed_entry_at_the_root()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> before = compiler.Compile("Collapse(isManager, UnknownAsFalse)").CompiledRule!;
+        CompiledRule<RuleTestContext> after = compiler.Compile("Collapse(isManager, UnknownAsTrue)").CompiledRule!;
+
+        RuleDiffResult diff = RuleDiff.Compare(before, after);
+
+        RuleDiffEntry entry = Assert.Single(diff.Entries);
+        Assert.Equal(RuleDiffChangeKind.Changed, entry.Kind);
+        Assert.Empty(entry.Path);
+        Assert.Equal("Collapse(UnknownAsFalse)", entry.Before!.Label);
+        Assert.Equal("Collapse(UnknownAsTrue)", entry.After!.Label);
+    }
+
+    /// <summary>Adding a collapse around an otherwise identical rule is reported once, at the root.</summary>
+    [Fact]
+    public void An_added_collapse_produces_a_changed_entry_at_the_root()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> before = compiler.Compile("isManager AND isDepartmentHead").CompiledRule!;
+        CompiledRule<RuleTestContext> after = compiler
+            .Compile("Collapse(isManager AND isDepartmentHead, UnknownIsError)")
+            .CompiledRule!;
+
+        RuleDiffResult diff = RuleDiff.Compare(before, after);
+
+        RuleDiffEntry entry = Assert.Single(diff.Entries);
+        Assert.Equal(RuleDiffChangeKind.Changed, entry.Kind);
+        Assert.Empty(entry.Path);
+        Assert.Equal("AND", entry.Before!.Label);
+        Assert.Equal("Collapse(UnknownIsError)", entry.After!.Label);
+    }
+
+    /// <summary>
+    /// With the same collapse on both sides, operand changes inside are located relative to the inner expression, exactly as
+    /// without a collapse, and the descriptions line up with the expression nodes.
+    /// </summary>
+    [Fact]
+    public void A_changed_term_inside_the_same_collapse_is_located_relative_to_the_inner_expression()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        CompiledRule<RuleTestContext> before = compiler
+            .Compile("Collapse(isManager AND hasRole(role: \"Y\"), UnknownAsFalse)")
+            .CompiledRule!;
+        CompiledRule<RuleTestContext> after = compiler
+            .Compile("Collapse(isManager AND hasRole(role: \"Z\"), UnknownAsFalse)")
+            .CompiledRule!;
+
+        RuleDiffResult diff = RuleDiff.Compare(before, after);
+
+        RuleDiffEntry entry = Assert.Single(diff.Entries);
+        Assert.Equal(RuleDiffChangeKind.Changed, entry.Kind);
+        Assert.Equal([1], entry.Path);
+        Assert.Equal("hasRole", entry.Before!.Label);
+    }
+
     private static RuleCompiler<RuleTestContext> CreateCompiler()
     {
         return new(

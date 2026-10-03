@@ -261,6 +261,18 @@ public abstract class RuleBuilder
     }
 
     /// <summary>
+    /// Creates a builder for the outermost <c>Collapse(operand, policy)</c> boundary. It is valid only as the root of a
+    /// rule: used as an operand of another builder it compiles to the nested-collapse diagnostic.
+    /// </summary>
+    /// <param name="operand">The rule whose three-valued result the policy collapses.</param>
+    /// <param name="policy">How an <c>Unknown</c> result is resolved.</param>
+    /// <returns>A builder for the collapsed rule.</returns>
+    public static RuleBuilder Collapse(RuleBuilder operand, CollapsePolicy policy)
+    {
+        return new CollapseBuilder(operand, policy);
+    }
+
+    /// <summary>
     /// Creates a builder for <c>Project(operand, unknownAs)</c>: <c>True</c> and <c>False</c> pass through and
     /// <c>Unknown</c> is replaced by <paramref name="unknownAs"/>, so the result is always definite (the same value as
     /// <c>COALESCE(operand, unknownAs)</c>).
@@ -441,6 +453,22 @@ public abstract class RuleBuilder
                 ["min"] = this.min,
                 ["max"] = this.max,
                 ["operands"] = OperandsNode(this.operands),
+            };
+        }
+    }
+
+    private sealed class CollapseBuilder(RuleBuilder operand, CollapsePolicy policy) : RuleBuilder
+    {
+        private readonly RuleBuilder operand = operand;
+        private readonly CollapsePolicy policy = policy;
+
+        private protected override JsonNode ToNode()
+        {
+            return new JsonObject
+            {
+                ["op"] = "collapse",
+                ["policy"] = CollapsePolicyText.TreeFormat(this.policy),
+                ["operands"] = OperandsNode([this.operand]),
             };
         }
     }

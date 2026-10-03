@@ -1,5 +1,6 @@
 namespace TruthWeaver.Printing;
 
+using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
 
 /// <summary>
@@ -24,10 +25,15 @@ internal static class CanonicalPrinter
 
     /// <summary>Prints an expression tree to canonical DSL text.</summary>
     /// <param name="root">The tree to print.</param>
+    /// <param name="collapse">
+    /// The outermost <c>Collapse</c> policy the rule declared, or <see langword="null"/>. When present it wraps the whole
+    /// tree (<c>Collapse(expr, UnknownAsFalse)</c>), the only place the DSL accepts it.
+    /// </param>
     /// <returns>The canonical DSL text.</returns>
-    public static string Print(Expression root)
+    public static string Print(Expression root, CollapsePolicy? collapse = null)
     {
-        return PrintNode(root, PrintContext.Top);
+        string text = PrintNode(root, PrintContext.Top);
+        return collapse is { } policy ? $"Collapse({text}, {CollapsePolicyText.Canonical(policy)})" : text;
     }
 
     private static bool NeedsWrap(Expression node, PrintContext context)

@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using TruthWeaver.Abstractions;
 using TruthWeaver.Analysis;
 using TruthWeaver.Ast;
 using TruthWeaver.Diagnostics;
@@ -112,11 +113,8 @@ public sealed class RuleCompiler<TContext>(
             return new CompilationResult<TContext>(null, diagnostics);
         }
 
-        (Expression? tree, IReadOnlyList<Diagnostic> validationDiagnostics) = RuleNodeCompiler<TContext>.Compile(
-            root,
-            this.registry,
-            this.options
-        );
+        (Expression? tree, CollapsePolicy? collapse, IReadOnlyList<Diagnostic> validationDiagnostics) =
+            RuleNodeCompiler<TContext>.Compile(root, this.registry, this.options);
         diagnostics.AddRange(validationDiagnostics);
 
         if (tree is not null)
@@ -128,7 +126,7 @@ public sealed class RuleCompiler<TContext>(
 
         bool hasErrors = diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error);
         CompiledRule<TContext>? compiled =
-            !hasErrors && tree is not null ? new CompiledRule<TContext>(tree, this.registry, this.logger) : null;
+            !hasErrors && tree is not null ? new CompiledRule<TContext>(tree, this.registry, this.logger, collapse) : null;
         return new CompilationResult<TContext>(compiled, diagnostics);
     }
 
