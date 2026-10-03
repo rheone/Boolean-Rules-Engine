@@ -43,16 +43,18 @@ public static class DiagnosticCodes
     public const string AnalysisSkippedTooManyTerms = "BRE0011";
 
     /// <summary>
-    /// The two-valued (classical) analyzer found a sub-expression that is always <c>True</c> when every
-    /// term is <c>True</c> or <c>False</c>. This is not a Strong K3 tautology: the sub-expression can still
-    /// be <c>Unknown</c>. The code is kept for compatibility until the K3-aware analyzer lands.
+    /// The Strong K3 analyzer found a sub-expression that is <c>True</c> for every <c>{True, False, Unknown}</c>
+    /// assignment of its terms (a K3 tautology). <c>A OR NOT A</c> is not one: it is <c>Unknown</c> when
+    /// <c>A</c> is. The name is historical ("structural" as opposed to evaluated) and kept so the code and
+    /// constant are stable.
     /// </summary>
     public const string StructuralTautology = "BRE0012";
 
     /// <summary>
-    /// The two-valued (classical) analyzer found a sub-expression that is always <c>False</c> when every
-    /// term is <c>True</c> or <c>False</c>. This is not a Strong K3 contradiction: the sub-expression can
-    /// still be <c>Unknown</c>. The code is kept for compatibility until the K3-aware analyzer lands.
+    /// The Strong K3 analyzer found a sub-expression that is <c>False</c> for every <c>{True, False, Unknown}</c>
+    /// assignment of its terms (a K3 contradiction). <c>A AND NOT A</c> is not one: it is <c>Unknown</c> when
+    /// <c>A</c> is. The name is historical ("structural" as opposed to evaluated) and kept so the code and
+    /// constant are stable.
     /// </summary>
     public const string StructuralContradiction = "BRE0013";
 

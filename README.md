@@ -284,9 +284,11 @@ A service that only *implements* domain predicates references
   of the same rule is invoked at most once per evaluation, keyed by
   structural term identity (see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
   Entry point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
-- **A BDD-based analyzer**, not brute-force truth tables, flags structurally
-  constant or contradictory sub-expressions (e.g.
-  `hasTopping(topping: "greenOlives") AND NOT hasTopping(topping: "greenOlives")`) as compile diagnostics.
+- **A Strong K3 BDD analyzer**, not brute-force truth tables, flags
+  sub-expressions that are `True` (or `False`) for every `{True, False, Unknown}`
+  assignment of their terms (e.g.
+  `hasTopping(topping: "greenOlives") AND FALSE`) as compile diagnostics. It does
+  not flag `A AND NOT A` or `A OR NOT A`: both are `Unknown` when `A` is.
   Entry point: [`Analyzer`](src/TruthWeaver/Analysis/Analyzer.cs) and
   [`BddManager`](src/TruthWeaver/Analysis/BddManager.cs).
 - **Resource limits and `CompilationMode.Lenient`.** `CompilerOptions`
@@ -1364,7 +1366,7 @@ flowchart TD
     Parse -->|"syntax error"| Diag1[["Diagnostics<br/>(Error)"]]
     Parse -->|"raw tree"| Validate["Validate<br/>(known predicates, argument schema,<br/>depth/node limits, CompilerOptions)"]
     Validate -->|"validation error"| Diag2[["Diagnostics<br/>(Error / Warning / Info)"]]
-    Validate -->|"valid tree"| Analyze["Analyze<br/>(BDD-based two-valued constant/contradiction detection)"]
+    Validate -->|"valid tree"| Analyze["Analyze<br/>(dual-rail BDD Strong K3 constant/contradiction detection)"]
     Analyze --> Diag3[["Diagnostics<br/>(Warning / Info)"]]
     Analyze --> Build["Build immutable expression tree"]
     Build --> Result["CompilationResult&lt;TContext&gt;<br/>CompiledRule&lt;TContext&gt;? + Diagnostics"]
@@ -1375,7 +1377,7 @@ flowchart TD
 ```
 
 `Compile` never throws for an authoring error — every problem, from a
-syntax error to a two-valued tautology, becomes a `Diagnostic` (code,
+syntax error to a Strong K3 tautology, becomes a `Diagnostic` (code,
 severity, source span) in the returned `CompilationResult<TContext>`.
 `CompiledRule<TContext>` is populated only when there are no `Error`-severity
 diagnostics, which is what makes "a bad edit is rejected, the previously
@@ -1428,7 +1430,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | Term | Meaning |
 | --- | --- |
 | `AtLeast(k, ...)` / `AtMost(k, ...)` / `GreaterThan(k, ...)` / `LessThan(k, ...)` / `Exactly(k, ...)` | The threshold operator family: n-ary comparisons against the true-operand count, all compiling to one shared `ThresholdExpression` node — see [Operators](#operators). |
-| BDD analyzer | The compiler's constant/contradiction-detection pass, backed by a real binary decision diagram rather than brute-force truth tables. It reasons in classical two-valued logic, so its warnings (`BRE0012`/`BRE0013`) say "when every term is True or False" and are not Strong K3 claims: `A AND NOT A` is still `Unknown` when `A` is `Unknown` (a K3-aware analyzer is planned, ADR-0005 decision 17) — see [Compilation pipeline](#compilation-pipeline). |
+| BDD analyzer | The compiler's constant/contradiction-detection pass, backed by a real binary decision diagram rather than brute-force truth tables. It reasons in Strong K3 with a dual-rail BDD ("definitely true" / "possibly true" per sub-expression, each term contributing an independent `True`/`False`/`Unknown` state), so its warnings (`BRE0012` tautology, `BRE0013` contradiction) mean the sub-expression is `True` (resp. `False`) for every `{True, False, Unknown}` assignment: `A AND NOT A` and `A OR NOT A` are not reported because they are `Unknown` when `A` is (ADR-0005 decision 17) — see [Compilation pipeline](#compilation-pipeline). |
 | `CompilationMode` | `Strict` (default — an unregistered predicate is a compile error) or `Lenient` (an unregistered predicate compiles to a permanent `Unknown` term, for services sharing a rule store with different predicate sets). |
 | `CompilationResult<TContext>` | What `Compile`/`CompileJson`/`CompileYaml` return: a nullable `CompiledRule<TContext>` plus every `Diagnostic` raised. |
 | `CompiledRule<TContext>` | The immutable, thread-safe result of a successful compile. Safe to cache, share, and evaluate repeatedly; swapping the reference that holds it is how a host applies a rule edit at runtime. |

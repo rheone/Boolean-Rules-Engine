@@ -213,6 +213,13 @@ immutable, so runtime rule changes are a compile-and-swap-a-reference: no
 locking, in-flight evaluations finish against the old rule. Full reasoning:
 [ADR-0002](docs/adr/0002-evaluation-semantics.md).
 
+The analyzer step reasons in Strong K3 too (dual-rail BDD: "definitely true" /
+"possibly true"). It warns (`BRE0012` tautology, `BRE0013` contradiction) only
+when a sub-expression is `True` (resp. `False`) for every
+`{True, False, Unknown}` assignment of its terms, so `A AND NOT A` and
+`A OR NOT A` are not reported: both are `Unknown` when `A` is.
+([ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 17.)
+
 ## Syntax and serialization (summary)
 
 The string DSL (word operators, plus the symbol aliases `&&`, `||`, `!`, `∧`, `∨`,

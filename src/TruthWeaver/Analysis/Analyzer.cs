@@ -8,17 +8,23 @@ using TruthWeaver.Printing;
 
 /// <summary>
 /// The BDD-based analyzer step of the compilation pipeline (ADR-0003: Parse → Validate → Analyze →
-/// Build): flags sub-expressions that are always-true or always-false in classical two-valued logic,
-/// using term identity (CONTEXT.md) to recognize repeated references to the same variable — e.g.
-/// <c>hasRole(role: "Y") AND NOT hasRole(role: "Y")</c> is false whenever <c>hasRole</c> returns
-/// <c>True</c> or <c>False</c>. The BDD is two-valued, so these findings are NOT Strong K3 claims: the
-/// same expression is <c>Unknown</c> when the term is <c>Unknown</c>. The diagnostics are labelled
-/// accordingly until the dual-rail K3 analyzer replaces this pass (ADR-0005 decision 17). They are
+/// Build). It reasons in Strong K3 (ADR-0005 decision 17) with a dual-rail BDD: every sub-expression is
+/// represented by two BDDs, <em>definitely true</em> (it is <c>True</c>) and <em>possibly true</em>
+/// (it is <c>True</c> or <c>Unknown</c>, i.e. not <c>False</c>). A sub-expression is reported as a
+/// tautology only when it is <c>True</c> for every <c>{True, False, Unknown}</c> assignment of its terms
+/// (the definitely-true rail is constant true), and as a contradiction only when it is <c>False</c> for
+/// every assignment (the possibly-true rail is constant false). So <c>A AND NOT A</c> and
+/// <c>A OR NOT A</c> are not reported: both are <c>Unknown</c> when <c>A</c> is. Term identity
+/// (CONTEXT.md) recognises repeated references to the same variable. Findings are
 /// <see cref="DiagnosticSeverity.Warning"/> diagnostics — they never block compilation.
 /// </summary>
 internal static class Analyzer
 {
-    /// <summary>Analyzes a compiled tree for classical (two-valued) tautologies and contradictions.</summary>
+    private static readonly DualRail TrueRail = new(BddManager.True, BddManager.True);
+    private static readonly DualRail FalseRail = new(BddManager.False, BddManager.False);
+    private static readonly DualRail UnknownRail = new(BddManager.False, BddManager.True);
+
+    /// <summary>Analyzes a compiled tree for Strong K3 tautologies and contradictions.</summary>
     /// <param name="root">The compiled expression tree.</param>
     /// <param name="options">The compiler options, whose <c>MaxAnalysisTerms</c> caps this analysis.</param>
     /// <returns>The diagnostics raised (never <see cref="DiagnosticSeverity.Error"/>).</returns>
@@ -41,7 +47,7 @@ internal static class Analyzer
         Dictionary<TermIdentity, int> variableIndex = [];
         BddManager bdd = new();
         List<Diagnostic> diagnostics = [];
-        Build(root, bdd, variableIndex, diagnostics);
+        _ = Build(root, bdd, variableIndex, diagnostics);
         return diagnostics;
     }
 
@@ -94,6 +100,49 @@ internal static class Analyzer
         }
     }
 
+    /// <summary>
+    /// Strong K3 negation on the rails: <c>NOT x</c> is definitely true when <c>x</c> is not even possibly
+    /// true, and possibly true when <c>x</c> is not definitely true. <c>Unknown</c> stays <c>Unknown</c>.
+    /// </summary>
+    private static DualRail Not(BddManager bdd, DualRail x)
+    {
+        return new DualRail(bdd.Not(x.Possible), bdd.Not(x.Definite));
+    }
+
+    /// <summary>Strong K3 conjunction: definitely true needs both definitely true; possibly true needs both possibly true.</summary>
+    private static DualRail And(BddManager bdd, DualRail x, DualRail y)
+    {
+        return new DualRail(bdd.And(x.Definite, y.Definite), bdd.And(x.Possible, y.Possible));
+    }
+
+    /// <summary>Strong K3 disjunction: the dual of <see cref="And"/>.</summary>
+    private static DualRail Or(BddManager bdd, DualRail x, DualRail y)
+    {
+        return new DualRail(bdd.Or(x.Definite, y.Definite), bdd.Or(x.Possible, y.Possible));
+    }
+
+    /// <summary>
+    /// Binary XOR as <c>(x AND NOT y) OR (NOT x AND y)</c> — the primitive definition, so it is
+    /// <c>Unknown</c> whenever either side is.
+    /// </summary>
+    private static DualRail Xor(BddManager bdd, DualRail x, DualRail y)
+    {
+        return Or(bdd, And(bdd, x, Not(bdd, y)), And(bdd, Not(bdd, x), y));
+    }
+
+    /// <summary>
+    /// "At least <paramref name="k"/> operands are true" over the interval semantics: definitely true when
+    /// the definitely-true operands alone reach <paramref name="k"/>, possibly true when the possibly-true
+    /// operands can. Every other cardinality operator is built from this and <see cref="Not"/>.
+    /// </summary>
+    private static DualRail AtLeast(BddManager bdd, IReadOnlyList<DualRail> operands, int k)
+    {
+        return new DualRail(
+            AtLeastBdd(bdd, [.. operands.Select(o => o.Definite)], k, 0),
+            AtLeastBdd(bdd, [.. operands.Select(o => o.Possible)], k, 0)
+        );
+    }
+
     private static int AtLeastBdd(BddManager bdd, IReadOnlyList<int> operandIds, int k, int fromIndex)
     {
         int remaining = operandIds.Count - fromIndex;
@@ -112,53 +161,50 @@ internal static class Analyzer
         return bdd.Or(withFirstTrue, withoutFirst);
     }
 
-    private static string ClassicalMessage(string alwaysValue, Expression node)
+    /// <summary>"Exactly <paramref name="k"/> operands are true": <c>AtLeast(k) AND NOT AtLeast(k + 1)</c>.</summary>
+    private static DualRail Exactly(BddManager bdd, IReadOnlyList<DualRail> operands, int k)
     {
-        // The BDD is two-valued, so the finding only holds when every term is True or False; naming
-        // that caveat (and Unknown) keeps the warning from being read as a Strong K3 claim.
-        string caveat =
-            $"Two-valued (classical) analysis: this sub-expression is always {alwaysValue} when every term is True or False.";
-        return $"{caveat} In Strong K3 it can still be Unknown: {CanonicalPrinter.Print(node)}";
+        return And(bdd, AtLeast(bdd, operands, k), Not(bdd, AtLeast(bdd, operands, k + 1)));
     }
 
-    private static void Diagnose(int nodeId, Expression node, List<Diagnostic> diagnostics)
+    private static string Message(string alwaysValue, Expression node)
     {
-        if (nodeId == BddManager.True)
+        return $"Strong K3 analysis: this sub-expression is {alwaysValue} for every True/False/Unknown assignment of its terms: {CanonicalPrinter.Print(node)}";
+    }
+
+    private static void Diagnose(DualRail rail, Expression node, List<Diagnostic> diagnostics)
+    {
+        if (rail.Definite == BddManager.True)
         {
-            diagnostics.Add(
-                Diagnostic.Warning(DiagnosticCodes.StructuralTautology, ClassicalMessage("True", node), SourceSpan.None)
-            );
+            // Definitely true in every assignment: it can never be False or Unknown.
+            diagnostics.Add(Diagnostic.Warning(DiagnosticCodes.StructuralTautology, Message("True", node), SourceSpan.None));
         }
-        else if (nodeId == BddManager.False)
+        else if (rail.Possible == BddManager.False)
         {
+            // Never possibly true in any assignment: it can never be True or Unknown.
             diagnostics.Add(
-                Diagnostic.Warning(DiagnosticCodes.StructuralContradiction, ClassicalMessage("False", node), SourceSpan.None)
+                Diagnostic.Warning(DiagnosticCodes.StructuralContradiction, Message("False", node), SourceSpan.None)
             );
         }
     }
 
-    private static int Build(
+    private static DualRail Build(
         Expression node,
         BddManager bdd,
         Dictionary<TermIdentity, int> variableIndex,
         List<Diagnostic> diagnostics
     )
     {
-        int nodeId;
+        DualRail rail;
         switch (node)
         {
             case ConstantExpression c:
-                if (c.Value == TruthValue.Unknown)
+                return c.Value switch
                 {
-                    // Interim (the dual-rail K3 analyzer is a later slice): an Unknown literal is neither
-                    // structurally true nor false, so it becomes its own fresh variable. That keeps
-                    // `Unknown AND NOT Unknown` from being reported as a classical contradiction.
-                    int fresh = variableIndex.Count;
-                    variableIndex[new TermIdentity($"<unknown#{fresh}>", [])] = fresh;
-                    return bdd.Variable(fresh);
-                }
-
-                return c.Value == TruthValue.True ? BddManager.True : BddManager.False;
+                    TruthValue.True => TrueRail,
+                    TruthValue.False => FalseRail,
+                    _ => UnknownRail,
+                };
             case TermExpression t:
                 if (!variableIndex.TryGetValue(t.Identity, out int index))
                 {
@@ -166,56 +212,57 @@ internal static class Analyzer
                     variableIndex[t.Identity] = index;
                 }
 
-                return bdd.Variable(index);
+                // Each term gets two independent BDD variables: d ("is True") and q ("is Unknown").
+                // The rails are d and d OR q, so every variable setting is a valid K3 state
+                // (d=1 is True, d=0 and q=1 is Unknown, d=0 and q=0 is False) and a "definitely true but
+                // not possibly true" state can never be produced.
+                int definite = bdd.Variable(2 * index);
+                int unknown = bdd.Variable((2 * index) + 1);
+                return new DualRail(definite, bdd.Or(definite, unknown));
             case NotExpression n:
-                nodeId = bdd.Not(Build(n.Operand, bdd, variableIndex, diagnostics));
+                rail = Not(bdd, Build(n.Operand, bdd, variableIndex, diagnostics));
                 break;
             case AndExpression a:
-                nodeId = BddManager.True;
+                rail = TrueRail;
                 foreach (Expression operand in a.Operands)
                 {
-                    nodeId = bdd.And(nodeId, Build(operand, bdd, variableIndex, diagnostics));
+                    rail = And(bdd, rail, Build(operand, bdd, variableIndex, diagnostics));
                 }
 
                 break;
             case OrExpression o:
-                nodeId = BddManager.False;
+                rail = FalseRail;
                 foreach (Expression operand in o.Operands)
                 {
-                    nodeId = bdd.Or(nodeId, Build(operand, bdd, variableIndex, diagnostics));
+                    rail = Or(bdd, rail, Build(operand, bdd, variableIndex, diagnostics));
                 }
 
                 break;
             case XorExpression x:
-                nodeId = bdd.Xor(
+                rail = Xor(
+                    bdd,
                     Build(x.Left, bdd, variableIndex, diagnostics),
                     Build(x.Right, bdd, variableIndex, diagnostics)
                 );
                 break;
             case XnorExpression xn:
-                nodeId = bdd.Not(
-                    bdd.Xor(Build(xn.Left, bdd, variableIndex, diagnostics), Build(xn.Right, bdd, variableIndex, diagnostics))
+                rail = Not(
+                    bdd,
+                    Xor(bdd, Build(xn.Left, bdd, variableIndex, diagnostics), Build(xn.Right, bdd, variableIndex, diagnostics))
                 );
                 break;
             case ExactlyOneExpression e:
-                List<int> exactlyOneOperandIds = [.. e.Operands.Select(o => Build(o, bdd, variableIndex, diagnostics))];
-                nodeId = bdd.And(
-                    AtLeastBdd(bdd, exactlyOneOperandIds, 1, 0),
-                    bdd.Not(AtLeastBdd(bdd, exactlyOneOperandIds, 2, 0))
-                );
+                rail = Exactly(bdd, BuildOperands(e.Operands, bdd, variableIndex, diagnostics), 1);
                 break;
             case ThresholdExpression th:
-                List<int> thresholdOperandIds = [.. th.Operands.Select(o => Build(o, bdd, variableIndex, diagnostics))];
-                nodeId = th.Comparison switch
+                List<DualRail> operands = BuildOperands(th.Operands, bdd, variableIndex, diagnostics);
+                rail = th.Comparison switch
                 {
-                    ThresholdComparison.AtLeast => AtLeastBdd(bdd, thresholdOperandIds, th.K, 0),
-                    ThresholdComparison.AtMost => bdd.Not(AtLeastBdd(bdd, thresholdOperandIds, th.K + 1, 0)),
-                    ThresholdComparison.GreaterThan => AtLeastBdd(bdd, thresholdOperandIds, th.K + 1, 0),
-                    ThresholdComparison.LessThan => bdd.Not(AtLeastBdd(bdd, thresholdOperandIds, th.K, 0)),
-                    ThresholdComparison.Exactly => bdd.And(
-                        AtLeastBdd(bdd, thresholdOperandIds, th.K, 0),
-                        bdd.Not(AtLeastBdd(bdd, thresholdOperandIds, th.K + 1, 0))
-                    ),
+                    ThresholdComparison.AtLeast => AtLeast(bdd, operands, th.K),
+                    ThresholdComparison.AtMost => Not(bdd, AtLeast(bdd, operands, th.K + 1)),
+                    ThresholdComparison.GreaterThan => AtLeast(bdd, operands, th.K + 1),
+                    ThresholdComparison.LessThan => Not(bdd, AtLeast(bdd, operands, th.K)),
+                    ThresholdComparison.Exactly => Exactly(bdd, operands, th.K),
                     _ => throw new InvalidOperationException($"Unhandled threshold comparison '{th.Comparison}'."),
                 };
                 break;
@@ -223,7 +270,27 @@ internal static class Analyzer
                 throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'.");
         }
 
-        Diagnose(nodeId, node, diagnostics);
-        return nodeId;
+        Diagnose(rail, node, diagnostics);
+        return rail;
     }
+
+    private static List<DualRail> BuildOperands(
+        IEnumerable<Expression> operands,
+        BddManager bdd,
+        Dictionary<TermIdentity, int> variableIndex,
+        List<Diagnostic> diagnostics
+    )
+    {
+        return [.. operands.Select(o => Build(o, bdd, variableIndex, diagnostics))];
+    }
+
+    /// <summary>
+    /// The two BDDs that describe one K3 value: <c>Definite</c> is true exactly when the value is
+    /// <c>True</c>, <c>Possible</c> exactly when it is <c>True</c> or <c>Unknown</c>. The pair
+    /// (<c>Definite</c>, <c>Possible</c>) encodes <c>True</c> = (1,1), <c>Unknown</c> = (0,1) and
+    /// <c>False</c> = (0,0).
+    /// </summary>
+    /// <param name="Definite">The BDD node for "is definitely True".</param>
+    /// <param name="Possible">The BDD node for "is True or Unknown" (not False).</param>
+    private readonly record struct DualRail(int Definite, int Possible);
 }

@@ -1,73 +1,111 @@
 namespace TruthWeaver.Tests;
 
+using TruthWeaver.Abstractions;
 using TruthWeaver.Compilation;
 using TruthWeaver.Diagnostics;
 using TruthWeaver.Registry;
 using TruthWeaver.Tests.TestSupport;
 
-/// <summary>Ticket 10: BDD-based analyzer — constant/contradiction diagnostics.</summary>
+/// <summary>
+/// The analyzer's Strong K3 constant/contradiction diagnostics (ticket 10; made K3-aware by k3-conformance 06).
+/// </summary>
 public sealed class AnalyzerTests
 {
+    private static readonly (string Name, Func<int, int, bool> Satisfies)[] Thresholds =
+    [
+        ("AtLeast", (count, k) => count >= k),
+        ("AtMost", (count, k) => count <= k),
+        ("GreaterThan", (count, k) => count > k),
+        ("LessThan", (count, k) => count < k),
+        ("Exactly", (count, k) => count == k),
+    ];
+
+    /// <summary>
+    /// <c>A AND NOT A</c> is <c>Unknown</c> when <c>A</c> is <c>Unknown</c>, so it is not a Strong K3
+    /// contradiction and must not be reported as one.
+    /// </summary>
     [Fact]
-    public void Contradiction_using_the_same_term_twice_is_flagged()
+    public void Compile_TermAndItsNegation_IsNotReportedAsContradiction_Test()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
         CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") AND NOT hasRole(role: \"Y\")");
 
         Assert.True(result.Succeeded);
-        Assert.Contains(
-            result.Diagnostics,
-            d => d.Code == DiagnosticCodes.StructuralContradiction && d.Severity == DiagnosticSeverity.Warning
-        );
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
     }
 
     /// <summary>
-    /// The interim classical contradiction warning says it is a two-valued finding and that the rule can
-    /// still be Unknown, so it does not claim a Strong K3 contradiction.
+    /// <c>A OR NOT A</c> is <c>Unknown</c> when <c>A</c> is <c>Unknown</c>, so it is not a Strong K3
+    /// tautology and must not be reported as one.
     /// </summary>
     [Fact]
-    public void Compile_ClassicalContradiction_MessageStatesTwoValuedAndNotK3_Test()
+    public void Compile_TermOrItsNegation_IsNotReportedAsTautology_Test()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") AND NOT hasRole(role: \"Y\")");
+        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") OR NOT hasRole(role: \"Y\")");
+
+        Assert.True(result.Succeeded);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+    }
+
+    /// <summary>A conjunction with <c>False</c> is <c>False</c> for every input, which is a genuine K3 contradiction.</summary>
+    [Fact]
+    public void Compile_TermAndFalse_ReportsContradictionAsWarning_Test()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") AND FALSE");
 
         Diagnostic diagnostic = Assert.Single(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
-        Assert.Contains("two-valued", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Unknown", diagnostic.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("structural contradiction", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+    }
+
+    /// <summary>A disjunction with <c>True</c> is <c>True</c> for every input, which is a genuine K3 tautology.</summary>
+    [Fact]
+    public void Compile_TermOrTrue_ReportsTautologyAsWarning_Test()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") OR TRUE");
+
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
     }
 
     /// <summary>
-    /// The interim classical tautology warning says it is a two-valued finding and that the rule can
-    /// still be Unknown, so it does not claim a Strong K3 tautology.
+    /// The contradiction message states the Strong K3 claim (False for every True/False/Unknown input) and
+    /// no longer carries the interim two-valued caveat.
     /// </summary>
     [Fact]
-    public void Compile_ClassicalTautology_MessageStatesTwoValuedAndNotK3_Test()
+    public void Compile_K3Contradiction_MessageStatesStrongK3Claim_Test()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") OR NOT hasRole(role: \"Y\")");
+        CompilationResult<RuleTestContext> result = compiler.Compile("a AND FALSE");
 
-        Diagnostic diagnostic = Assert.Single(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
-        Assert.Contains("two-valued", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Unknown", diagnostic.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("structural tautology", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
+        Assert.Contains("Strong K3", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("every", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("two-valued", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The tautology message states the Strong K3 claim (True for every True/False/Unknown input) and
+    /// no longer carries the interim two-valued caveat.
+    /// </summary>
     [Fact]
-    public void Tautology_using_the_same_term_twice_is_flagged()
+    public void Compile_K3Tautology_MessageStatesStrongK3Claim_Test()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") OR NOT hasRole(role: \"Y\")");
+        CompilationResult<RuleTestContext> result = compiler.Compile("a OR TRUE");
 
-        Assert.True(result.Succeeded);
-        Assert.Contains(
-            result.Diagnostics,
-            d => d.Code == DiagnosticCodes.StructuralTautology && d.Severity == DiagnosticSeverity.Warning
-        );
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+        Assert.Contains("Strong K3", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("every", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("two-valued", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -81,54 +119,124 @@ public sealed class AnalyzerTests
         Assert.Empty(result.Diagnostics);
     }
 
+    /// <summary>
+    /// Every operator the analyzer supports reports its genuine K3 tautology or contradiction at the
+    /// operator itself (the root), using operands that are constant <c>False</c> (or <c>True</c>) under any input.
+    /// </summary>
     [Theory]
-    [InlineData("XOR")]
-    [InlineData("ExactlyOne")]
-    [InlineData("AtLeast")]
-    [InlineData("AtMost")]
-    [InlineData("GreaterThan")]
-    [InlineData("LessThan")]
-    [InlineData("Exactly")]
-    public void Analysis_covers_every_operator_not_just_and_or_not(string variant)
+    [InlineData("(a AND FALSE) XOR (b AND FALSE)", false)]
+    [InlineData("(a AND FALSE) XNOR (b AND FALSE)", true)]
+    [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
+    [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
+    [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
+    [InlineData("AtMost(1, (a AND FALSE), (b AND FALSE))", true)]
+    [InlineData("GreaterThan(0, (a AND FALSE), (b AND FALSE))", false)]
+    [InlineData("LessThan(2, (a AND FALSE), (b AND FALSE))", true)]
+    [InlineData("Exactly(1, (a AND FALSE), (b AND FALSE))", false)]
+    public void Compile_OperatorWithConstantOperands_ReportsK3VerdictAtTheOperator_Test(string rule, bool tautology)
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
-        string rule = variant switch
-        {
-            "XOR" => "a XOR NOT a",
-            "ExactlyOne" => "ExactlyOne(a, NOT a)",
-            "AtLeast" => "AtLeast(1, a, NOT a)",
-            "AtMost" => "AtMost(1, a, NOT a)",
-            "GreaterThan" => "GreaterThan(0, a, NOT a)",
-            "LessThan" => "LessThan(2, a, NOT a)",
-            _ => "Exactly(1, a, NOT a)",
-        };
 
         CompilationResult<RuleTestContext> result = compiler.Compile(rule);
 
         Assert.True(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+        string code = tautology ? DiagnosticCodes.StructuralTautology : DiagnosticCodes.StructuralContradiction;
+        Assert.True(IsRootFlagged(result, code), $"expected {code} at the root of '{rule}'");
     }
 
-    [Fact]
-    public void Xnor_of_the_same_term_twice_is_flagged_as_a_tautology()
+    /// <summary>
+    /// Operators over a term and its negation are <c>Unknown</c> when the term is <c>Unknown</c>, so none of
+    /// them is reported.
+    /// </summary>
+    [Theory]
+    [InlineData("a XOR NOT a")]
+    [InlineData("a XNOR NOT a")]
+    [InlineData("a XNOR a")]
+    [InlineData("ExactlyOne(a, NOT a)")]
+    [InlineData("AtLeast(1, a, NOT a)")]
+    [InlineData("AtMost(1, a, NOT a)")]
+    [InlineData("GreaterThan(0, a, NOT a)")]
+    [InlineData("LessThan(2, a, NOT a)")]
+    [InlineData("Exactly(1, a, NOT a)")]
+    public void Compile_OperatorOverTermAndItsNegation_IsNotReported_Test(string rule)
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("a XNOR a");
+        CompilationResult<RuleTestContext> result = compiler.Compile(rule);
 
         Assert.True(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+        Assert.DoesNotContain(
+            result.Diagnostics,
+            d => d.Code is DiagnosticCodes.StructuralTautology or DiagnosticCodes.StructuralContradiction
+        );
     }
 
+    /// <summary>
+    /// A K3 verdict is found even when the constant is combined with a sub-expression that can stay unknown:
+    /// <c>(A OR NOT A) AND FALSE</c> is <c>False</c> whatever <c>A</c> is.
+    /// </summary>
     [Fact]
-    public void Xnor_of_a_term_and_its_negation_is_flagged_as_a_contradiction()
+    public void Compile_UnknownCapableSubexpressionAndFalse_ReportsContradictionAtTheRoot_Test()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("a XNOR NOT a");
+        CompilationResult<RuleTestContext> result = compiler.Compile("(a OR NOT a) AND FALSE");
 
-        Assert.True(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
+        Assert.True(IsRootFlagged(result, DiagnosticCodes.StructuralContradiction));
+    }
+
+    /// <summary>
+    /// Over many generated rules and every {True, False, Unknown} assignment of three terms, a sub-expression
+    /// is reported as a tautology exactly when the independent <see cref="K3Oracle"/> finds it True in every
+    /// row, and as a contradiction exactly when it is False in every row. Every sub-expression is checked as
+    /// the root of its own compilation.
+    /// </summary>
+    [Fact]
+    public void Compile_GeneratedRules_AnalyzerVerdictsAgreeWithK3OracleOverAllAssignments_Test()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+        Random random = new(20261002);
+        List<string> disagreements = [];
+        int checkedRules = 0;
+        int flagged = 0;
+
+        for (int i = 0; i < 400; i++)
+        {
+            foreach (GeneratedRule node in Subtrees(GenerateRule(random, depth: 3)))
+            {
+                if (node.Children.Count == 0)
+                {
+                    // The analyzer reports operators only, never a bare term or literal.
+                    continue;
+                }
+
+                CompilationResult<RuleTestContext> result = compiler.Compile(node.Text);
+                if (result.CompiledRule is null)
+                {
+                    // Out-of-range thresholds (BRE0008) are authoring errors, not analyzer input.
+                    continue;
+                }
+
+                checkedRules++;
+                (bool tautology, bool contradiction) = node.Verdict();
+                flagged += tautology || contradiction ? 1 : 0;
+                if (IsRootFlagged(result, DiagnosticCodes.StructuralTautology) != tautology)
+                {
+                    disagreements.Add($"{node.Text}: oracle tautology={tautology}");
+                }
+
+                if (IsRootFlagged(result, DiagnosticCodes.StructuralContradiction) != contradiction)
+                {
+                    disagreements.Add($"{node.Text}: oracle contradiction={contradiction}");
+                }
+            }
+        }
+
+        Assert.Empty(disagreements);
+
+        // Guard against a vacuous pass: the sample must contain real verdicts and plenty of rules.
+        Assert.True(checkedRules > 1000, $"only {checkedRules} rules were checked");
+        Assert.True(flagged > 20, $"only {flagged} rules had a K3 verdict");
     }
 
     [Fact]
@@ -136,7 +244,7 @@ public sealed class AnalyzerTests
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") AND NOT hasRole(role: \"Y\")");
+        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") AND FALSE");
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
@@ -146,7 +254,7 @@ public sealed class AnalyzerTests
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompilerWithMaxAnalysisTerms(2);
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("a AND NOT a");
+        CompilationResult<RuleTestContext> result = compiler.Compile("(a AND FALSE) OR b");
 
         Assert.True(result.Succeeded);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.AnalysisSkippedTooManyTerms);
@@ -158,7 +266,7 @@ public sealed class AnalyzerTests
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompilerWithMaxAnalysisTerms(1);
 
-        CompilationResult<RuleTestContext> result = compiler.Compile("a AND NOT a AND b");
+        CompilationResult<RuleTestContext> result = compiler.Compile("(a AND FALSE) OR b");
 
         Assert.True(result.Succeeded);
         Diagnostic diagnostic = Assert.Single(result.Diagnostics);
@@ -175,6 +283,111 @@ public sealed class AnalyzerTests
 
         Assert.True(result.Succeeded);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCodes.AnalysisSkippedTooManyTerms);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="code"/> was reported for the whole compiled rule rather than only for one of its
+    /// sub-expressions: diagnostics end with the canonical text of the node they describe.
+    /// </summary>
+    private static bool IsRootFlagged(CompilationResult<RuleTestContext> result, string code)
+    {
+        string root = result.CompiledRule?.ToString() ?? throw new InvalidOperationException("The rule did not compile.");
+        return result.Diagnostics.Any(d => d.Code == code && d.Message.EndsWith($": {root}", StringComparison.Ordinal));
+    }
+
+    private static IEnumerable<GeneratedRule> Subtrees(GeneratedRule rule)
+    {
+        yield return rule;
+        foreach (GeneratedRule child in rule.Children)
+        {
+            foreach (GeneratedRule descendant in Subtrees(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Generates a random rule over terms <c>a</c>, <c>b</c>, <c>c</c> and the three constants, together with an
+    /// evaluation built only from <see cref="K3Oracle"/>. Compound nodes are always parenthesised so the
+    /// no-implicit-mixing rule cannot reject them.
+    /// </summary>
+    private static GeneratedRule GenerateRule(Random random, int depth)
+    {
+        if (depth == 0 || random.Next(5) == 0)
+        {
+            return GenerateLeaf(random);
+        }
+
+        GeneratedRule Child()
+        {
+            return GenerateRule(random, depth - 1);
+        }
+
+        switch (random.Next(8))
+        {
+            case 0:
+                GeneratedRule operand = Child();
+                return new GeneratedRule($"NOT ({operand.Text})", v => K3Oracle.Not(operand.Eval(v)), [operand]);
+            case 1:
+                GeneratedRule[] ands = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"({string.Join(" AND ", ands.Select(o => o.Text))})",
+                    v => K3Oracle.And(ands.Select(o => o.Eval(v))),
+                    ands
+                );
+            case 2:
+                GeneratedRule[] ors = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"({string.Join(" OR ", ors.Select(o => o.Text))})",
+                    v => K3Oracle.Or(ors.Select(o => o.Eval(v))),
+                    ors
+                );
+            case 3:
+                GeneratedRule xl = Child();
+                GeneratedRule xr = Child();
+                return new GeneratedRule($"({xl.Text} XOR {xr.Text})", v => K3Oracle.Xor(xl.Eval(v), xr.Eval(v)), [xl, xr]);
+            case 4:
+                GeneratedRule el = Child();
+                GeneratedRule er = Child();
+                return new GeneratedRule(
+                    $"({el.Text} XNOR {er.Text})",
+                    v => K3Oracle.Equivalent(el.Eval(v), er.Eval(v)),
+                    [el, er]
+                );
+            case 5:
+                GeneratedRule[] exactlyOne = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"ExactlyOne({string.Join(", ", exactlyOne.Select(o => o.Text))})",
+                    v => K3Oracle.ExactlyOne([.. exactlyOne.Select(o => o.Eval(v))]),
+                    exactlyOne
+                );
+            default:
+                (string name, Func<int, int, bool> satisfies) = Thresholds[random.Next(Thresholds.Length)];
+                GeneratedRule[] operands = [.. Enumerable.Range(0, random.Next(2, 5)).Select(_ => Child())];
+                int k = random.Next(0, operands.Length + 1);
+                return new GeneratedRule(
+                    $"{name}({k}, {string.Join(", ", operands.Select(o => o.Text))})",
+                    v => K3Oracle.Cardinality(count => satisfies(count, k), [.. operands.Select(o => o.Eval(v))]),
+                    operands
+                );
+        }
+    }
+
+    private static GeneratedRule GenerateLeaf(Random random)
+    {
+        switch (random.Next(6))
+        {
+            case 0:
+                return new GeneratedRule("TRUE", _ => TruthValue.True, []);
+            case 1:
+                return new GeneratedRule("FALSE", _ => TruthValue.False, []);
+            case 2:
+                return new GeneratedRule("UNKNOWN", _ => TruthValue.Unknown, []);
+            default:
+                int index = random.Next(3);
+                return new GeneratedRule(((char)('a' + index)).ToString(), v => v[index], []);
+        }
     }
 
     private static RuleCompiler<RuleTestContext> CreateCompiler()
@@ -196,5 +409,28 @@ public sealed class AnalyzerTests
             PredicateRegistry<RuleTestContext>.CreateBuilder().AddConstant("a", true).AddConstant("b", true).Build(),
             new CompilerOptions(MaxAnalysisTerms: maxAnalysisTerms)
         );
+    }
+
+    /// <summary>A generated rule: its DSL text, an oracle-built evaluation over terms a..c, and its operands.</summary>
+    private sealed record GeneratedRule(
+        string Text,
+        Func<IReadOnlyList<TruthValue>, TruthValue> Eval,
+        IReadOnlyList<GeneratedRule> Children
+    )
+    {
+        /// <summary>Whether the rule is True (resp. False) in every {True, False, Unknown} assignment of a, b, c.</summary>
+        public (bool Tautology, bool Contradiction) Verdict()
+        {
+            bool always = true;
+            bool never = true;
+            foreach (TruthValue[] assignment in K3Oracle.Assignments(3))
+            {
+                TruthValue value = this.Eval(assignment);
+                always &= value == TruthValue.True;
+                never &= value == TruthValue.False;
+            }
+
+            return (always, never);
+        }
     }
 }

@@ -115,7 +115,14 @@ the aliases are cheap once the canonical form stays single.
 17. **The analyzer is K3-aware.** A dual-rail BDD tracking "definitely true"
     and "possibly true" replaces classical two-valued analysis, so
     `A AND NOT A` is a K3 contradiction only when it is, and `A OR NOT A` is
-    not a tautology. Interim: classical diagnostics are relabelled.
+    not a tautology. Implemented in k3-conformance 06 (the interim relabel
+    from ticket 05 is superseded). Each term contributes two independent BDD
+    variables (is `True`; is `Unknown`), so every variable setting is a valid
+    K3 state. A sub-expression is reported as a tautology (`BRE0012`) when its
+    definitely-true rail is constant true and as a contradiction (`BRE0013`)
+    when its possibly-true rail is constant false. The `Structural*` constant
+    names and codes are kept for stability. Each later operator slice extends
+    the analyzer with its own rail definition.
 
 ## Open decisions
 
