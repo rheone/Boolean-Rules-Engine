@@ -8,15 +8,17 @@ using TruthWeaver.Printing;
 
 /// <summary>
 /// The BDD-based analyzer step of the compilation pipeline (ADR-0003: Parse → Validate → Analyze →
-/// Build): flags sub-expressions that are structurally always-true or always-false, using term
-/// identity (CONTEXT.md) to recognize repeated references to the same variable — e.g.
-/// <c>hasRole(role: "Y") AND NOT hasRole(role: "Y")</c> is a structural contradiction regardless of
-/// what <c>hasRole</c> actually returns at evaluation time. These are <see cref="DiagnosticSeverity.Warning"/>
-/// diagnostics — they never block compilation.
+/// Build): flags sub-expressions that are always-true or always-false in classical two-valued logic,
+/// using term identity (CONTEXT.md) to recognize repeated references to the same variable — e.g.
+/// <c>hasRole(role: "Y") AND NOT hasRole(role: "Y")</c> is false whenever <c>hasRole</c> returns
+/// <c>True</c> or <c>False</c>. The BDD is two-valued, so these findings are NOT Strong K3 claims: the
+/// same expression is <c>Unknown</c> when the term is <c>Unknown</c>. The diagnostics are labelled
+/// accordingly until the dual-rail K3 analyzer replaces this pass (ADR-0005 decision 17). They are
+/// <see cref="DiagnosticSeverity.Warning"/> diagnostics — they never block compilation.
 /// </summary>
 internal static class Analyzer
 {
-    /// <summary>Analyzes a compiled tree for structural tautologies and contradictions.</summary>
+    /// <summary>Analyzes a compiled tree for classical (two-valued) tautologies and contradictions.</summary>
     /// <param name="root">The compiled expression tree.</param>
     /// <param name="options">The compiler options, whose <c>MaxAnalysisTerms</c> caps this analysis.</param>
     /// <returns>The diagnostics raised (never <see cref="DiagnosticSeverity.Error"/>).</returns>
@@ -110,26 +112,27 @@ internal static class Analyzer
         return bdd.Or(withFirstTrue, withoutFirst);
     }
 
+    private static string ClassicalMessage(string alwaysValue, Expression node)
+    {
+        // The BDD is two-valued, so the finding only holds when every term is True or False; naming
+        // that caveat (and Unknown) keeps the warning from being read as a Strong K3 claim.
+        string caveat =
+            $"Two-valued (classical) analysis: this sub-expression is always {alwaysValue} when every term is True or False.";
+        return $"{caveat} In Strong K3 it can still be Unknown: {CanonicalPrinter.Print(node)}";
+    }
+
     private static void Diagnose(int nodeId, Expression node, List<Diagnostic> diagnostics)
     {
         if (nodeId == BddManager.True)
         {
             diagnostics.Add(
-                Diagnostic.Warning(
-                    DiagnosticCodes.StructuralTautology,
-                    $"This sub-expression is a structural tautology (always true): {CanonicalPrinter.Print(node)}",
-                    SourceSpan.None
-                )
+                Diagnostic.Warning(DiagnosticCodes.StructuralTautology, ClassicalMessage("True", node), SourceSpan.None)
             );
         }
         else if (nodeId == BddManager.False)
         {
             diagnostics.Add(
-                Diagnostic.Warning(
-                    DiagnosticCodes.StructuralContradiction,
-                    $"This sub-expression is a structural contradiction (always false): {CanonicalPrinter.Print(node)}",
-                    SourceSpan.None
-                )
+                Diagnostic.Warning(DiagnosticCodes.StructuralContradiction, ClassicalMessage("False", node), SourceSpan.None)
             );
         }
     }

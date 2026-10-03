@@ -22,6 +22,40 @@ public sealed class AnalyzerTests
         );
     }
 
+    /// <summary>
+    /// The interim classical contradiction warning says it is a two-valued finding and that the rule can
+    /// still be Unknown, so it does not claim a Strong K3 contradiction.
+    /// </summary>
+    [Fact]
+    public void Compile_ClassicalContradiction_MessageStatesTwoValuedAndNotK3_Test()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") AND NOT hasRole(role: \"Y\")");
+
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralContradiction);
+        Assert.Contains("two-valued", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Unknown", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("structural contradiction", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The interim classical tautology warning says it is a two-valued finding and that the rule can
+    /// still be Unknown, so it does not claim a Strong K3 tautology.
+    /// </summary>
+    [Fact]
+    public void Compile_ClassicalTautology_MessageStatesTwoValuedAndNotK3_Test()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompilationResult<RuleTestContext> result = compiler.Compile("hasRole(role: \"Y\") OR NOT hasRole(role: \"Y\")");
+
+        Diagnostic diagnostic = Assert.Single(result.Diagnostics, d => d.Code == DiagnosticCodes.StructuralTautology);
+        Assert.Contains("two-valued", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Unknown", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("structural tautology", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Tautology_using_the_same_term_twice_is_flagged()
     {

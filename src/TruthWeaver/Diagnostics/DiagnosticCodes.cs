@@ -42,10 +42,18 @@ public static class DiagnosticCodes
     /// <summary>Constant/contradiction analysis was skipped because the term count exceeds <c>CompilerOptions.MaxAnalysisTerms</c>.</summary>
     public const string AnalysisSkippedTooManyTerms = "BRE0011";
 
-    /// <summary>The analyzer determined a sub-expression is a structural tautology (always <see langword="true"/>).</summary>
+    /// <summary>
+    /// The two-valued (classical) analyzer found a sub-expression that is always <c>True</c> when every
+    /// term is <c>True</c> or <c>False</c>. This is not a Strong K3 tautology: the sub-expression can still
+    /// be <c>Unknown</c>. The code is kept for compatibility until the K3-aware analyzer lands.
+    /// </summary>
     public const string StructuralTautology = "BRE0012";
 
-    /// <summary>The analyzer determined a sub-expression is a structural contradiction (always <see langword="false"/>).</summary>
+    /// <summary>
+    /// The two-valued (classical) analyzer found a sub-expression that is always <c>False</c> when every
+    /// term is <c>True</c> or <c>False</c>. This is not a Strong K3 contradiction: the sub-expression can
+    /// still be <c>Unknown</c>. The code is kept for compatibility until the K3-aware analyzer lands.
+    /// </summary>
     public const string StructuralContradiction = "BRE0013";
 
     /// <summary>The tree/JSON/YAML source is malformed independently of DSL syntax (e.g. unknown <c>op</c>, missing discriminator key).</summary>

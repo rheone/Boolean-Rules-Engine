@@ -1347,7 +1347,7 @@ flowchart TD
     Parse -->|"syntax error"| Diag1[["Diagnostics<br/>(Error)"]]
     Parse -->|"raw tree"| Validate["Validate<br/>(known predicates, argument schema,<br/>depth/node limits, CompilerOptions)"]
     Validate -->|"validation error"| Diag2[["Diagnostics<br/>(Error / Warning / Info)"]]
-    Validate -->|"valid tree"| Analyze["Analyze<br/>(BDD-based constant/contradiction detection)"]
+    Validate -->|"valid tree"| Analyze["Analyze<br/>(BDD-based two-valued constant/contradiction detection)"]
     Analyze --> Diag3[["Diagnostics<br/>(Warning / Info)"]]
     Analyze --> Build["Build immutable expression tree"]
     Build --> Result["CompilationResult&lt;TContext&gt;<br/>CompiledRule&lt;TContext&gt;? + Diagnostics"]
@@ -1358,7 +1358,7 @@ flowchart TD
 ```
 
 `Compile` never throws for an authoring error — every problem, from a
-syntax error to a structural tautology, becomes a `Diagnostic` (code,
+syntax error to a two-valued tautology, becomes a `Diagnostic` (code,
 severity, source span) in the returned `CompilationResult<TContext>`.
 `CompiledRule<TContext>` is populated only when there are no `Error`-severity
 diagnostics, which is what makes "a bad edit is rejected, the previously
@@ -1411,7 +1411,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | Term | Meaning |
 | --- | --- |
 | `AtLeast(k, ...)` / `AtMost(k, ...)` / `GreaterThan(k, ...)` / `LessThan(k, ...)` / `Exactly(k, ...)` | The threshold operator family: n-ary comparisons against the true-operand count, all compiling to one shared `ThresholdExpression` node — see [Operators](#operators). |
-| BDD analyzer | The compiler's constant/contradiction-detection pass, backed by a real binary decision diagram rather than brute-force truth tables — see [Compilation pipeline](#compilation-pipeline). |
+| BDD analyzer | The compiler's constant/contradiction-detection pass, backed by a real binary decision diagram rather than brute-force truth tables. It reasons in classical two-valued logic, so its warnings (`BRE0012`/`BRE0013`) say "when every term is True or False" and are not Strong K3 claims: `A AND NOT A` is still `Unknown` when `A` is `Unknown` (a K3-aware analyzer is planned, ADR-0005 decision 17) — see [Compilation pipeline](#compilation-pipeline). |
 | `CompilationMode` | `Strict` (default — an unregistered predicate is a compile error) or `Lenient` (an unregistered predicate compiles to a permanent `Unknown` term, for services sharing a rule store with different predicate sets). |
 | `CompilationResult<TContext>` | What `Compile`/`CompileJson`/`CompileYaml` return: a nullable `CompiledRule<TContext>` plus every `Diagnostic` raised. |
 | `CompiledRule<TContext>` | The immutable, thread-safe result of a successful compile. Safe to cache, share, and evaluate repeatedly; swapping the reference that holds it is how a host applies a rule edit at runtime. |
