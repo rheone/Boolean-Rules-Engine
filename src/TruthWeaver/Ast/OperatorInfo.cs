@@ -48,6 +48,10 @@ public static class OperatorInfo
                 "XNOR",
                 "Logical biconditional (IFF) — true iff both operands agree (both true or both false). The negation of XOR."
             ),
+            "Implies" => new OperatorDescriptor(
+                "IMPLIES",
+                "Material implication (NOT antecedent OR consequent). True if the antecedent is False or the consequent is True; otherwise Unknown if either operand is Unknown."
+            ),
             "ExactlyOne" => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
             _ => new OperatorDescriptor($"{shape.OpName}({shape.K})", ThresholdDescription(shape)),
         };

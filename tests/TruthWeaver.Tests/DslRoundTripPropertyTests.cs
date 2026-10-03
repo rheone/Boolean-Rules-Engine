@@ -88,6 +88,7 @@ public sealed class DslRoundTripPropertyTests
             Gen<Expression> genNot = self.Select(operand => (Expression)new NotExpression(operand));
             Gen<Expression> genXor = self.Select(self, (left, right) => (Expression)new XorExpression(left, right));
             Gen<Expression> genXnor = self.Select(self, (left, right) => (Expression)new XnorExpression(left, right));
+            Gen<Expression> genImplies = self.Select(self, (left, right) => (Expression)new ImpliesExpression(left, right));
             Gen<Expression> genExactlyOne = self.Array[2, 4]
                 .Select(operands => (Expression)new ExactlyOneExpression(new EquatableArray<Expression>(operands)));
             Gen<Expression> genThreshold = BuildThresholdGen(self);
@@ -99,6 +100,7 @@ public sealed class DslRoundTripPropertyTests
                 (2, genNot),
                 (1, genXor),
                 (1, genXnor),
+                (1, genImplies),
                 (1, genExactlyOne),
                 (1, genThreshold)
             );

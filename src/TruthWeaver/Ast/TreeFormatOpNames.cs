@@ -19,6 +19,7 @@ internal static class TreeFormatOpNames
         ["Or"] = "or",
         ["Xor"] = "xor",
         ["Xnor"] = "xnor",
+        ["Implies"] = "implies",
         ["ExactlyOne"] = "exactlyOne",
         ["AtLeast"] = "atLeast",
         ["AtMost"] = "atMost",

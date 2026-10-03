@@ -80,11 +80,12 @@ internal static class RuleRenderTree
     /// Renders <paramref name="description"/>'s label in <paramref name="style"/>, with its
     /// <see cref="RuleDescription.ArgumentText"/> appended when <paramref name="showArgumentValues"/>
     /// is <see langword="true"/> and the term has any. Only an operator node's exact word-form label
-    /// (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>XNOR</c>) with at least one operand is
+    /// (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>XNOR</c>, <c>IMPLIES</c>) with at least one operand is
     /// eligible for restyling — a term or constant leaf (always zero operands) is never restyled even
     /// if a predicate's authored label happens to collide with one of those words, and
     /// <c>ExactlyOne</c>/threshold labels (e.g. <c>AtLeast(3)</c>) fall through unchanged in every
-    /// style, since they have no symbolic or C-style spelling.
+    /// style, since they have no symbolic or C-style spelling. <c>IMPLIES</c> has a symbolic spelling
+    /// (<c>→</c>) but no C-family one, so it keeps its word form in <see cref="OperatorStyle.CStyle"/>.
     /// </summary>
     private static string StyledLabel(RuleDescription description, OperatorStyle style, bool showArgumentValues)
     {
@@ -108,6 +109,7 @@ internal static class RuleRenderTree
                 "NOT" => "¬",
                 "XOR" => "⊕",
                 "XNOR" => "↔",
+                "IMPLIES" => "→",
                 _ => description.Label,
             },
             OperatorStyle.CStyle => description.Label switch

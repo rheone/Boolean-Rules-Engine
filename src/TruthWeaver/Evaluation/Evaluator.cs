@@ -63,6 +63,7 @@ internal sealed class Evaluator<TContext>(
             "Or" => "OR",
             "Xor" => "XOR",
             "Xnor" => "XNOR",
+            "Implies" => "IMPLIES",
             "ExactlyOne" => "ExactlyOne",
             _ => $"{shape.OpName}({shape.K})",
         };
@@ -113,6 +114,12 @@ internal sealed class Evaluator<TContext>(
     private static TruthValue KleeneXnor(TruthValue left, TruthValue right)
     {
         return KleeneNot(KleeneXor(left, right));
+    }
+
+    /// <summary>Strong Kleene material implication: <c>NOT antecedent OR consequent</c>.</summary>
+    private static TruthValue KleeneImplies(TruthValue antecedent, TruthValue consequent)
+    {
+        return KleeneOr(KleeneNot(antecedent), consequent);
     }
 
     private static TruthValue EvaluateExactlyOne(IReadOnlyList<TruthValue> operandValues)
@@ -233,6 +240,14 @@ internal sealed class Evaluator<TContext>(
                 IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
                 TruthValue value = KleeneXnor(results[0].Value, results[1].Value);
                 return new EvalResult(value, new EvaluatedNode("XNOR", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case ImpliesExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneImplies(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("IMPLIES", value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ExactlyOneExpression:

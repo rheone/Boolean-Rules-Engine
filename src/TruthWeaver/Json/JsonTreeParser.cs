@@ -216,6 +216,8 @@ internal static class JsonTreeParser
                 return new XorNode(operands, SourceSpan.None);
             case "Xnor":
                 return new XnorNode(operands, SourceSpan.None);
+            case "Implies":
+                return new ImpliesNode(operands, SourceSpan.None);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":

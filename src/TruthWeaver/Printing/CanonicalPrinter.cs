@@ -7,7 +7,7 @@ using TruthWeaver.Ast;
 /// parenthesized for clarity wherever an operator is mixed with a different one, even where
 /// precedence alone would make the meaning unambiguous (e.g. <c>a AND b OR c</c> prints as
 /// <c>(a AND b) OR c</c>) — the point is to make a large nested rule easy for a human to read at a
-/// glance, not merely to avoid a parser error. <c>XOR</c>/<c>XNOR</c> are always parenthesized
+/// glance, not merely to avoid a parser error. <c>XOR</c>/<c>XNOR</c>/<c>IMPLIES</c> are always parenthesized
 /// regardless of context. This is the exact form <c>parse</c> reproduces a structurally equal tree
 /// from (ticket 06).
 /// </summary>
@@ -19,7 +19,7 @@ internal static class CanonicalPrinter
         AndOperand,
         OrOperand,
         NotOperand,
-        XorOperand,
+        InfixOperand,
     }
 
     /// <summary>Prints an expression tree to canonical DSL text.</summary>
@@ -36,19 +36,20 @@ internal static class CanonicalPrinter
         {
             (XorExpression, _) => true,
             (XnorExpression, _) => true,
+            (ImpliesExpression, _) => true,
             (
                 AndExpression,
                 PrintContext.AndOperand
                     or PrintContext.OrOperand
                     or PrintContext.NotOperand
-                    or PrintContext.XorOperand
+                    or PrintContext.InfixOperand
             ) => true,
             (
                 OrExpression,
                 PrintContext.AndOperand
                     or PrintContext.OrOperand
                     or PrintContext.NotOperand
-                    or PrintContext.XorOperand
+                    or PrintContext.InfixOperand
             ) => true,
             _ => false,
         };
@@ -63,12 +64,15 @@ internal static class CanonicalPrinter
             NotExpression n => "NOT " + PrintNode(n.Operand, PrintContext.NotOperand),
             AndExpression => JoinOperands(node, " AND ", PrintContext.AndOperand),
             OrExpression => JoinOperands(node, " OR ", PrintContext.OrOperand),
-            XorExpression x => PrintNode(x.Left, PrintContext.XorOperand)
+            XorExpression x => PrintNode(x.Left, PrintContext.InfixOperand)
                 + " XOR "
-                + PrintNode(x.Right, PrintContext.XorOperand),
-            XnorExpression xn => PrintNode(xn.Left, PrintContext.XorOperand)
+                + PrintNode(x.Right, PrintContext.InfixOperand),
+            XnorExpression xn => PrintNode(xn.Left, PrintContext.InfixOperand)
                 + " XNOR "
-                + PrintNode(xn.Right, PrintContext.XorOperand),
+                + PrintNode(xn.Right, PrintContext.InfixOperand),
+            ImpliesExpression im => PrintNode(im.Antecedent, PrintContext.InfixOperand)
+                + " IMPLIES "
+                + PrintNode(im.Consequent, PrintContext.InfixOperand),
             ExactlyOneExpression => $"ExactlyOne({JoinOperands(node, ", ", PrintContext.Top)})",
             ThresholdExpression th => $"{th.Comparison}({th.K}, {JoinOperands(node, ", ", PrintContext.Top)})",
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'."),

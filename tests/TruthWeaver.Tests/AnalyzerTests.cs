@@ -126,6 +126,9 @@ public sealed class AnalyzerTests
     [Theory]
     [InlineData("(a AND FALSE) XOR (b AND FALSE)", false)]
     [InlineData("(a AND FALSE) XNOR (b AND FALSE)", true)]
+    [InlineData("(a AND FALSE) IMPLIES b", true)]
+    [InlineData("a IMPLIES (b OR TRUE)", true)]
+    [InlineData("(a OR TRUE) IMPLIES (b AND FALSE)", false)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -152,6 +155,8 @@ public sealed class AnalyzerTests
     [InlineData("a XOR NOT a")]
     [InlineData("a XNOR NOT a")]
     [InlineData("a XNOR a")]
+    [InlineData("a IMPLIES a")]
+    [InlineData("a IMPLIES NOT a")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
     [InlineData("AtMost(1, a, NOT a)")]
@@ -324,7 +329,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(8))
+        switch (random.Next(9))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -356,6 +361,14 @@ public sealed class AnalyzerTests
                     [el, er]
                 );
             case 5:
+                GeneratedRule il = Child();
+                GeneratedRule ir = Child();
+                return new GeneratedRule(
+                    $"({il.Text} IMPLIES {ir.Text})",
+                    v => K3Oracle.Implies(il.Eval(v), ir.Eval(v)),
+                    [il, ir]
+                );
+            case 6:
                 GeneratedRule[] exactlyOne = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];
                 return new GeneratedRule(
                     $"ExactlyOne({string.Join(", ", exactlyOne.Select(o => o.Text))})",

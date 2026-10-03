@@ -77,6 +77,16 @@ public sealed record XorExpression(Expression Left, Expression Right) : Expressi
 /// <param name="Right">The right operand.</param>
 public sealed record XnorExpression(Expression Left, Expression Right) : Expression;
 
+/// <summary>
+/// Strong Kleene material implication, <c>NOT antecedent OR consequent</c> (ADR-0005). It is a first-class node
+/// rather than sugar, so it round-trips as written; its primitive definition drives the analyzer and the
+/// conformance oracle. A <c>False</c> antecedent or a <c>True</c> consequent yields <c>True</c>; otherwise an
+/// <c>Unknown</c> operand makes the result <c>Unknown</c>.
+/// </summary>
+/// <param name="Antecedent">The "if" operand, evaluated first.</param>
+/// <param name="Consequent">The "then" operand.</param>
+public sealed record ImpliesExpression(Expression Antecedent, Expression Consequent) : Expression;
+
 /// <summary>N-ary "exactly one of these operands is true".</summary>
 /// <param name="Operands">The operands (at least two).</param>
 public sealed record ExactlyOneExpression(EquatableArray<Expression> Operands) : Expression;

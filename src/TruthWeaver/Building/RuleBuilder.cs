@@ -99,6 +99,15 @@ public abstract class RuleBuilder
         return new OperatorBuilder("xnor", [left, right]);
     }
 
+    /// <summary>Creates a builder for material implication (<c>NOT antecedent OR consequent</c>).</summary>
+    /// <param name="antecedent">The "if" operand.</param>
+    /// <param name="consequent">The "then" operand.</param>
+    /// <returns>A builder for the <c>IMPLIES</c> expression.</returns>
+    public static RuleBuilder Implies(RuleBuilder antecedent, RuleBuilder consequent)
+    {
+        return new OperatorBuilder("implies", [antecedent, consequent]);
+    }
+
     /// <summary>Creates a builder for the n-ary "exactly one of these is true" operator.</summary>
     /// <param name="operands">The operands (at least two).</param>
     /// <returns>A builder for the <c>ExactlyOne</c> expression.</returns>

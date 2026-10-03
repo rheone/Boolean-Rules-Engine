@@ -83,6 +83,10 @@ internal static class Analyzer
                 CollectTerms(xn.Left, terms);
                 CollectTerms(xn.Right, terms);
                 break;
+            case ImpliesExpression im:
+                CollectTerms(im.Antecedent, terms);
+                CollectTerms(im.Consequent, terms);
+                break;
             case ExactlyOneExpression e:
                 foreach (Expression o in e.Operands)
                 {
@@ -119,6 +123,12 @@ internal static class Analyzer
     private static DualRail Or(BddManager bdd, DualRail x, DualRail y)
     {
         return new DualRail(bdd.Or(x.Definite, y.Definite), bdd.Or(x.Possible, y.Possible));
+    }
+
+    /// <summary>Material implication as its primitive definition <c>NOT x OR y</c>.</summary>
+    private static DualRail Implies(BddManager bdd, DualRail x, DualRail y)
+    {
+        return Or(bdd, Not(bdd, x), y);
     }
 
     /// <summary>
@@ -249,6 +259,13 @@ internal static class Analyzer
                 rail = Not(
                     bdd,
                     Xor(bdd, Build(xn.Left, bdd, variableIndex, diagnostics), Build(xn.Right, bdd, variableIndex, diagnostics))
+                );
+                break;
+            case ImpliesExpression im:
+                rail = Implies(
+                    bdd,
+                    Build(im.Antecedent, bdd, variableIndex, diagnostics),
+                    Build(im.Consequent, bdd, variableIndex, diagnostics)
                 );
                 break;
             case ExactlyOneExpression e:

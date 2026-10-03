@@ -66,6 +66,18 @@ public sealed class K3ConformanceTests
         Assert.Empty(mismatches);
     }
 
+    /// <summary>Binary IMPLIES, in word, symbol and lower-case spellings, matches the oracle for every assignment.</summary>
+    [Theory]
+    [InlineData("a IMPLIES b")]
+    [InlineData("a implies b")]
+    [InlineData("a → b")]
+    public async Task Evaluate_ImpliesOverAllAssignments_MatchesOracle_Test(string rule)
+    {
+        List<string> mismatches = await MismatchesAsync(rule, 2, v => K3Oracle.Implies(v[0], v[1]));
+
+        Assert.Empty(mismatches);
+    }
+
     /// <summary>ExactlyOne over 2..4 operands matches the oracle's interval cardinality for every assignment.</summary>
     [Fact]
     public async Task Evaluate_ExactlyOneOverAllAssignments_MatchesOracle_Test()

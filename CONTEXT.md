@@ -30,7 +30,7 @@ an authorization layer is intentionally out of scope.
 | **Expression** | The boolean tree: operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasTopping` or `lovesPineapple`. The *function*, not any particular call to it. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
-| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `True`/`False`/`Unknown` (case-insensitive; printed upper camel). Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
+| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `IMPLIES`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `True`/`False`/`Unknown` (case-insensitive; printed upper camel). Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
 | **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |
 | **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. A predicate that simply returns `Unknown` is a normal answer and records no fault. |
@@ -61,6 +61,7 @@ classDiagram
     class NotExpression
     class XorExpression
     class XnorExpression
+    class ImpliesExpression
     class ExactlyOneExpression
     class ThresholdExpression {
         +int K
@@ -81,6 +82,7 @@ classDiagram
     Expression <|-- NotExpression
     Expression <|-- XorExpression
     Expression <|-- XnorExpression
+    Expression <|-- ImpliesExpression
     Expression <|-- ExactlyOneExpression
     Expression <|-- ThresholdExpression
     Expression <|-- ConstantExpression
@@ -89,6 +91,7 @@ classDiagram
     NotExpression "1" o-- "1" Expression : operand
     XorExpression "1" o-- "2" Expression : operands
     XnorExpression "1" o-- "2" Expression : operands
+    ImpliesExpression "1" o-- "2" Expression : antecedent, consequent
     ExactlyOneExpression "1" o-- "2..*" Expression : operands
     ThresholdExpression "1" o-- "2..*" Expression : operands
     Term "1" --> "1" Predicate : bound to
@@ -106,6 +109,7 @@ Expression =
     | NOT(Expression)
     | XOR(Expression, Expression)          // binary only
     | XNOR(Expression, Expression)         // binary only; NOT(XOR(...))
+    | IMPLIES(Expression, Expression)      // binary only; OR(NOT(antecedent), consequent)
     | ExactlyOne(Expression, Expression, ...)
     | AtLeast(k, Expression, Expression, ...)
     | AtMost(k, Expression, Expression, ...)
@@ -148,6 +152,7 @@ with an operator that would just be a synonym for one of these:
 | `Exactly(n, ...)`, where `n` is the operand count | `AND(...)` |
 | `Exactly(1, ...)` | `ExactlyOne(...)` |
 | `XNOR(a, b)` | `NOT(XOR(a, b))` |
+| `IMPLIES(a, b)` | `OR(NOT(a), b)` |
 | `GreaterThan(0, ...)` | `OR(...)` |
 | `LessThan(n, ...)`, where `n` is the operand count | `NOT(AND(...))` |
 
@@ -223,7 +228,7 @@ when a sub-expression is `True` (resp. `False`) for every
 ## Syntax and serialization (summary)
 
 The string DSL (word operators, plus the symbol aliases `&&`, `||`, `!`, `∧`, `∨`,
-`¬`, `⊕` that compile to the same nodes and are never printed; `NOT > AND > OR` precedence, every infix operator other than `NOT`/`AND`/`OR`
+`¬`, `⊕`, `→` that compile to the same nodes and are never printed; `NOT > AND > OR` precedence, every infix operator other than `NOT`/`AND`/`OR`
 never mixed with `AND`/`OR` or with a different infix operator without parentheses) is
 canonical and is what gets persisted. JSON and YAML are interchange/tooling
 formats that compile to the same AST and round-trip losslessly with the DSL.

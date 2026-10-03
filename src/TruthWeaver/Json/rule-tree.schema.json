@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rheone/TruthWeaver/main/src/TruthWeaver/Json/rule-tree.schema.json",
   "title": "TruthWeaver rule tree",
-  "description": "The flat, key-discriminated JSON tree shape for a TruthWeaver rule expression, as defined by ADR-0003 (docs/adr/0003-rule-syntax-and-serialization.md). A node is discriminated by which of 'const', 'predicate', or 'op' is present. Constants and operator names are case-insensitive when parsed; a constant may be the string 'unknown'. This schema describes structural JSON shape only, matching what JsonTreeParser accepts before compile-time validation (e.g. XOR/XNOR binary-only, ExactlyOne/threshold k-range checks) runs; a document can be schema-valid and still fail RuleCompiler validation.",
+  "description": "The flat, key-discriminated JSON tree shape for a TruthWeaver rule expression, as defined by ADR-0003 (docs/adr/0003-rule-syntax-and-serialization.md). A node is discriminated by which of 'const', 'predicate', or 'op' is present. Constants and operator names are case-insensitive when parsed; a constant may be the string 'unknown'. This schema describes structural JSON shape only, matching what JsonTreeParser accepts before compile-time validation (e.g. XOR/XNOR/IMPLIES binary-only, ExactlyOne/threshold k-range checks) runs; a document can be schema-valid and still fail RuleCompiler validation.",
   "$ref": "#/$defs/node",
   "$defs": {
     "node": {
@@ -79,10 +79,10 @@
       "additionalProperties": false
     },
     "naryOperatorNode": {
-      "description": "AND, OR, XOR, XNOR, ExactlyOne: an operand list (XOR/XNOR are compile-time restricted to exactly two operands; that restriction is not expressible as JSON structure).",
+      "description": "AND, OR, XOR, XNOR, IMPLIES, ExactlyOne: an operand list (XOR/XNOR/IMPLIES are compile-time restricted to exactly two operands, IMPLIES as [antecedent, consequent]; that restriction is not expressible as JSON structure).",
       "type": "object",
       "properties": {
-        "op": { "enum": ["and", "or", "xor", "xnor", "exactlyOne"] },
+        "op": { "enum": ["and", "or", "xor", "xnor", "implies", "exactlyOne"] },
         "operands": {
           "type": "array",
           "items": { "$ref": "#/$defs/node" }

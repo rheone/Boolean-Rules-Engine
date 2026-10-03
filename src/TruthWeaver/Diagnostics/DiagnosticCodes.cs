@@ -18,7 +18,7 @@ public static class DiagnosticCodes
     /// <summary>A term supplies an argument name the predicate's schema does not declare.</summary>
     public const string UnknownArgument = "BRE0005";
 
-    /// <summary><c>XOR</c> or <c>XNOR</c> was given more than two operands.</summary>
+    /// <summary><c>XOR</c>, <c>XNOR</c> or <c>IMPLIES</c> was given other than exactly two operands.</summary>
     public const string XorArityViolation = "BRE0006";
 
     /// <summary>

@@ -90,7 +90,14 @@ the aliases are cheap once the canonical form stays single.
 13. **JSON/YAML node shapes** for `If`, inspection, boundaries and the
     `Unknown` literal follow the existing `{"op": ..., "operands": [...]}`
     pattern (literal: `{"op": "unknown"}`) and are recorded here when
-    implemented.
+    implemented. Implemented so far (k3-conformance 09): `IMPLIES` is
+    `{"op": "implies", "operands": [antecedent, consequent]}` (exactly two
+    operands, compile-time checked like `XOR`; op name case-insensitive on
+    read) in both JSON and YAML (`op: implies`), and `rule-tree.schema.json`
+    lists `implies` among the operator ops. The DSL accepts `IMPLIES` and `→`;
+    the canonical printer writes `(a IMPLIES b)`; the symbolic tree-printer
+    style renders `→`, while the C-style has no spelling for it and keeps
+    `IMPLIES`.
 
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,

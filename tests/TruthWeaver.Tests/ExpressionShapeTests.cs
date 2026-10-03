@@ -71,6 +71,17 @@ public sealed class ExpressionShapeTests
     }
 
     [Fact]
+    public void Implies_shape_exposes_antecedent_then_consequent_as_operands()
+    {
+        ImpliesExpression node = new(TermA, TermB);
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Implies", shape.OpName);
+        Assert.Equal([TermA, TermB], shape.Operands);
+    }
+
+    [Fact]
     public void ExactlyOne_shape_carries_its_operands_in_order()
     {
         ExactlyOneExpression node = new(new([TermA, TermB]));

@@ -19,6 +19,7 @@ public sealed class OperatorInfoTests
     [InlineData("NOT a", "NOT")]
     [InlineData("(a XOR b)", "XOR")]
     [InlineData("(a XNOR b)", "XNOR")]
+    [InlineData("(a IMPLIES b)", "IMPLIES")]
     [InlineData("ExactlyOne(a, b)", "ExactlyOne")]
     [InlineData("AtLeast(1, a, b)", "AtLeast(1)")]
     [InlineData("AtMost(1, a, b)", "AtMost(1)")]

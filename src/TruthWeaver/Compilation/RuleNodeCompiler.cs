@@ -132,6 +132,7 @@ internal sealed class RuleNodeCompiler<TContext>
             ),
             XorNode x => this.BuildXor(x, depth),
             XnorNode xn => this.BuildXnor(xn, depth),
+            ImpliesNode i => this.BuildImplies(i, depth),
             ExactlyOneNode e => this.BuildVariadic(
                 e.Operands,
                 depth,
@@ -209,6 +210,22 @@ internal sealed class RuleNodeCompiler<TContext>
         Expression left = this.Build(node.Operands[0], depth + 1);
         Expression right = this.Build(node.Operands[1], depth + 1);
         return new XnorExpression(left, right);
+    }
+
+    private Expression BuildImplies(ImpliesNode node, int depth)
+    {
+        if (node.Operands.Count != 2)
+        {
+            string message =
+                $"IMPLIES is binary only; found {node.Operands.Count} operands. "
+                + "Add parentheses (or nest IMPLIES nodes) to say how chained implications group.";
+            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, node.Span));
+            return FailedNode.Placeholder;
+        }
+
+        Expression antecedent = this.Build(node.Operands[0], depth + 1);
+        Expression consequent = this.Build(node.Operands[1], depth + 1);
+        return new ImpliesExpression(antecedent, consequent);
     }
 
     private Expression BuildThreshold(ThresholdNode node, int depth)

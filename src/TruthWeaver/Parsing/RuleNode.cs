@@ -54,6 +54,13 @@ internal sealed record XorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span
 /// </summary>
 internal sealed record XnorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
+/// <summary>
+/// A raw <c>IMPLIES</c> reference (material implication). Operand count is validated by
+/// <c>RuleNodeCompiler</c> (exactly two), like <see cref="XorNode"/>, so a DSL chain
+/// (<c>a IMPLIES b IMPLIES c</c>) and a malformed JSON/YAML node are rejected the same way.
+/// </summary>
+internal sealed record ImpliesNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
 /// <summary>N-ary "exactly one of these is true".</summary>
 internal sealed record ExactlyOneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 

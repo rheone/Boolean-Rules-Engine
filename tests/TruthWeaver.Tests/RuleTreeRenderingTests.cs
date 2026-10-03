@@ -215,6 +215,16 @@ public sealed class RuleTreeRenderingTests
     }
 
     [Theory]
+    [InlineData(OperatorStyle.Word, "IMPLIES")]
+    [InlineData(OperatorStyle.Symbolic, "→")]
+    [InlineData(OperatorStyle.CStyle, "IMPLIES")]
+    public void PlainText_and_Mermaid_render_implies_in_the_requested_style(OperatorStyle style, string expected)
+    {
+        Assert.Contains(expected, PlainTextTreePrinter.Print(BinaryNode("IMPLIES"), style));
+        Assert.Contains(expected, MermaidTreePrinter.Print(BinaryNode("IMPLIES"), style));
+    }
+
+    [Theory]
     [InlineData(OperatorStyle.Word)]
     [InlineData(OperatorStyle.Symbolic)]
     [InlineData(OperatorStyle.CStyle)]

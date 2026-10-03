@@ -100,6 +100,12 @@ public static class K3Oracle
         return Or([And([left, Not(right)]), And([Not(left), right])]);
     }
 
+    /// <summary>Strong Kleene material implication, defined from the primitives as <c>NOT left OR right</c>.</summary>
+    public static TruthValue Implies(TruthValue left, TruthValue right)
+    {
+        return Or([Not(left), right]);
+    }
+
     /// <summary>Binary biconditional: the negation of <see cref="Xor"/>.</summary>
     public static TruthValue Equivalent(TruthValue left, TruthValue right)
     {

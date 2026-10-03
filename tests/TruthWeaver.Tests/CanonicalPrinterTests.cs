@@ -31,6 +31,16 @@ public sealed class CanonicalPrinterTests
     }
 
     [Fact]
+    public void Implies_is_always_parenthesized_and_printed_with_the_word_operator()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile("isManager → isDepartmentHead").CompiledRule!;
+
+        Assert.Equal("(isManager IMPLIES isDepartmentHead)", rule.CanonicalText);
+    }
+
+    [Fact]
     public void Xnor_operand_is_always_parenthesized_even_when_unnecessary_for_precedence()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();

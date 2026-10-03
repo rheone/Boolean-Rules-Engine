@@ -21,6 +21,7 @@ internal sealed class DslParser
         "NOT",
         "XOR",
         "XNOR",
+        "IMPLIES",
         "TRUE",
         "FALSE",
         "UNKNOWN",
@@ -34,7 +35,7 @@ internal sealed class DslParser
 
     // Infix operators that sit outside the NOT > AND > OR precedence chain: they may not be mixed with
     // each other or with AND/OR at one nesting level without parentheses (ADR-0005 decision 8).
-    private static readonly string[] InfixOperators = ["XOR", "XNOR"];
+    private static readonly string[] InfixOperators = ["XOR", "XNOR", "IMPLIES"];
 
     private readonly IReadOnlyList<Token> tokens;
     private readonly List<Diagnostic> diagnostics;
@@ -97,6 +98,7 @@ internal sealed class DslParser
             "||" or "∨" => "OR",
             "!" or "¬" => "NOT",
             "⊕" => "XOR",
+            "→" => "IMPLIES",
             _ => null,
         };
     }
@@ -213,6 +215,7 @@ internal sealed class DslParser
         {
             "XOR" => new XorNode(operands, span),
             "XNOR" => new XnorNode(operands, span),
+            "IMPLIES" => new ImpliesNode(operands, span),
             _ => throw new InvalidOperationException($"Unhandled infix operator '{chainOperator}'."),
         };
         return (result, chainOperator);
