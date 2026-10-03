@@ -273,7 +273,9 @@ Full reasoning and the truth tables: [ADR-0001](docs/adr/0001-kleene-failure-mod
 
 `Compile` never throws for authoring errors; it returns a `CompilationResult`
 of a nullable `CompiledRule` plus a list of diagnostics (code, severity,
-source span). **Nothing that fails compilation is ever persisted** — the
+message, source span or JSON/YAML path, expected-versus-found pair and an
+optional "did you mean" suggestion; `CompilationResult.FormatDiagnostics`
+renders them as text). **Nothing that fails compilation is ever persisted** — the
 write path treats diagnostics as form-validation messages, and a rejected
 save leaves the previously persisted rule active. `CompiledRule` is
 immutable, so runtime rule changes are a compile-and-swap-a-reference: no

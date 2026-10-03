@@ -15,4 +15,15 @@ public sealed record CompilationResult<TContext>(CompiledRule<TContext>? Compile
 {
     /// <summary>Gets a value indicating whether compilation succeeded (no <see cref="DiagnosticSeverity.Error"/> diagnostics).</summary>
     public bool Succeeded => this.CompiledRule is not null;
+
+    /// <summary>
+    /// Renders <see cref="Diagnostics"/> as plain text for a log or an editor panel (see <see cref="DiagnosticFormatter"/>).
+    /// The structured members of each <see cref="Diagnostic"/> remain available for callers that lay them out themselves.
+    /// </summary>
+    /// <param name="source">The rule text that was compiled, so locations show a line and column and the offending line; <see langword="null"/> to show offsets only.</param>
+    /// <returns>The rendered diagnostics, one block each; empty when there are none.</returns>
+    public string FormatDiagnostics(string? source = null)
+    {
+        return DiagnosticFormatter.Format(this.Diagnostics, source);
+    }
 }

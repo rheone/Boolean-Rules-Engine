@@ -32,6 +32,7 @@ anything else.
   - [Rendering a rule as a diagram](#rendering-a-rule-as-a-diagram)
 - [Evaluation flow](#evaluation-flow)
 - [Compilation pipeline](#compilation-pipeline)
+- [Reading diagnostics](#reading-diagnostics)
 - [Benchmarks](#benchmarks)
 - [Glossary](#glossary)
 - [Appendix: Truth tables](#appendix-truth-tables)
@@ -1758,6 +1759,76 @@ severity, source span) in the returned `CompilationResult<TContext>`.
 diagnostics, which is what makes "a bad edit is rejected, the previously
 persisted rule stays active" true by construction rather than by convention.
 Full reasoning: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
+
+## Reading diagnostics
+
+A rule that does not compile never throws; `Compile` returns a
+`CompilationResult<TContext>` whose `Diagnostics` explain what is wrong. Each
+`Diagnostic` is structured data first and text second, so an editor can lay it
+out itself and a log can print it as is.
+
+| Member          | Meaning                                                                                              |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| `Code`          | Stable identifier such as `BRE0001` (see `DiagnosticCodes`).                                         |
+| `Severity`      | `Error` blocks compilation; `Warning` and `Info` do not.                                             |
+| `Message`       | A plain-language explanation of the problem.                                                         |
+| `Span`          | Where it is in the rule text (0-based offset and length). `Span.GetLocation(source)` gives line and column. |
+| `Path`          | Where it is in a JSON or YAML rule, for example `$.operands[1].op`; `null` for DSL text.             |
+| `Expected` / `Found` | What the compiler needed and what it saw (`')'` and `']'`, `2 operands` and `3 operands`), when that applies. |
+| `Suggestion`    | A `DiagnosticSuggestion`: a `Replacement` ("did you mean `AND`?") or a `Hint` (advice such as adding parentheses). |
+
+```csharp
+const string source = "a ANDD b";
+CompilationResult<MyContext> result = compiler.Compile(source);
+
+foreach (Diagnostic d in result.Diagnostics)
+{
+    SourceLocation at = d.Span.GetLocation(source);          // line 1, column 3
+    Console.WriteLine($"{d.Code} {at.Line}:{at.Column} {d.Message}");
+    Console.WriteLine($"expected {d.Expected}, found {d.Found}, try {d.Suggestion?.Text}");
+}
+
+// Or render everything as plain text for a log or an editor panel.
+Console.WriteLine(result.FormatDiagnostics(source));
+```
+
+```text
+BRE0001 error at line 1, column 3: Unexpected token 'ANDD' after end of expression.
+  a ANDD b
+    ^^^^
+  Expected: an operator or the end of the rule
+  Found: 'ANDD'
+  Did you mean: AND
+```
+
+`DiagnosticFormatter.Format(diagnostic, source)` renders a single diagnostic;
+without the source text the header shows `at offset 2` and the source line is
+left out.
+
+"Did you mean" suggestions come from a small, deterministic edit distance
+(case-insensitive, counting a swapped pair of letters as one edit, with a
+cut-off that scales with the length of the word) over the operators, aliases,
+reserved words and the predicate names registered in your registry; equally
+close candidates resolve to the ordinally first one, so the same typo always
+gets the same answer. A word that is nowhere near anything known gets no
+suggestion rather than a bad guess. They cover unknown predicate and operator
+names, misspelt `Collapse` policies, undeclared predicate argument names, and a
+lone `&` or `|`.
+
+The classes of malformed rule text each report as follows.
+
+| Problem | Code | Expected / found | Suggestion |
+| ------- | ---- | ---------------- | ---------- |
+| Unknown predicate or operator name | `BRE0002` | a registered name or an operator / the name | nearest known name |
+| Misspelt operator between operands, trailing tokens | `BRE0001` | an operator or the end of the rule / the token | nearest word operator |
+| Missing operand or literal | `BRE0001` | a term, constant or `(` (or a literal) / the token or end of rule | none |
+| Mismatched, unclosed or unmatched delimiter | `BRE0001` | the closer / the token or end of rule (an unclosed group is reported at its opener) | none |
+| Unterminated string, bad escape | `BRE0001`, `BRE0015` | a closing `"`, or the supported escapes / end of rule or the escape | none |
+| Wrong operand count, `XOR` and the other binary operators | `BRE0006`, `BRE0014` | `2 operands` / `3 operands` | `NXOR` / `ExactlyOne` for `XOR`, parentheses for the others |
+| Ambiguous mixing without parentheses | `BRE0007` | parentheses around one of the groups / the operators sharing a level | hint showing the parenthesised text |
+| Threshold or `BETWEEN` bounds, non-integer bound | `BRE0008`, `BRE0001` | the valid range, or an integer / the value | none |
+| Nested `Collapse` | `BRE0016` | `Collapse` as the outermost expression / nested | hint to move it outside or use `Project` |
+| Missing, unknown or mistyped predicate argument | `BRE0003`, `BRE0005`, `BRE0004` | the argument or kind / what was written | nearest declared argument name |
 
 ## Benchmarks
 

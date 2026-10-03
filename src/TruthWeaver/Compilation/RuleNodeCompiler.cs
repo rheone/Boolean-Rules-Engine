@@ -56,7 +56,9 @@ internal sealed class RuleNodeCompiler<TContext>
                     Diagnostic.Error(
                         DiagnosticCodes.MalformedTree,
                         $"Collapse requires exactly 1 operand but found {outermost.Operands.Count}.",
-                        outermost.Span
+                        outermost.Span,
+                        expected: "1 operand",
+                        found: CountText(outermost.Operands.Count)
                     )
                 );
                 return (null, null, compiler.diagnostics);
@@ -69,6 +71,32 @@ internal sealed class RuleNodeCompiler<TContext>
         Expression tree = compiler.Build(body, depth: 1);
         bool hasErrors = compiler.diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error);
         return (hasErrors ? null : tree, collapse, compiler.diagnostics);
+    }
+
+    /// <summary>Phrases an operand count for a diagnostic's expected/found pair: <c>1 operand</c>, <c>3 operands</c>.</summary>
+    private static string CountText(int count)
+    {
+        return count == 1 ? "1 operand" : $"{count} operands";
+    }
+
+    private static DiagnosticSuggestion NestingHint(string name)
+    {
+        return new DiagnosticSuggestion(
+            DiagnosticSuggestionKind.Hint,
+            $"Add parentheses (or nest {name} nodes) to say how the chained operands group."
+        );
+    }
+
+    /// <summary>Names the form a raw literal was written in, for an argument-type mismatch's <c>Found</c>.</summary>
+    private static string DescribeLiteral(RawLiteral literal)
+    {
+        return literal.Form switch
+        {
+            RawLiteralForm.QuotedString => $"the string \"{literal.Text}\"",
+            RawLiteralForm.Number => $"the number {literal.Text}",
+            RawLiteralForm.Boolean => $"the boolean {(literal.BooleanValue ? "true" : "false")}",
+            _ => "a list",
+        };
     }
 
     private static TermIdentity BuildUnknownIdentity(TermNode node)
@@ -112,7 +140,9 @@ internal sealed class RuleNodeCompiler<TContext>
                     Diagnostic.Error(
                         DiagnosticCodes.MaxNodeCountExceeded,
                         $"Rule exceeds the maximum node count of {this.options.MaxNodeCount}.",
-                        node.Span
+                        node.Span,
+                        expected: $"at most {this.options.MaxNodeCount} nodes",
+                        found: "more nodes than that"
                     )
                 );
             }
@@ -126,7 +156,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.MaxDepthExceeded,
                     $"Rule exceeds the maximum tree depth of {this.options.MaxDepth}.",
-                    node.Span
+                    node.Span,
+                    expected: $"nesting at most {this.options.MaxDepth} deep",
+                    found: "deeper nesting"
                 )
             );
             return FailedNode.Placeholder;
@@ -218,7 +250,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"If requires exactly 3 operands (condition, whenTrue, whenFalse) but found {node.Operands.Count}.",
-                    node.Span
+                    node.Span,
+                    expected: "3 operands",
+                    found: CountText(node.Operands.Count)
                 )
             );
             return FailedNode.Placeholder;
@@ -240,7 +274,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"{node.Kind} requires exactly 1 operand but found {node.Operands.Count}.",
-                    node.Span
+                    node.Span,
+                    expected: "1 operand",
+                    found: CountText(node.Operands.Count)
                 )
             );
             return FailedNode.Placeholder;
@@ -259,7 +295,13 @@ internal sealed class RuleNodeCompiler<TContext>
             Diagnostic.Error(
                 DiagnosticCodes.NestedCollapse,
                 "Collapse can only be the outermost expression of a rule, because it is the final step that turns the result into a two-valued answer. Move it to the outside of the whole rule, or use Project(expr, True) / Project(expr, False) to resolve Unknown inside the rule.",
-                node.Span
+                node.Span,
+                expected: "Collapse as the outermost expression",
+                found: "Collapse nested inside another expression",
+                suggestion: new DiagnosticSuggestion(
+                    DiagnosticSuggestionKind.Hint,
+                    "Move Collapse to the outside of the whole rule, or use Project(expr, True) or Project(expr, False) to resolve Unknown inside the rule."
+                )
             )
         );
         return node.Operands.Count == 1 ? this.Build(node.Operands[0], depth + 1) : FailedNode.Placeholder;
@@ -274,7 +316,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"Project requires exactly 1 operand but found {node.Operands.Count}.",
-                    node.Span
+                    node.Span,
+                    expected: "1 operand",
+                    found: CountText(node.Operands.Count)
                 )
             );
             return FailedNode.Placeholder;
@@ -297,7 +341,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"This operator requires at least {minOperands} operands but found {operands.Count}.",
-                    span
+                    span,
+                    expected: $"at least {minOperands} operands",
+                    found: CountText(operands.Count)
                 )
             );
             return FailedNode.Placeholder;
@@ -319,7 +365,19 @@ internal sealed class RuleNodeCompiler<TContext>
             string message =
                 $"XOR is binary only; found {node.Operands.Count} operands. "
                 + "Use NXOR(...) for n-ary parity (an odd number of True operands) or ExactlyOne(...) for n-ary 'exactly one'.";
-            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, node.Span));
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.XorArityViolation,
+                    message,
+                    node.Span,
+                    expected: "2 operands",
+                    found: CountText(node.Operands.Count),
+                    suggestion: new DiagnosticSuggestion(
+                        DiagnosticSuggestionKind.Hint,
+                        "Use NXOR(...) for n-ary parity (an odd number of True operands) or ExactlyOne(...) for n-ary 'exactly one'."
+                    )
+                )
+            );
             return FailedNode.Placeholder;
         }
 
@@ -335,7 +393,16 @@ internal sealed class RuleNodeCompiler<TContext>
             string message =
                 $"EQUIVALENT is binary only; found {node.Operands.Count} operands. "
                 + "Add parentheses (or nest EQUIVALENT nodes) to say how chained equivalences group.";
-            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, node.Span));
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.XorArityViolation,
+                    message,
+                    node.Span,
+                    expected: "2 operands",
+                    found: CountText(node.Operands.Count),
+                    suggestion: NestingHint("EQUIVALENT")
+                )
+            );
             return FailedNode.Placeholder;
         }
 
@@ -361,7 +428,16 @@ internal sealed class RuleNodeCompiler<TContext>
             string message =
                 $"{name} is binary only; found {operands.Count} operands. "
                 + $"Add parentheses (or nest {name} nodes) to say how chained operations group.";
-            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, span));
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.XorArityViolation,
+                    message,
+                    span,
+                    expected: "2 operands",
+                    found: CountText(operands.Count),
+                    suggestion: NestingHint(name)
+                )
+            );
             return FailedNode.Placeholder;
         }
 
@@ -377,7 +453,16 @@ internal sealed class RuleNodeCompiler<TContext>
             string message =
                 $"IMPLIES is binary only; found {node.Operands.Count} operands. "
                 + "Add parentheses (or nest IMPLIES nodes) to say how chained implications group.";
-            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, node.Span));
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.XorArityViolation,
+                    message,
+                    node.Span,
+                    expected: "2 operands",
+                    found: CountText(node.Operands.Count),
+                    suggestion: NestingHint("IMPLIES")
+                )
+            );
             return FailedNode.Placeholder;
         }
 
@@ -391,7 +476,13 @@ internal sealed class RuleNodeCompiler<TContext>
         if (node.Operands.Count < 1)
         {
             this.diagnostics.Add(
-                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"{node.Comparison} requires at least one operand.", node.Span)
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"{node.Comparison} requires at least one operand.",
+                    node.Span,
+                    expected: "at least 1 operand",
+                    found: CountText(0)
+                )
             );
             return FailedNode.Placeholder;
         }
@@ -403,7 +494,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.InvalidThresholdValue,
                     $"{node.Comparison}'s threshold k={node.K} must satisfy {minK} <= k <= {maxK} for {node.Operands.Count} operand(s) (any value outside that range makes the result a structural constant).",
-                    node.Span
+                    node.Span,
+                    expected: $"{minK} <= k <= {maxK}",
+                    found: $"k={node.K}"
                 )
             );
             return FailedNode.Placeholder;
@@ -432,7 +525,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.MalformedTree,
                     $"BETWEEN requires at least 2 operands but found {operandCount}.",
-                    node.Span
+                    node.Span,
+                    expected: "at least 2 operands",
+                    found: CountText(operandCount)
                 )
             );
             return FailedNode.Placeholder;
@@ -448,7 +543,9 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.InvalidThresholdValue,
                     $"BETWEEN's bounds min={node.Min}, max={node.Max} are invalid: {reason}.",
-                    node.Span
+                    node.Span,
+                    expected: $"0 <= min <= max <= {operandCount}, excluding the full range",
+                    found: $"min={node.Min}, max={node.Max}"
                 )
             );
             return FailedNode.Placeholder;
@@ -476,7 +573,10 @@ internal sealed class RuleNodeCompiler<TContext>
                 Diagnostic.Error(
                     DiagnosticCodes.UnknownPredicate,
                     $"No predicate named '{node.PredicateName}' is registered.",
-                    node.Span
+                    node.Span,
+                    expected: "a registered predicate name or an operator",
+                    found: $"'{node.PredicateName}'",
+                    suggestion: NameSuggester.Suggest(node.PredicateName, this.registry.Names.Concat(DslVocabulary.Keywords))
                 )
             );
             return FailedNode.Placeholder;
@@ -493,11 +593,16 @@ internal sealed class RuleNodeCompiler<TContext>
             );
             if (argSchema is null)
             {
+                string[] declared = [.. schema.Arguments.Select(a => a.Name)];
+                string expectedArguments = declared.Length == 0 ? "no arguments" : $"one of {string.Join(", ", declared)}";
                 this.diagnostics.Add(
                     Diagnostic.Error(
                         DiagnosticCodes.UnknownArgument,
                         $"Predicate '{schema.Name}' does not declare an argument named '{arg.Name}'.",
-                        arg.Span
+                        arg.Span,
+                        expected: expectedArguments,
+                        found: $"'{arg.Name}'",
+                        suggestion: NameSuggester.Suggest(arg.Name, declared)
                     )
                 );
                 continue;
@@ -509,7 +614,9 @@ internal sealed class RuleNodeCompiler<TContext>
                     Diagnostic.Error(
                         DiagnosticCodes.ArgumentTypeMismatch,
                         $"Argument '{arg.Name}' of predicate '{schema.Name}' must be of kind '{argSchema.Type}'.",
-                        arg.Value.Span
+                        arg.Value.Span,
+                        expected: $"a value of kind '{argSchema.Type}'",
+                        found: DescribeLiteral(arg.Value)
                     )
                 );
                 continue;
@@ -527,11 +634,17 @@ internal sealed class RuleNodeCompiler<TContext>
 
             if (argSchema.Required)
             {
+                string supplied =
+                    suppliedNames.Count == 0
+                        ? "no arguments"
+                        : $"only {string.Join(", ", suppliedNames.Order(StringComparer.Ordinal).Select(n => $"'{n}'"))}";
                 this.diagnostics.Add(
                     Diagnostic.Error(
                         DiagnosticCodes.MissingArgument,
                         $"Predicate '{schema.Name}' requires argument '{argSchema.Name}'.",
-                        node.Span
+                        node.Span,
+                        expected: $"argument '{argSchema.Name}'",
+                        found: supplied
                     )
                 );
             }

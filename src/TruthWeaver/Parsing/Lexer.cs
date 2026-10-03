@@ -105,8 +105,20 @@ internal sealed class Lexer(string source)
         }
 
         this.position++;
+
+        // A lone '&' or '|' is almost always half of the doubled symbol, so say which one.
+        DiagnosticSuggestion? suggestion = DslVocabulary.DoubledSymbolFor(c) is { } doubled
+            ? new DiagnosticSuggestion(DiagnosticSuggestionKind.Replacement, doubled)
+            : null;
         this.Diagnostics.Add(
-            Diagnostic.Error(DiagnosticCodes.SyntaxError, $"Unexpected character '{c}'.", new SourceSpan(start, 1))
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                $"Unexpected character '{c}'.",
+                new SourceSpan(start, 1),
+                expected: "a term, operator or delimiter",
+                found: $"'{c}'",
+                suggestion: suggestion
+            )
         );
         return this.NextToken();
     }
@@ -189,7 +201,9 @@ internal sealed class Lexer(string source)
                             Diagnostic.Error(
                                 DiagnosticCodes.InvalidEscapeSequence,
                                 $"Unrecognized escape sequence '\\{next}' in string literal.",
-                                new SourceSpan(this.position, 2)
+                                new SourceSpan(this.position, 2),
+                                expected: "one of \\\", \\\\, \\n, \\t",
+                                found: $"\\{next}"
                             )
                         );
                         builder.Append(next);
@@ -211,7 +225,9 @@ internal sealed class Lexer(string source)
                 Diagnostic.Error(
                     DiagnosticCodes.SyntaxError,
                     "Unterminated string literal.",
-                    new SourceSpan(start, this.position - start)
+                    new SourceSpan(start, this.position - start),
+                    expected: "a closing '\"'",
+                    found: "end of rule"
                 )
             );
         }

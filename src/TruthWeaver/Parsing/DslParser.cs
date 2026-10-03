@@ -65,12 +65,14 @@ internal sealed class DslParser
         ("ISKNOWN", InspectionKind.IsKnown),
     ];
 
+    private readonly string source;
     private readonly IReadOnlyList<Token> tokens;
     private readonly List<Diagnostic> diagnostics;
     private int position;
 
-    private DslParser(IReadOnlyList<Token> tokens, List<Diagnostic> diagnostics)
+    private DslParser(string source, IReadOnlyList<Token> tokens, List<Diagnostic> diagnostics)
     {
+        this.source = source;
         this.tokens = tokens;
         this.diagnostics = diagnostics;
     }
@@ -93,7 +95,7 @@ internal sealed class DslParser
         Lexer lexer = new(source);
         IReadOnlyList<Token> tokens = lexer.Tokenize();
         List<Diagnostic> diagnostics = [.. lexer.Diagnostics];
-        DslParser parser = new(tokens, diagnostics);
+        DslParser parser = new(source, tokens, diagnostics);
         RuleNode root = parser.ParseExpression();
         if (IsGroupCloser(parser.Current.Kind))
         {
@@ -102,7 +104,9 @@ internal sealed class DslParser
                 Diagnostic.Error(
                     DiagnosticCodes.SyntaxError,
                     $"Unexpected closing '{parser.Current.Text}' with no matching opener.",
-                    parser.Current.Span
+                    parser.Current.Span,
+                    expected: "the end of the rule",
+                    found: DescribeFound(parser.Current)
                 )
             );
         }
@@ -112,12 +116,27 @@ internal sealed class DslParser
                 Diagnostic.Error(
                     DiagnosticCodes.SyntaxError,
                     $"Unexpected token '{parser.Current.Text}' after end of expression.",
-                    parser.Current.Span
+                    parser.Current.Span,
+                    expected: "an operator or the end of the rule",
+                    found: DescribeFound(parser.Current),
+                    suggestion: SuggestInfixWord(parser.Current)
                 )
             );
         }
 
         return (root, diagnostics);
+    }
+
+    /// <summary>Describes a token for a diagnostic's <c>Found</c>: its text in quotes, or "end of rule" for the end of input.</summary>
+    private static string DescribeFound(Token token)
+    {
+        return token.Kind == TokenKind.Eof ? "end of rule" : $"'{token.Text}'";
+    }
+
+    /// <summary>Suggests the nearest word operator when the token is a word that is probably a misspelt one.</summary>
+    private static DiagnosticSuggestion? SuggestInfixWord(Token token)
+    {
+        return token.Kind == TokenKind.Identifier ? NameSuggester.Suggest(token.Text, DslVocabulary.InfixWords) : null;
     }
 
     private static bool IsGroupOpener(TokenKind kind)
@@ -271,7 +290,12 @@ internal sealed class DslParser
         string message =
             "Mixing ?: with another ?: at the same level requires explicit parentheses. "
             + "Add parentheses around the nested conditional to say how the branches group.";
-        this.ReportAmbiguousMixing(this.Current.Span, message);
+        this.ReportAmbiguousMixing(
+            this.Current.Span,
+            message,
+            "?: next to ?: without parentheses",
+            "Add parentheses around the nested conditional to say how the branches group."
+        );
 
         // The nested condition was already checked as the enclosing branch.
         return this.ParseTernaryTail(nestedCondition, null, nestedStart, checkCondition: false);
@@ -297,7 +321,12 @@ internal sealed class DslParser
             string message =
                 $"Mixing ?: with {bare} at the same level requires explicit parentheses. "
                 + $"Add parentheses around the {bare} expression used as the {role} to say which operator applies first.";
-            this.ReportAmbiguousMixing(part.Span, message);
+            this.ReportAmbiguousMixing(
+                part.Span,
+                message,
+                $"?: next to {bare} without parentheses",
+                this.WrapHint(bare, part.Span)
+            );
         }
     }
 
@@ -382,7 +411,12 @@ internal sealed class DslParser
             string message =
                 $"Mixing {shown} with AND/OR at the same level requires explicit parentheses. "
                 + $"Add parentheses around the {shown} expression to say which operator applies first.";
-            this.ReportAmbiguousMixing(operand.Span, message);
+            this.ReportAmbiguousMixing(
+                operand.Span,
+                message,
+                $"{shown} next to {keyword} without parentheses",
+                this.WrapHint(shown, operand.Span)
+            );
         }
 
         return (construct(operands, SpanCovering(node.Span.Start, operands[^1].Span.End)), null);
@@ -411,7 +445,12 @@ internal sealed class DslParser
                 string message =
                     $"Mixing {DisplayName(chainOperator)} with {DisplayName(current)} at the same level requires explicit parentheses. "
                     + "Add parentheses around the operands that should be grouped first.";
-                this.ReportAmbiguousMixing(this.Current.Span, message);
+                this.ReportAmbiguousMixing(
+                    this.Current.Span,
+                    message,
+                    $"{DisplayName(chainOperator)} next to {DisplayName(current)} without parentheses",
+                    "Add parentheses around the operands that should be grouped first."
+                );
             }
 
             this.position++;
@@ -580,7 +619,9 @@ internal sealed class DslParser
             Diagnostic.Error(
                 DiagnosticCodes.SyntaxError,
                 $"Expected a term, constant, or '(' but found '{this.Current.Text}'.",
-                this.Current.Span
+                this.Current.Span,
+                expected: "a term, constant or '('",
+                found: DescribeFound(this.Current)
             )
         );
         SourceSpan errorSpan = this.Current.Span;
@@ -652,7 +693,9 @@ internal sealed class DslParser
                     Diagnostic.Error(
                         DiagnosticCodes.SyntaxError,
                         $"Expected a literal value but found '{current.Text}'.",
-                        current.Span
+                        current.Span,
+                        expected: "a literal value",
+                        found: DescribeFound(current)
                     )
                 );
                 if (current.Kind != TokenKind.Eof)
@@ -721,7 +764,9 @@ internal sealed class DslParser
                 Diagnostic.Error(
                     DiagnosticCodes.SyntaxError,
                     $"Expected an integer threshold as {comparison}'s first argument.",
-                    this.Current.Span
+                    this.Current.Span,
+                    expected: "an integer",
+                    found: DescribeFound(this.Current)
                 )
             );
         }
@@ -802,7 +847,9 @@ internal sealed class DslParser
                     Diagnostic.Error(
                         DiagnosticCodes.SyntaxError,
                         "Project takes exactly two arguments: an expression and the constant True or False.",
-                        extra.Span
+                        extra.Span,
+                        expected: "two arguments",
+                        found: "an extra argument"
                     )
                 );
             }
@@ -853,7 +900,9 @@ internal sealed class DslParser
                     Diagnostic.Error(
                         DiagnosticCodes.SyntaxError,
                         "Collapse takes exactly two arguments: an expression and a policy.",
-                        extra.Span
+                        extra.Span,
+                        expected: "two arguments",
+                        found: "an extra argument"
                     )
                 );
             }
@@ -877,11 +926,16 @@ internal sealed class DslParser
             return policy;
         }
 
+        DiagnosticSuggestion? suggestion =
+            token.Kind == TokenKind.Identifier ? NameSuggester.Suggest(token.Text, CollapsePolicyText.Names) : null;
         this.diagnostics.Add(
             Diagnostic.Error(
                 DiagnosticCodes.SyntaxError,
                 $"Collapse's policy must be one of {string.Join(", ", CollapsePolicyText.Names)}, but found '{token.Text}'.",
-                token.Span
+                token.Span,
+                expected: $"one of {string.Join(", ", CollapsePolicyText.Names)}",
+                found: DescribeFound(token),
+                suggestion: suggestion
             )
         );
         if (token.Kind != TokenKind.Eof && token.Kind != TokenKind.RParen)
@@ -898,7 +952,9 @@ internal sealed class DslParser
             Diagnostic.Error(
                 DiagnosticCodes.SyntaxError,
                 $"Collapse requires two arguments: an expression and a policy, as in Collapse(expr, UnknownAsFalse) (found '{this.Current.Text}').",
-                at
+                at,
+                expected: "an expression and a policy",
+                found: DescribeFound(this.Current)
             )
         );
     }
@@ -924,7 +980,15 @@ internal sealed class DslParser
             value is ConstantNode
                 ? "Project's value cannot be Unknown: Project replaces Unknown, so it needs the constant True or False to replace it with."
                 : "Project's second argument must be the constant True or False (the value that replaces Unknown), not an expression.";
-        this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.SyntaxError, message, value.Span));
+        this.diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                message,
+                value.Span,
+                expected: "the constant True or False",
+                found: $"'{this.TextOf(value.Span)}'"
+            )
+        );
         return false;
     }
 
@@ -934,7 +998,9 @@ internal sealed class DslParser
             Diagnostic.Error(
                 DiagnosticCodes.SyntaxError,
                 $"Project requires two arguments: an expression and the constant True or False, as in Project(expr, True) (found '{this.Current.Text}').",
-                at
+                at,
+                expected: "an expression and the constant True or False",
+                found: DescribeFound(this.Current)
             )
         );
     }
@@ -958,7 +1024,9 @@ internal sealed class DslParser
             Diagnostic.Error(
                 DiagnosticCodes.SyntaxError,
                 $"Expected an integer {which} as BETWEEN's {(which == "minimum" ? "first" : "second")} argument.",
-                this.Current.Span
+                this.Current.Span,
+                expected: "an integer",
+                found: DescribeFound(this.Current)
             )
         );
         if (this.Current.Kind == TokenKind.NumberLiteral)
@@ -1017,7 +1085,9 @@ internal sealed class DslParser
             Diagnostic.Error(
                 DiagnosticCodes.SyntaxError,
                 $"Expected {description} but found '{this.Current.Text}'.",
-                this.Current.Span
+                this.Current.Span,
+                expected: description,
+                found: DescribeFound(this.Current)
             )
         );
     }
@@ -1043,7 +1113,9 @@ internal sealed class DslParser
                 Diagnostic.Error(
                     DiagnosticCodes.SyntaxError,
                     $"Unclosed '{opener.Text}' at offset {opener.Span.Start}: expected '{expected}' before the end of the rule.",
-                    opener.Span
+                    opener.Span,
+                    expected: $"'{expected}'",
+                    found: "end of rule"
                 )
             );
             return;
@@ -1053,7 +1125,10 @@ internal sealed class DslParser
             Diagnostic.Error(
                 DiagnosticCodes.SyntaxError,
                 $"Expected '{expected}' to close '{opener.Text}' at offset {opener.Span.Start} but found '{this.Current.Text}'.",
-                this.Current.Span
+                this.Current.Span,
+                expected: $"'{expected}'",
+                found: DescribeFound(this.Current),
+                suggestion: SuggestInfixWord(this.Current)
             )
         );
         if (IsGroupCloser(this.Current.Kind))
@@ -1062,8 +1137,30 @@ internal sealed class DslParser
         }
     }
 
-    private void ReportAmbiguousMixing(SourceSpan span, string message)
+    private void ReportAmbiguousMixing(SourceSpan span, string message, string found, string hint)
     {
-        this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.AmbiguousOperatorMixing, message, span));
+        this.diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.AmbiguousOperatorMixing,
+                message,
+                span,
+                expected: "parentheses around one of the groups",
+                found: found,
+                suggestion: new DiagnosticSuggestion(DiagnosticSuggestionKind.Hint, hint)
+            )
+        );
+    }
+
+    /// <summary>Gets the source text a span covers, clamped to the source.</summary>
+    private string TextOf(SourceSpan span)
+    {
+        int start = Math.Clamp(span.Start, 0, this.source.Length);
+        return this.source[start..Math.Clamp(span.End, start, this.source.Length)];
+    }
+
+    /// <summary>Builds the parentheses hint for a bare operand, quoting its source text already wrapped so it can be pasted back.</summary>
+    private string WrapHint(string operatorName, SourceSpan operand)
+    {
+        return $"Wrap the {operatorName} expression in parentheses: ({this.TextOf(operand)})";
     }
 }

@@ -202,6 +202,26 @@ the aliases are cheap once the canonical form stays single.
     JSON/YAML path), optional "did you mean" suggestion, and an
     expected-vs-found pair, with a plain-text rendering.
 
+    Implemented in k3-conformance 28 (DSL). `Diagnostic` keeps its positional
+    members and gains optional, init-only `Path`, `Expected`, `Found` and
+    `Suggestion` (a `DiagnosticSuggestion` of kind `Replacement` for "did you
+    mean" or `Hint` for advice), set through optional parameters on
+    `Diagnostic.Error/Warning/Info`; existing message text is unchanged, so the
+    structure is additive. `SourceSpan.GetLocation(source)` derives the 1-based
+    line and column (`SourceLocation`). `DiagnosticFormatter.Format` (one or
+    many) and `CompilationResult.FormatDiagnostics(source)` render the plain
+    text: a header (`BRE0001 error at line 1, column 3: ...`), the source line
+    with a caret underline, then `Expected:`, `Found:` and `Did you mean:` /
+    `Hint:` lines. Suggestions use an internal, deterministic
+    optimal-string-alignment distance (case-insensitive, cut-off 1/2/3 edits for
+    words of up to 4/8/more characters, ties to the ordinally first candidate)
+    over the DSL vocabulary and the registry's predicate names. The shared
+    `XorArityViolation` code (`BRE0006`) is kept for the five binary operators;
+    its `Expected`/`Found` carry the operand counts and the `Suggestion` names
+    `NXOR`/`ExactlyOne` for `XOR` and nesting for the others. The
+    no-mixing "add parentheses" advice is now also a `Hint` suggestion that
+    quotes the operand wrapped in parentheses where there is one.
+
 12. **`Project(expr, unknown)`** is an in-tree node that keeps `True`/`False`
     and replaces `Unknown` with the chosen `True` or `False`
     (`.tmp/ProjectAndCollapse.md`). It always yields a definite `TruthValue`
