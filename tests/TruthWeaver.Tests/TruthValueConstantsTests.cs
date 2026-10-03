@@ -146,9 +146,9 @@ public sealed class TruthValueConstantsTests
     [Fact]
     public void CompileJson_MixedCaseOperatorNames_CompileToTheSameTreeAsLowerCamel_Test()
     {
-        string mixed =
+        const string mixed =
             """{"op": "AND", "operands": [{"const": "Unknown"}, {"op": "ExactlyOne", "operands": [{"const": true}, {"const": false}]}]}""";
-        string lower =
+        const string lower =
             """{"op": "and", "operands": [{"const": "unknown"}, {"op": "exactlyOne", "operands": [{"const": true}, {"const": false}]}]}""";
 
         Assert.Equal(

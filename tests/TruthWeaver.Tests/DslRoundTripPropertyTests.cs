@@ -221,8 +221,8 @@ public sealed class DslRoundTripPropertyTests
         const string Whitespace = " \t\r\n";
         string RandomRun()
         {
-            return new string(
-                Enumerable.Range(0, random.Next(0, 4)).Select(_ => Whitespace[random.Next(Whitespace.Length)]).ToArray()
+            return string.Concat(
+                Enumerable.Range(0, random.Next(0, 4)).Select(_ => Whitespace[random.Next(Whitespace.Length)])
             );
         }
 

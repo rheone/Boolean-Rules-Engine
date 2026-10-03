@@ -287,7 +287,7 @@ internal sealed class DslParser
     /// <summary>Reports an unparenthesized ternary nested in a branch (<c>a ? b : c ? d : e</c>) and parses it for recovery.</summary>
     private RuleNode ParseNestedTernary(RuleNode nestedCondition, int nestedStart)
     {
-        string message =
+        const string message =
             "Mixing ?: with another ?: at the same level requires explicit parentheses. "
             + "Add parentheses around the nested conditional to say how the branches group.";
         this.ReportAmbiguousMixing(
