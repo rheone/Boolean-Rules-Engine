@@ -82,7 +82,10 @@ isn't a pin to that exact patch.
    ```
 
 2. **Implement a predicate.** A zero-argument predicate is the simplest
-   shape — a class implementing `IPredicate<TContext>`:
+   shape — a class implementing `IPredicate<TContext>`. A predicate answers
+   a three-valued `TruthValue`: return `TruthValue.Unknown` when the answer
+   is legitimately indeterminate (that is a normal result and records no
+   fault), and throw only for a genuine failure:
 
    ```csharp
    public sealed class LovesPineapple : IPredicate<Customer>
@@ -90,8 +93,8 @@ isn't a pin to that exact patch.
        public static PredicateSchema Schema =>
            PredicateSchema.NoArguments("lovesPineapple", "Loves Pineapple", "Does this customer like pineapple on pizza?");
 
-       public ValueTask<bool> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct) =>
-           ValueTask.FromResult(customer.LovesPineapple);
+       public ValueTask<TruthValue> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct) =>
+           ValueTask.FromResult(customer.LovesPineapple ? TruthValue.True : TruthValue.False);
    }
    ```
 
@@ -325,7 +328,7 @@ A service that only *implements* domain predicates references
   [`src/TruthWeaver.Predicates`](src/TruthWeaver.Predicates).
 - **Test support.** `TruthWeaver.Testing` ships fluent `Decision`
   assertions and fake/scripted predicate factories (fixed answer, simulated
-  fault, sequenced answers) for testing without a hand-written
+  fault, sequenced answers, `Unknown` answered directly) for testing without a hand-written
   `IPredicate<TContext>` per test. Entry point:
   [`src/TruthWeaver.Testing`](src/TruthWeaver.Testing).
 
@@ -453,7 +456,7 @@ predicate per name.
 ```csharp
 .Add(
     PredicateSchema.NoArguments("isBanned", "Is Banned", "Is the current customer's account banned?"),
-    (customer, args, ct) => ValueTask.FromResult(customer.IsBanned))
+    (customer, args, ct) => ValueTask.FromResult(customer.IsBanned ? TruthValue.True : TruthValue.False))
 ```
 
 ### 1 argument, stateless lambda
@@ -495,14 +498,14 @@ public sealed class HasEarnedEnoughLoyaltyStamps : IPredicate<PizzaOrder>
                 new PredicateArgumentSchema("withinDays", "The lookback window, in days.", LiteralKind.Int64),
             ]);
 
-    public async ValueTask<bool> EvaluateAsync(PizzaOrder order, PredicateArguments args, CancellationToken ct)
+    public async ValueTask<TruthValue> EvaluateAsync(PizzaOrder order, PredicateArguments args, CancellationToken ct)
     {
         long minCount = args.GetInt64("minCount");
         long withinDays = args.GetInt64("withinDays");
         DateTimeOffset cutoff = this.clock.GetUtcNow().AddDays(-withinDays);
 
         long count = await this.stamps.CountStampsSinceAsync(order.Id, cutoff, ct);
-        return count >= minCount;
+        return count >= minCount ? TruthValue.True : TruthValue.False;
     }
 }
 ```
@@ -548,7 +551,7 @@ single canonical shape here; it covers three distinct cases, none more
 central than the others:
 
 1. **Single-value, no comparison target.** The literal key resolves
-   directly to the boolean answer — there's no "other side" to compare
+   directly to the answer — there's no "other side" to compare
    against, and `TContext` may not be read at all. A feature-flag check is
    the classic instance:
 
@@ -562,8 +565,8 @@ central than the others:
                "Is the given promo code currently active, resolved live from the promotions service?",
                [new PredicateArgumentSchema("promoCode", "The promo code to look up.", LiteralKind.String)]);
 
-       public ValueTask<bool> EvaluateAsync(object? context, PredicateArguments args, CancellationToken ct) =>
-           promos.IsActiveAsync(args.GetString("promoCode"), ct);
+       public async ValueTask<TruthValue> EvaluateAsync(object? context, PredicateArguments args, CancellationToken ct) =>
+           await promos.IsActiveAsync(args.GetString("promoCode"), ct) ? TruthValue.True : TruthValue.False;
    }
    ```
 
@@ -585,11 +588,11 @@ central than the others:
                "Is the delivery run's amount within the live order limit resolved for the given delivery zone code?",
                [new PredicateArgumentSchema("zoneCode", "The delivery zone code to look up a live limit for.", LiteralKind.String)]);
 
-       public async ValueTask<bool> EvaluateAsync(DeliveryRun run, PredicateArguments args, CancellationToken ct)
+       public async ValueTask<TruthValue> EvaluateAsync(DeliveryRun run, PredicateArguments args, CancellationToken ct)
        {
            string zoneCode = args.GetString("zoneCode");
            decimal limit = await zoneLimits.ResolveLimitAsync(zoneCode, ct);
-           return run.Amount <= limit;
+           return run.Amount <= limit ? TruthValue.True : TruthValue.False;
        }
    }
    ```
@@ -614,12 +617,12 @@ central than the others:
                "Does the order's actual assigned driver, resolved live, match the given candidate?",
                [new PredicateArgumentSchema("candidateDriverId", "The candidate driver to validate.", LiteralKind.Guid)]);
 
-       public async ValueTask<bool> EvaluateAsync(PizzaOrder order, PredicateArguments args, CancellationToken ct)
+       public async ValueTask<TruthValue> EvaluateAsync(PizzaOrder order, PredicateArguments args, CancellationToken ct)
        {
            Guid candidateDriverId = args.GetGuid("candidateDriverId");
            // candidateDriverId here belongs to "Mister Moneybags," our top delivery driver.
            Guid actualDriverId = await drivers.ResolveDriverIdAsync(order.Id, ct);
-           return actualDriverId == candidateDriverId;
+           return actualDriverId == candidateDriverId ? TruthValue.True : TruthValue.False;
        }
    }
    ```
@@ -650,8 +653,9 @@ A few things stay true across all three shapes:
 - Because the live call happens inside `EvaluateAsync`, a lookup failure
   (timeout, connection error) is absorbed the same way any other predicate
   fault is — as a `Fault` and `TruthValue.Unknown` (ADR-0001), never an
-  unhandled exception. No special handling is needed in the predicate
-  itself; see [`IPredicate<TContext>`](src/TruthWeaver.Abstractions/IPredicate.cs).
+  unhandled exception. A predicate that merely cannot decide (for example
+  the data is not available) returns `TruthValue.Unknown` directly, with no
+  `Fault`. No special handling is needed in the predicate itself; see [`IPredicate<TContext>`](src/TruthWeaver.Abstractions/IPredicate.cs).
 
 This is the documented alternative to the deferred
 "[context-bound term arguments](.scratch/deferred-features/spec.md)" feature (a
@@ -670,12 +674,12 @@ covers the same pattern as a lighter-weight lambda factory, with no one-off
 class needed. The single-value convenience overload matches shape 1 above:
 
 ```csharp
-(PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+(PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
     ResolvedValuePredicates.Create<object?>(
         "isPromoActive",
         "Is Promo Active",
         "Is the given promo code currently active, resolved live from the promotions service?",
-        (_, args, ct) => promos.IsActiveAsync(args.GetString("promoCode"), ct),
+        async (_, args, ct) => await promos.IsActiveAsync(args.GetString("promoCode"), ct) ? TruthValue.True : TruthValue.False,
         new PredicateArgumentSchema("promoCode", "The promo code to look up.", LiteralKind.String));
 ```
 
@@ -732,7 +736,8 @@ PredicateRegistry<Customer> registry = PredicateRegistry<Customer>.CreateBuilder
             "Has Topping",
             "Does the order include the given topping?",
             [new PredicateArgumentSchema("topping", "The topping to check for.", LiteralKind.String)]),
-        (customer, args, ct) => ValueTask.FromResult(customer.Toppings.Contains(args.GetString("topping"))))
+        (customer, args, ct) =>
+            ValueTask.FromResult(customer.Toppings.Contains(args.GetString("topping")) ? TruthValue.True : TruthValue.False))
     .Build();
 ```
 
@@ -783,8 +788,11 @@ PredicateRegistry<Customer> registry = PredicateRegistry<Customer>.CreateBuilder
                 new PredicateArgumentSchema("amount", "The amount requested (e.g. \"regular\" or \"extra\").", LiteralKind.String),
             ]),
         (customer, args, ct) =>
-            ValueTask.FromResult(customer.ToppingAmounts.TryGetValue(args.GetString("topping"), out string? amount)
-                && amount == args.GetString("amount")))
+            ValueTask.FromResult(
+                customer.ToppingAmounts.TryGetValue(args.GetString("topping"), out string? amount)
+                && amount == args.GetString("amount")
+                    ? TruthValue.True
+                    : TruthValue.False))
     .Build();
 ```
 
@@ -892,7 +900,8 @@ PredicateRegistry<PizzaOrder> registry = PredicateRegistry<PizzaOrder>.CreateBui
             "Has Topping",
             "Does the order include the given topping?",
             [new PredicateArgumentSchema("topping", "The topping to check for.", LiteralKind.String)]),
-        (order, args, ct) => ValueTask.FromResult(order.Toppings.Contains(args.GetString("topping"))))
+        (order, args, ct) =>
+            ValueTask.FromResult(order.Toppings.Contains(args.GetString("topping")) ? TruthValue.True : TruthValue.False))
     .Add(hasCrustSchema, hasCrustEvaluate)
     .Build();
 
@@ -1064,11 +1073,11 @@ public sealed class HasAnyTopping : IPredicate<Customer>
                 ),
             ]);
 
-    public ValueTask<bool> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct)
+    public ValueTask<TruthValue> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct)
     {
         IReadOnlyList<string> toppings = args.GetStringArray("toppings");
         bool result = toppings.Any(topping => customer.Toppings.Any(t => string.Equals(t, topping, StringComparison.Ordinal)));
-        return ValueTask.FromResult(result);
+        return ValueTask.FromResult(result ? TruthValue.True : TruthValue.False);
     }
 }
 ```
@@ -1117,10 +1126,10 @@ public sealed class HasToppingMatching : IPredicate<Customer>
             "Does the order include a topping whose code matches the given regular expression?",
             [new PredicateArgumentSchema("pattern", "The regular expression to match a topping code against.", LiteralKind.String)]);
 
-    public ValueTask<bool> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct)
+    public ValueTask<TruthValue> EvaluateAsync(Customer customer, PredicateArguments args, CancellationToken ct)
     {
         Regex pattern = new(args.GetString("pattern"), RegexOptions.None, TimeSpan.FromMilliseconds(100));
-        return ValueTask.FromResult(customer.Toppings.Any(pattern.IsMatch));
+        return ValueTask.FromResult(customer.Toppings.Any(pattern.IsMatch) ? TruthValue.True : TruthValue.False);
     }
 }
 ```

@@ -19,7 +19,7 @@ public static class TestPredicates
     {
         return builder.Add(
             PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', always {value}."),
-            (_, _, _) => ValueTask.FromResult(value)
+            (_, _, _) => ValueTask.FromResult(value ? TruthValue.True : TruthValue.False)
         );
     }
 
@@ -36,7 +36,7 @@ public static class TestPredicates
             (_, _, _) =>
             {
                 invocationLog.Add(name);
-                return ValueTask.FromResult(value);
+                return ValueTask.FromResult(value ? TruthValue.True : TruthValue.False);
             }
         );
     }
@@ -66,7 +66,7 @@ public static class TestPredicates
             async (_, _, ct) =>
             {
                 await Task.Delay(delay, ct).ConfigureAwait(false);
-                return value;
+                return value ? TruthValue.True : TruthValue.False;
             }
         );
     }
@@ -89,7 +89,7 @@ public static class TestPredicates
             {
                 await cancellationTokenSource.CancelAsync().ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
-                return true;
+                return TruthValue.True;
             }
         );
     }
@@ -126,7 +126,11 @@ public static class TestPredicates
                 [new PredicateArgumentSchema(argumentName, $"The value to compare against '{matchValue}'.", LiteralKind.String)]
             ),
             (_, args, _) =>
-                ValueTask.FromResult(string.Equals(args.GetString(argumentName), matchValue, StringComparison.Ordinal))
+                ValueTask.FromResult(
+                    string.Equals(args.GetString(argumentName), matchValue, StringComparison.Ordinal)
+                        ? TruthValue.True
+                        : TruthValue.False
+                )
         );
     }
 
@@ -145,7 +149,7 @@ public static class TestPredicates
                 $"Test predicate '{name}', true iff '{argumentName}' equals '{matchValue}'.",
                 [new PredicateArgumentSchema(argumentName, $"The GUID to compare against '{matchValue}'.", LiteralKind.Guid)]
             ),
-            (_, args, _) => ValueTask.FromResult(args.GetGuid(argumentName) == matchValue)
+            (_, args, _) => ValueTask.FromResult(args.GetGuid(argumentName) == matchValue ? TruthValue.True : TruthValue.False)
         );
     }
 
@@ -170,7 +174,8 @@ public static class TestPredicates
                     ),
                 ]
             ),
-            (_, args, _) => ValueTask.FromResult(args.GetDecimal(argumentName) == matchValue)
+            (_, args, _) =>
+                ValueTask.FromResult(args.GetDecimal(argumentName) == matchValue ? TruthValue.True : TruthValue.False)
         );
     }
 
@@ -195,7 +200,7 @@ public static class TestPredicates
                     ),
                 ]
             ),
-            (_, args, _) => ValueTask.FromResult(args.GetBool(argumentName) == matchValue)
+            (_, args, _) => ValueTask.FromResult(args.GetBool(argumentName) == matchValue ? TruthValue.True : TruthValue.False)
         );
     }
 
@@ -220,7 +225,8 @@ public static class TestPredicates
                     ),
                 ]
             ),
-            (_, args, _) => ValueTask.FromResult(args.GetDateTimeOffset(argumentName) == matchValue)
+            (_, args, _) =>
+                ValueTask.FromResult(args.GetDateTimeOffset(argumentName) == matchValue ? TruthValue.True : TruthValue.False)
         );
     }
 }

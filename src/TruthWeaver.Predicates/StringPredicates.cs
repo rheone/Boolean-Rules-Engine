@@ -21,7 +21,7 @@ public static class StringPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Equals<TContext>(string name, Func<TContext, string?> selector, string label = "Equals", string argumentName = "value")
     {
         const string description =
@@ -47,7 +47,7 @@ public static class StringPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) EqualsIgnoreCase<TContext>(
         string name,
         Func<TContext, string?> selector,
@@ -79,7 +79,7 @@ public static class StringPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) StartsWith<TContext>(
         string name,
         Func<TContext, string?> selector,
@@ -110,7 +110,7 @@ public static class StringPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) EndsWith<TContext>(
         string name,
         Func<TContext, string?> selector,
@@ -141,7 +141,7 @@ public static class StringPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Contains<TContext>(
         string name,
         Func<TContext, string?> selector,
@@ -172,7 +172,7 @@ public static class StringPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) IsNullOrEmpty<TContext>(string name, Func<TContext, string?> selector, string label = "Is Null Or Empty")
     {
         PredicateSchema schema = PredicateSchema.NoArguments(
@@ -181,7 +181,7 @@ public static class StringPredicates
             "True when the selected string is null or the empty string (\"\")."
         );
 
-        return (schema, (context, _, _) => ValueTask.FromResult(string.IsNullOrEmpty(selector(context))));
+        return (schema, (context, _, _) => PredicateResult.FromBoolAsync(string.IsNullOrEmpty(selector(context))));
     }
 
     /// <summary>
@@ -209,7 +209,7 @@ public static class StringPredicates
     /// </exception>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) EqualsConfigurable<TContext>(
         string name,
         Func<TContext, string?> selector,
@@ -259,7 +259,7 @@ public static class StringPredicates
                 string? selected = selector(context);
                 if (selected is null)
                 {
-                    return ValueTask.FromResult(false);
+                    return PredicateResult.FromBoolAsync(false);
                 }
 
                 string target = args.GetString(argumentName);
@@ -278,14 +278,14 @@ public static class StringPredicates
                     : CultureInfo.GetCultureInfo(culture);
                 CompareOptions options = ignoreCase ? CompareOptions.IgnoreCase : CompareOptions.None;
 
-                return ValueTask.FromResult(compareCulture.CompareInfo.Compare(selected, target, options) == 0);
+                return PredicateResult.FromBoolAsync(compareCulture.CompareInfo.Compare(selected, target, options) == 0);
             }
         );
     }
 
     private static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Create<TContext>(
         string name,
         string label,
@@ -309,8 +309,8 @@ public static class StringPredicates
             {
                 string? selected = selector(context);
                 return selected is null
-                    ? ValueTask.FromResult(false)
-                    : ValueTask.FromResult(compare(selected, args.GetString(argumentName)));
+                    ? PredicateResult.FromBoolAsync(false)
+                    : PredicateResult.FromBoolAsync(compare(selected, args.GetString(argumentName)));
             }
         );
     }

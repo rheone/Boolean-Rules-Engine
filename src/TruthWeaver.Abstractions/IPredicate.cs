@@ -1,9 +1,7 @@
 namespace TruthWeaver.Abstractions;
 
-// TODO Predicates should repect pure K3 and reuturn one of a Truthy, Falsey, or Unknown value rather than a boolean
-
 /// <summary>
-/// A registered, reusable boolean condition over an application-supplied context — the function a
+/// A registered, reusable three-valued (Strong Kleene) condition over an application-supplied context — the function a
 /// rule's terms bind arguments to and call (CONTEXT.md). Implementations should be stateless; any
 /// per-call dependency (a <c>DbContext</c>, a scoped <c>HttpClient</c>) is resolved by the engine
 /// from the <see cref="IServiceProvider"/> supplied to each evaluation, never captured once at
@@ -21,16 +19,18 @@ public interface IPredicate<in TContext>
 #pragma warning restore S2743
 
     /// <summary>
-    /// Evaluates this predicate for one term. Signal "I cannot determine this" (a timeout, a
-    /// connection failure) by simply throwing — the evaluator absorbs the exception as a
-    /// <see cref="Fault"/> and treats the term as <see cref="TruthValue.Unknown"/> (ADR-0001); no
+    /// Evaluates this predicate for one term. Return <see cref="TruthValue.Unknown"/> when the
+    /// answer is legitimately indeterminate (for example the data is not available); that is a normal
+    /// result and records no <see cref="Fault"/>. Signal a genuine failure (a timeout, a connection
+    /// failure) by simply throwing — the evaluator absorbs the exception as a <see cref="Fault"/>
+    /// and treats the term as <see cref="TruthValue.Unknown"/> (ADR-0001, ADR-0005); no
     /// try/catch-and-wrap boilerplate is expected of the implementation.
     /// </summary>
     /// <param name="context">The application-supplied evaluation context.</param>
     /// <param name="args">This term's arguments, validated against <see cref="Schema"/> at compile time.</param>
     /// <param name="cancellationToken">A token observed for cooperative cancellation.</param>
     /// <returns>
-    /// A <see cref="ValueTask{Boolean}"/> resolving to this term's boolean answer for the given context.
+    /// A <see cref="ValueTask{TruthValue}"/> resolving to this term's Kleene answer for the given context.
     /// </returns>
-    public ValueTask<bool> EvaluateAsync(TContext context, PredicateArguments args, CancellationToken cancellationToken);
+    public ValueTask<TruthValue> EvaluateAsync(TContext context, PredicateArguments args, CancellationToken cancellationToken);
 }

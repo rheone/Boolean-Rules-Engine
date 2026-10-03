@@ -7,66 +7,47 @@ public sealed class FakePredicatesTests
     [Fact]
     public async Task Returning_Bool_True_AlwaysReturnsTrue()
     {
-        (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             FakePredicates.Returning<object?>("hasRole", true);
 
-        bool result = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
+        TruthValue result = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
 
-        Assert.True(result);
+        Assert.Equal(TruthValue.True, result);
         Assert.Equal("hasRole", schema.Name);
     }
 
     [Fact]
     public async Task Returning_Bool_False_AlwaysReturnsFalse()
     {
-        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) = FakePredicates.Returning<object?>(
-            "hasRole",
-            false
-        );
+        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
+            FakePredicates.Returning<object?>("hasRole", false);
 
-        bool result = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
+        TruthValue result = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
 
-        Assert.False(result);
+        Assert.Equal(TruthValue.False, result);
     }
 
+    /// <summary>Returning with any Kleene value answers exactly that value, including Unknown, without throwing.</summary>
     [Theory]
-    [InlineData(TruthValue.True, true)]
-    [InlineData(TruthValue.False, false)]
-    public async Task Returning_Kleene_TrueOrFalse_ReturnsMatchingBool(TruthValue value, bool expected)
+    [InlineData(TruthValue.True)]
+    [InlineData(TruthValue.False)]
+    [InlineData(TruthValue.Unknown)]
+    public async Task Returning_Kleene_AnyValue_ReturnsThatValueDirectly(TruthValue value)
     {
-        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) = FakePredicates.Returning<object?>(
-            "hasRole",
-            value
-        );
+        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
+            FakePredicates.Returning<object?>("hasRole", value);
 
-        bool result = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
+        TruthValue result = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
 
-        Assert.Equal(expected, result);
-    }
-
-    [Fact]
-    public Task Returning_Kleene_Unknown_Throws()
-    {
-        // IPredicate<TContext> only ever returns bool (ADR-0001) - Unknown can only be simulated by
-        // throwing, the same way a real predicate signals "cannot determine this".
-        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) = FakePredicates.Returning<object?>(
-            "hasRole",
-            TruthValue.Unknown
-        );
-
-        return Assert.ThrowsAsync<SimulatedPredicateFaultException>(async () =>
-            await evaluate(null, PredicateArguments.Empty, CancellationToken.None)
-        );
+        Assert.Equal(value, result);
     }
 
     [Fact]
     public async Task Faulting_AlwaysThrowsGivenException()
     {
         InvalidOperationException exception = new("boom");
-        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) = FakePredicates.Faulting<object?>(
-            "hasRole",
-            exception
-        );
+        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
+            FakePredicates.Faulting<object?>("hasRole", exception);
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await evaluate(null, PredicateArguments.Empty, CancellationToken.None)
@@ -83,43 +64,23 @@ public sealed class FakePredicatesTests
     [Fact]
     public async Task Scripted_ReturnsSuccessiveAnswersInOrder()
     {
-        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) = FakePredicates.Scripted<object?>(
-            "flapping",
-            [TruthValue.True, TruthValue.False, TruthValue.True]
-        );
+        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
+            FakePredicates.Scripted<object?>("flapping", [TruthValue.True, TruthValue.False, TruthValue.Unknown]);
 
-        bool first = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
-        bool second = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
-        bool third = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
+        TruthValue first = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
+        TruthValue second = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
+        TruthValue third = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
 
-        Assert.True(first);
-        Assert.False(second);
-        Assert.True(third);
-    }
-
-    [Fact]
-    public async Task Scripted_UnknownEntry_ThrowsOnThatCall()
-    {
-        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) = FakePredicates.Scripted<object?>(
-            "flapping",
-            [TruthValue.True, TruthValue.Unknown]
-        );
-
-        bool first = await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
-        Assert.True(first);
-
-        await Assert.ThrowsAsync<SimulatedPredicateFaultException>(async () =>
-            await evaluate(null, PredicateArguments.Empty, CancellationToken.None)
-        );
+        Assert.Equal(TruthValue.True, first);
+        Assert.Equal(TruthValue.False, second);
+        Assert.Equal(TruthValue.Unknown, third);
     }
 
     [Fact]
     public async Task Scripted_MoreCallsThanScriptedAnswers_Throws()
     {
-        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) = FakePredicates.Scripted<object?>(
-            "flapping",
-            [TruthValue.True]
-        );
+        (_, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
+            FakePredicates.Scripted<object?>("flapping", [TruthValue.True]);
 
         await evaluate(null, PredicateArguments.Empty, CancellationToken.None);
 

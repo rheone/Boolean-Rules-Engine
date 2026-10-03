@@ -222,7 +222,7 @@ public sealed class DslRoundTripPropertyTests
                         spec.PredicateName,
                         $"Property-test predicate '{spec.PredicateName}'."
                     ),
-                (_, _, _) => ValueTask.FromResult(true)
+                (_, _, _) => ValueTask.FromResult(true ? TruthValue.True : TruthValue.False)
             );
         }
 

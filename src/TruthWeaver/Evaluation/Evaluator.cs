@@ -336,10 +336,12 @@ internal sealed class Evaluator<TContext>(
         {
             this.cancellationToken.ThrowIfCancellationRequested();
             PredicateArguments args = new(identity.Arguments.ToDictionary(kv => kv.Key, kv => kv.Value));
-            bool value = descriptor.Evaluate is { } lambda
+
+            // A predicate may answer Unknown directly; that is a normal value, not a fault. Only a throw
+            // (including a timeout or cancellation surfaced as an exception) is recorded as a Fault.
+            return descriptor.Evaluate is { } lambda
                 ? await lambda(this.context, args, this.cancellationToken).ConfigureAwait(false)
                 : await this.InvokeClassBasedAsync(descriptor, args).ConfigureAwait(false);
-            return value ? TruthValue.True : TruthValue.False;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !this.cancellationToken.IsCancellationRequested)
         {
@@ -360,7 +362,7 @@ internal sealed class Evaluator<TContext>(
         }
     }
 
-    private ValueTask<bool> InvokeClassBasedAsync(PredicateDescriptor<TContext> descriptor, PredicateArguments args)
+    private ValueTask<TruthValue> InvokeClassBasedAsync(PredicateDescriptor<TContext> descriptor, PredicateArguments args)
     {
         object? instance =
             this.services.GetService(descriptor.ImplementationType!)

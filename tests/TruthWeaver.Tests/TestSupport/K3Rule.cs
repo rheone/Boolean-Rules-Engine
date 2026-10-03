@@ -34,17 +34,10 @@ public sealed class K3Rule
             int index = i;
             string name = ((char)('a' + i)).ToString();
 
-            // An Unknown input is delivered as a thrown fault until predicates can return TruthValue
-            // directly (k3-conformance ticket 02); the evaluator maps it to Unknown either way.
+            // Every input, including Unknown, is delivered directly as the predicate's answer.
             builder = builder.Add(
                 PredicateSchema.NoArguments(name, name, $"Conformance input '{name}'."),
-                (_, _, _) =>
-                    current[index] switch
-                    {
-                        TruthValue.True => ValueTask.FromResult(true),
-                        TruthValue.False => ValueTask.FromResult(false),
-                        _ => throw new InvalidOperationException($"'{name}' is Unknown."),
-                    }
+                (_, _, _) => ValueTask.FromResult(current[index])
             );
         }
 

@@ -12,7 +12,7 @@ using TruthWeaver.Abstractions;
 /// </summary>
 public static class FakePredicates
 {
-    /// <summary>Creates a predicate that always returns a fixed <see langword="bool"/> result.</summary>
+    /// <summary>Creates a predicate that always returns a fixed definite result: <see cref="TruthValue.True"/> or <see cref="TruthValue.False"/>.</summary>
     /// <typeparam name="TContext">The application context type (ignored by the fake).</typeparam>
     /// <param name="name">The predicate's registered name.</param>
     /// <param name="result">The fixed result every call returns.</param>
@@ -21,7 +21,7 @@ public static class FakePredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Returning<TContext>(
         string name,
         bool result,
@@ -30,16 +30,15 @@ public static class FakePredicates
     )
     {
         PredicateSchema schema = PredicateSchema.NoArguments(name, label, description);
-        return (schema, (_, _, _) => ValueTask.FromResult(result));
+        return (schema, (_, _, _) => ValueTask.FromResult(result ? TruthValue.True : TruthValue.False));
     }
 
     /// <summary>
     /// Creates a predicate that always answers with a fixed three-valued <see cref="TruthValue"/>.
-    /// <see cref="TruthValue.True"/> and <see cref="TruthValue.False"/> return the matching
-    /// <see langword="bool"/>; <see cref="TruthValue.Unknown"/> throws
-    /// <see cref="SimulatedPredicateFaultException"/>, since <see cref="IPredicate{TContext}"/> can
-    /// only ever return <see langword="bool"/> and signals "cannot determine this" by throwing
-    /// (ADR-0001) — the evaluator is what turns that into <see cref="TruthValue.Unknown"/>.
+    /// <see cref="TruthValue.Unknown"/> is returned directly, exactly as a real predicate would answer
+    /// "indeterminate": it records no <see cref="Fault"/>. To simulate a real failure (an exception,
+    /// which the evaluator records as a <see cref="Fault"/>), use
+    /// <see cref="Faulting{TContext}(string, Exception, string, string)"/> instead.
     /// </summary>
     /// <typeparam name="TContext">The application context type (ignored by the fake).</typeparam>
     /// <param name="name">The predicate's registered name.</param>
@@ -49,7 +48,7 @@ public static class FakePredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Returning<TContext>(
         string name,
         TruthValue result,
@@ -57,9 +56,8 @@ public static class FakePredicates
         string description = "A fake predicate that always answers with a fixed Kleene result, registered for a test."
     )
     {
-        return result == TruthValue.Unknown
-            ? Faulting<TContext>(name, SimulatedPredicateFaultException.ForPredicate(name), label, description)
-            : Returning<TContext>(name, result == TruthValue.True, label, description);
+        PredicateSchema schema = PredicateSchema.NoArguments(name, label, description);
+        return (schema, (_, _, _) => ValueTask.FromResult(result));
     }
 
     /// <summary>
@@ -75,12 +73,13 @@ public static class FakePredicates
     /// <exception cref="ArgumentNullException"><paramref name="exception"/> is <see langword="null"/>.</exception>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Faulting<TContext>(
         string name,
         Exception exception,
         string label = "Fake",
-        string description = "A fake predicate that always throws, simulating a fault (Unknown), registered for a test."
+        string description =
+            "A fake predicate that always throws, simulating a fault (recorded, Unknown), registered for a test."
     )
     {
         ArgumentNullException.ThrowIfNull(exception);
@@ -92,8 +91,8 @@ public static class FakePredicates
     /// Creates a predicate that answers with successive entries from <paramref name="script"/>, one
     /// per call, in order — useful for testing memoization boundaries or a sequence of evaluations
     /// against the same rule with a predicate whose answer changes over time (e.g. a simulated flap).
-    /// A <see cref="TruthValue.Unknown"/> entry throws <see cref="SimulatedPredicateFaultException"/>
-    /// on that call, the same as <see cref="Returning{TContext}(string, TruthValue, string, string)"/>.
+    /// A <see cref="TruthValue.Unknown"/> entry answers Unknown on that call without a fault, the same
+    /// as <see cref="Returning{TContext}(string, TruthValue, string, string)"/>.
     /// Calling the predicate more times than <paramref name="script"/> has entries throws
     /// <see cref="InvalidOperationException"/>, so an under-scripted test fails loudly rather than
     /// silently repeating or wrapping around.
@@ -107,7 +106,7 @@ public static class FakePredicates
     /// <exception cref="ArgumentException"><paramref name="script"/> is empty.</exception>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Scripted<TContext>(
         string name,
         IReadOnlyList<TruthValue> script,
@@ -136,12 +135,7 @@ public static class FakePredicates
                     );
                 }
 
-                return script[index] switch
-                {
-                    TruthValue.True => ValueTask.FromResult(true),
-                    TruthValue.False => ValueTask.FromResult(false),
-                    _ => throw SimulatedPredicateFaultException.ForPredicate(name),
-                };
+                return ValueTask.FromResult(script[index]);
             }
         );
     }

@@ -16,7 +16,7 @@ public sealed class EndToEndUsageExampleTests
     [Fact]
     public async Task FixedFakePredicate_DrivesASatisfiedDecision()
     {
-        (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             FakePredicates.Returning<object?>("hasRole", true);
 
         PredicateRegistry<object?> registry = PredicateRegistry<object?>.CreateBuilder().Add(schema, evaluate).Build();
@@ -32,10 +32,30 @@ public sealed class EndToEndUsageExampleTests
         decision.Should().BeSatisfied().HaveResult(TruthValue.True).HaveNoFaults();
     }
 
+    /// <summary>A fake that answers Unknown directly yields an Unknown decision with no fault recorded.</summary>
+    [Fact]
+    public async Task UnknownFakePredicate_DrivesAnUnknownDecisionWithNoFault()
+    {
+        (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
+            FakePredicates.Returning<object?>("hasRole", TruthValue.Unknown);
+
+        PredicateRegistry<object?> registry = PredicateRegistry<object?>.CreateBuilder().Add(schema, evaluate).Build();
+        RuleCompiler<object?> compiler = new(registry);
+        CompiledRule<object?> rule = compiler.Compile("hasRole").CompiledRule!;
+
+        Decision decision = await rule.EvaluateAsync(
+            null,
+            EmptyServiceProvider.Instance,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        decision.Should().NotBeSatisfied().HaveResult(TruthValue.Unknown).HaveNoFaults();
+    }
+
     [Fact]
     public async Task FaultingFakePredicate_DrivesAnUnknownDecisionWithAFault()
     {
-        (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (PredicateSchema schema, Func<object?, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             FakePredicates.Faulting<object?>("hasRole", new InvalidOperationException("simulated downstream failure"));
 
         PredicateRegistry<object?> registry = PredicateRegistry<object?>.CreateBuilder().Add(schema, evaluate).Build();

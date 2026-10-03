@@ -357,7 +357,8 @@ public sealed class JsonTreeTests
                         "True iff any of 'codes' matches.",
                         [new PredicateArgumentSchema("codes", "The codes to check for.", LiteralKind.Int64Array)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetInt64Array("codes").Count > 0)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetInt64Array("codes").Count > 0 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );

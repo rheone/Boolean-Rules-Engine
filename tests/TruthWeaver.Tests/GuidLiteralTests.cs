@@ -90,7 +90,8 @@ public sealed class GuidLiteralTests
                         "True iff any of the given ids matches.",
                         [new PredicateArgumentSchema("ids", "The ids to check.", LiteralKind.GuidArray)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetGuidArray("ids").Count > 0)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetGuidArray("ids").Count > 0 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );

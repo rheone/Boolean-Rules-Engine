@@ -33,7 +33,7 @@ an authorization layer is intentionally out of scope.
 | **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `true`/`false`. Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
 | **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |
-| **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. |
+| **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. A predicate that simply returns `Unknown` is a normal answer and records no fault. |
 | **CompiledRule** | The immutable, thread-safe result of compiling a rule's text. Safe to cache and share; compile once, evaluate many times. |
 | **PredicateRegistry** | Where predicate implementations are registered under a name, with their argument schema. Every predicate carries a required, read-only `Label` and `Description`; every argument carries a required `Description`. |
 
@@ -71,7 +71,7 @@ classDiagram
     }
     class Predicate {
         <<Interface>>
-        +EvaluateAsync() bool
+        +EvaluateAsync() TruthValue
     }
 
     Rule "1" *-- "1" Expression : has
@@ -183,7 +183,7 @@ Nothing broader is claimed or enforced:
 - **Ambient state (clocks, timezones) is the predicate's problem, not the
   engine's.** `IsToday` is just a predicate that happens to read
   `TimeProvider` internally; the engine only ever sees and memoizes its
-  boolean answer. The engine does not claim overall determinism across time.
+  `TruthValue` answer. The engine does not claim overall determinism across time.
 - **IO volume and sequencing inside a predicate is the predicate author's
   responsibility.** The engine will not fan out or batch calls on a
   predicate's behalf; a predicate that makes 40 sequential HTTP calls is a
@@ -195,7 +195,7 @@ evaluation model this contract supports.
 ## Failure model (summary)
 
 Internally three-valued (Kleene), two-valued at the boundary. A predicate
-signals a fault by throwing; the evaluator catches it, records a `Fault`
+may answer `Unknown` directly (no fault) and signals a failure by throwing; the evaluator catches it, records a `Fault`
 (predicate identity + exception), and treats the term as `Unknown` rather
 than aborting evaluation. Evaluation continues wherever the logic can still
 reach a determinate answer (`Unknown OR True` is `True`), because a fault

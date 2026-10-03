@@ -26,14 +26,16 @@ public interface IPredicate<in TContext>
 {
     static abstract PredicateSchema Schema { get; }
 
-    ValueTask<bool> EvaluateAsync(
+    ValueTask<TruthValue> EvaluateAsync(
         TContext context,
         PredicateArguments args,
         CancellationToken cancellationToken);
 }
 ```
 
-Predicates return `ValueTask<bool>` and take a required `CancellationToken`
+Predicates return `ValueTask<TruthValue>` (originally `ValueTask<bool>`; changed by
+[ADR-0005](0005-strong-k3-language-surface.md) decision 15 so a predicate can answer
+`Unknown` directly) and take a required `CancellationToken`
 (no default-cancellation-token overload on the evaluation path). This engine's
 primary consumers do I/O — a database lookup, an HTTP call, a config read via
 `IOptions<T>` — and async is the only choice that doesn't force every

@@ -23,7 +23,7 @@ public sealed class IsManagedByCandidate(IManagerLookupService managers) : IPred
         );
 
     /// <inheritdoc />
-    public async ValueTask<bool> EvaluateAsync(
+    public async ValueTask<TruthValue> EvaluateAsync(
         ResourceContext context,
         PredicateArguments args,
         CancellationToken cancellationToken
@@ -31,6 +31,6 @@ public sealed class IsManagedByCandidate(IManagerLookupService managers) : IPred
     {
         Guid candidateManagerId = args.GetGuid("candidateManagerId");
         Guid actualManagerId = await this.managers.ResolveManagerIdAsync(context.ResourceId, cancellationToken);
-        return actualManagerId == candidateManagerId;
+        return actualManagerId == candidateManagerId ? TruthValue.True : TruthValue.False;
     }
 }
