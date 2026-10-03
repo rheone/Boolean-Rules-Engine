@@ -12,17 +12,39 @@ internal static class JsonTreePrinter
 {
     /// <summary>Prints an expression tree to JSON tree text.</summary>
     /// <param name="root">The tree to print.</param>
+    /// <param name="collapse">
+    /// The outermost <c>Collapse</c> policy the rule declared, or <see langword="null"/>. When present the tree is wrapped
+    /// in <c>{"op": "collapse", "policy": ..., "operands": [root]}</c>, the only position the compiler accepts it.
+    /// </param>
     /// <returns>The JSON text.</returns>
-    public static string Print(Expression root)
+    public static string Print(Expression root, CollapsePolicy? collapse = null)
     {
-        return ToNode(root).ToJsonString();
+        JsonNode node = ToNode(root);
+        if (collapse is { } policy)
+        {
+            node = new JsonObject
+            {
+                ["op"] = TreeFormatOpNames.ToTreeFormat("Collapse"),
+                ["policy"] = CollapsePolicyText.TreeFormat(policy),
+                ["operands"] = new JsonArray(node),
+            };
+        }
+
+        return node.ToJsonString();
     }
 
     private static JsonNode ToNode(Expression node)
     {
         if (node is ConstantExpression c)
         {
-            return new JsonObject { ["const"] = c.Value };
+            // True/False stay plain JSON booleans (compatible with existing documents); Unknown has no JSON
+            // literal, so it is written as the string "unknown".
+            return c.Value switch
+            {
+                TruthValue.True => new JsonObject { ["const"] = true },
+                TruthValue.False => new JsonObject { ["const"] = false },
+                _ => new JsonObject { ["const"] = TruthValueText.TreeFormat(c.Value) },
+            };
         }
 
         if (node is TermExpression t)
@@ -36,7 +58,18 @@ internal static class JsonTreePrinter
             ["op"] = TreeFormatOpNames.ToTreeFormat(shape.OpName),
             ["operands"] = OperandsArray(shape.Operands),
         };
-        if (shape.K is { } k)
+        if (shape.UnknownAs is { } unknownAs)
+        {
+            // Project carries its policy as a plain JSON boolean, like a True/False const.
+            obj["unknownAs"] = unknownAs;
+        }
+        else if (shape.Max is { } max)
+        {
+            // BETWEEN carries its two bounds as min/max instead of a single threshold k.
+            obj["min"] = shape.K;
+            obj["max"] = max;
+        }
+        else if (shape.K is { } k)
         {
             obj["k"] = k;
         }

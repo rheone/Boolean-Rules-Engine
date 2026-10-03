@@ -17,5 +17,8 @@
   <PropertyGroup>
     <IsAotCompatible>true</IsAotCompatible>
     <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
+    <!-- S1135 (a TODO comment) is deliberately exempt: a TODO is a reminder to be visible as a warning, not a reason to fail the build.
+         Every other warning, including IL2xxx/IL3xxx, still fails CI. Documented here and in CLAUDE.md because analyzer severity may not be weakened without a reason. -->
+    <WarningsNotAsErrors Condition="'$(CI)' == 'true'">$(WarningsNotAsErrors);S1135</WarningsNotAsErrors>
   </PropertyGroup>
 </Project>

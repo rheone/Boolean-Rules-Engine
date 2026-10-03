@@ -48,7 +48,7 @@ public static class YamlRuleExtensions
     /// <returns>The YAML text.</returns>
     public static string PrintYaml<TContext>(this CompiledRule<TContext> rule)
     {
-        return YamlTreePrinter.Print(rule.Root);
+        return YamlTreePrinter.Print(rule.Root, rule.CollapsePolicy);
     }
 
     private static CompilationResult<TContext> CompileFromParsedYaml<TContext>(

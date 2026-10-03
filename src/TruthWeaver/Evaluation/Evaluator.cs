@@ -47,7 +47,7 @@ internal sealed class Evaluator<TContext>(
     {
         if (node is ConstantExpression c)
         {
-            return c.Value ? "true" : "false";
+            return TruthValueText.Canonical(c.Value);
         }
 
         if (node is TermExpression t)
@@ -62,10 +62,36 @@ internal sealed class Evaluator<TContext>(
             "And" => "AND",
             "Or" => "OR",
             "Xor" => "XOR",
-            "Xnor" => "XNOR",
+            "Equivalent" => "EQUIVALENT",
+            "Implies" => "IMPLIES",
+            "Nand" => "NAND",
+            "Nor" => "NOR",
+            "Nxor" => "NXOR",
+            "Any" => "ANY",
+            "All" => "ALL",
+            "None" => "NONE",
             "ExactlyOne" => "ExactlyOne",
+            "Between" => $"BETWEEN({shape.K}, {shape.Max})",
+            "Coalesce" => "COALESCE",
+            "If" => "If",
+            "IsTrue" or "IsFalse" or "IsUnknown" or "IsKnown" => shape.OpName,
+            "Project" => $"Project({TruthValueText.Canonical(shape.UnknownAs == true)})",
             _ => $"{shape.OpName}({shape.K})",
         };
+    }
+
+    /// <summary>Tests the K3 state of <paramref name="value"/>; the answer is always a definite <c>True</c> or <c>False</c>.</summary>
+    private static TruthValue Inspect(InspectionKind kind, TruthValue value)
+    {
+        bool matches = kind switch
+        {
+            InspectionKind.IsTrue => value == TruthValue.True,
+            InspectionKind.IsFalse => value == TruthValue.False,
+            InspectionKind.IsUnknown => value == TruthValue.Unknown,
+            InspectionKind.IsKnown => value != TruthValue.Unknown,
+            _ => throw new InvalidOperationException($"Unhandled inspection kind '{kind}'."),
+        };
+        return matches ? TruthValue.True : TruthValue.False;
     }
 
     private static TruthValue KleeneAnd(TruthValue a, TruthValue b)
@@ -110,9 +136,41 @@ internal sealed class Evaluator<TContext>(
         return (left == TruthValue.True) ^ (right == TruthValue.True) ? TruthValue.True : TruthValue.False;
     }
 
-    private static TruthValue KleeneXnor(TruthValue left, TruthValue right)
+    private static TruthValue KleeneEquivalent(TruthValue left, TruthValue right)
     {
         return KleeneNot(KleeneXor(left, right));
+    }
+
+    /// <summary>Strong Kleene negated conjunction: <c>NOT (left AND right)</c>.</summary>
+    private static TruthValue KleeneNand(TruthValue left, TruthValue right)
+    {
+        return KleeneNot(KleeneAnd(left, right));
+    }
+
+    /// <summary>Strong Kleene negated disjunction: <c>NOT (left OR right)</c>.</summary>
+    private static TruthValue KleeneNor(TruthValue left, TruthValue right)
+    {
+        return KleeneNot(KleeneOr(left, right));
+    }
+
+    /// <summary>Strong Kleene material implication: <c>NOT antecedent OR consequent</c>.</summary>
+    private static TruthValue KleeneImplies(TruthValue antecedent, TruthValue consequent)
+    {
+        return KleeneOr(KleeneNot(antecedent), consequent);
+    }
+
+    /// <summary>
+    /// Strong Kleene n-ary parity: <c>Unknown</c> if any operand is <c>Unknown</c> (the fold of binary XOR, which is
+    /// <c>Unknown</c> whenever either side is), otherwise <c>True</c> for an odd number of <c>True</c> operands.
+    /// </summary>
+    private static TruthValue EvaluateNxor(IReadOnlyList<TruthValue> operandValues)
+    {
+        if (operandValues.Any(v => v == TruthValue.Unknown))
+        {
+            return TruthValue.Unknown;
+        }
+
+        return operandValues.Count(v => v == TruthValue.True) % 2 == 1 ? TruthValue.True : TruthValue.False;
     }
 
     private static TruthValue EvaluateExactlyOne(IReadOnlyList<TruthValue> operandValues)
@@ -191,7 +249,7 @@ internal sealed class Evaluator<TContext>(
         switch (node)
         {
             case ConstantExpression c:
-                TruthValue constantValue = c.Value ? TruthValue.True : TruthValue.False;
+                TruthValue constantValue = c.Value;
                 string constantDescription = Describe(node);
                 this.trace.Add(new TraceEntry(constantDescription, constantValue, false));
                 return new EvalResult(constantValue, new EvaluatedNode(constantDescription, constantValue, false, []));
@@ -208,16 +266,64 @@ internal sealed class Evaluator<TContext>(
             case AndExpression:
             {
                 NodeShape shape = ExpressionShape.Of(node);
-                return await this.EvalChainAsync("AND", shape.Operands, TruthValue.True, KleeneAnd, stopValue: TruthValue.False)
+                return await this.EvalChainAsync(
+                        "AND",
+                        shape.Operands,
+                        TruthValue.True,
+                        KleeneAnd,
+                        stops: value => value == TruthValue.False
+                    )
                     .ConfigureAwait(false);
             }
 
             case OrExpression:
             {
                 NodeShape shape = ExpressionShape.Of(node);
-                return await this.EvalChainAsync("OR", shape.Operands, TruthValue.False, KleeneOr, stopValue: TruthValue.True)
+                return await this.EvalChainAsync(
+                        "OR",
+                        shape.Operands,
+                        TruthValue.False,
+                        KleeneOr,
+                        stops: value => value == TruthValue.True
+                    )
                     .ConfigureAwait(false);
             }
+
+            case CoalesceExpression:
+            {
+                // The first non-Unknown operand wins and later operands cannot change it, so (outside
+                // exhaustive mode) they are skipped and marked as such, exactly like AND/OR short-circuit.
+                NodeShape shape = ExpressionShape.Of(node);
+                return await this.EvalChainAsync(
+                        "COALESCE",
+                        shape.Operands,
+                        TruthValue.Unknown,
+                        (accumulated, next) => accumulated == TruthValue.Unknown ? next : accumulated,
+                        stops: value => value != TruthValue.Unknown
+                    )
+                    .ConfigureAwait(false);
+            }
+
+            case InspectionExpression inspection:
+            {
+                EvalResult operand = await this.EvalAsync(inspection.Operand).ConfigureAwait(false);
+                TruthValue value = Inspect(inspection.Kind, operand.Value);
+                return new EvalResult(value, new EvaluatedNode(inspection.Kind.ToString(), value, false, [operand.Node]));
+            }
+
+            case ProjectExpression project:
+            {
+                EvalResult operand = await this.EvalAsync(project.Operand).ConfigureAwait(false);
+
+                // Only Unknown is replaced; a faulting operand is Unknown with its Fault already recorded, so the
+                // projection makes the value definite without hiding the fault.
+                TruthValue replacement = project.UnknownAs ? TruthValue.True : TruthValue.False;
+                TruthValue value = operand.Value == TruthValue.Unknown ? replacement : operand.Value;
+                return new EvalResult(value, new EvaluatedNode(Describe(project), value, false, [operand.Node]));
+            }
+
+            case IfExpression ifNode:
+                return await this.EvalIfAsync(ifNode).ConfigureAwait(false);
 
             case XorExpression:
             {
@@ -227,12 +333,75 @@ internal sealed class Evaluator<TContext>(
                 return new EvalResult(value, new EvaluatedNode("XOR", value, false, [.. results.Select(r => r.Node)]));
             }
 
-            case XnorExpression:
+            case EquivalentExpression:
             {
                 NodeShape shape = ExpressionShape.Of(node);
                 IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
-                TruthValue value = KleeneXnor(results[0].Value, results[1].Value);
-                return new EvalResult(value, new EvaluatedNode("XNOR", value, false, [.. results.Select(r => r.Node)]));
+                TruthValue value = KleeneEquivalent(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("EQUIVALENT", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case ImpliesExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneImplies(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("IMPLIES", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NandExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneNand(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("NAND", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NorExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = KleeneNor(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("NOR", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NxorExpression:
+            {
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateNxor([.. results.Select(r => r.Value)]);
+                return new EvalResult(value, new EvaluatedNode("NXOR", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case AnyExpression:
+            {
+                // ANY is AtLeast(1, ...) over the definitely-true / possibly-true interval (ADR-0005 decision 6).
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateThreshold(ThresholdComparison.AtLeast, 1, [.. results.Select(r => r.Value)]);
+                return new EvalResult(value, new EvaluatedNode("ANY", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case AllExpression:
+            {
+                // ALL is AtLeast(n, ...) for the n operands.
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateThreshold(
+                    ThresholdComparison.AtLeast,
+                    results.Count,
+                    [.. results.Select(r => r.Value)]
+                );
+                return new EvalResult(value, new EvaluatedNode("ALL", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case NoneExpression:
+            {
+                // NONE is AtMost(0, ...).
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue value = EvaluateThreshold(ThresholdComparison.AtMost, 0, [.. results.Select(r => r.Value)]);
+                return new EvalResult(value, new EvaluatedNode("NONE", value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ExactlyOneExpression:
@@ -241,6 +410,20 @@ internal sealed class Evaluator<TContext>(
                 IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
                 TruthValue value = EvaluateExactlyOne([.. results.Select(r => r.Value)]);
                 return new EvalResult(value, new EvaluatedNode("ExactlyOne", value, false, [.. results.Select(r => r.Node)]));
+            }
+
+            case BetweenExpression bt:
+            {
+                // AND(AtLeast(min, ...), AtMost(max, ...)) over the same operand values (ADR-0005 decision 6).
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue[] operandValues = [.. results.Select(r => r.Value)];
+                TruthValue value = KleeneAnd(
+                    EvaluateThreshold(ThresholdComparison.AtLeast, bt.Min, operandValues),
+                    EvaluateThreshold(ThresholdComparison.AtMost, bt.Max, operandValues)
+                );
+                string description = Describe(node);
+                return new EvalResult(value, new EvaluatedNode(description, value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ThresholdExpression th:
@@ -257,12 +440,51 @@ internal sealed class Evaluator<TContext>(
         }
     }
 
+    /// <summary>
+    /// Evaluates <c>If(condition, whenTrue, whenFalse)</c>. A definite condition needs only its own branch, so the other
+    /// is skipped (marked <c>NotEvaluated</c>, like the operands AND/OR short-circuit past). An <c>Unknown</c> condition
+    /// cannot choose, so both branches are evaluated and the result is their shared definite value or <c>Unknown</c>.
+    /// <see cref="EvaluationMode.Exhaustive"/> evaluates both branches regardless.
+    /// </summary>
+    private async ValueTask<EvalResult> EvalIfAsync(IfExpression node)
+    {
+        EvalResult condition = await this.EvalAsync(node.Condition).ConfigureAwait(false);
+        bool exhaustive = this.options.Mode == EvaluationMode.Exhaustive;
+        bool needWhenTrue = exhaustive || condition.Value != TruthValue.False;
+        bool needWhenFalse = exhaustive || condition.Value != TruthValue.True;
+
+        EvalResult whenTrue = needWhenTrue
+            ? await this.EvalAsync(node.WhenTrue).ConfigureAwait(false)
+            : this.Skip(node.WhenTrue);
+        EvalResult whenFalse = needWhenFalse
+            ? await this.EvalAsync(node.WhenFalse).ConfigureAwait(false)
+            : this.Skip(node.WhenFalse);
+
+        TruthValue value = condition.Value switch
+        {
+            TruthValue.True => whenTrue.Value,
+            TruthValue.False => whenFalse.Value,
+
+            // No branch can be chosen: the answer is only certain when both branches agree on a definite value.
+            _ => whenTrue.Value == whenFalse.Value ? whenTrue.Value : TruthValue.Unknown,
+        };
+        return new EvalResult(value, new EvaluatedNode("If", value, false, [condition.Node, whenTrue.Node, whenFalse.Node]));
+    }
+
+    /// <summary>Records <paramref name="node"/> as not evaluated in the trace and evaluated tree.</summary>
+    private EvalResult Skip(Expression node)
+    {
+        string skippedDescription = Describe(node);
+        this.trace.Add(new TraceEntry(skippedDescription, null, true));
+        return new EvalResult(TruthValue.Unknown, new EvaluatedNode(skippedDescription, null, true, []));
+    }
+
     private async ValueTask<EvalResult> EvalChainAsync(
         string description,
         IReadOnlyList<Expression> operands,
         TruthValue identity,
         Func<TruthValue, TruthValue, TruthValue> combine,
-        TruthValue stopValue
+        Func<TruthValue, bool> stops
     )
     {
         TruthValue accumulator = identity;
@@ -282,7 +504,7 @@ internal sealed class Evaluator<TContext>(
             EvalResult result = await this.EvalAsync(operand).ConfigureAwait(false);
             children.Add(result.Node);
             accumulator = combine(accumulator, result.Value);
-            if (!exhaustive && result.Value == stopValue)
+            if (!exhaustive && stops(result.Value))
             {
                 stop = true;
             }
@@ -336,10 +558,12 @@ internal sealed class Evaluator<TContext>(
         {
             this.cancellationToken.ThrowIfCancellationRequested();
             PredicateArguments args = new(identity.Arguments.ToDictionary(kv => kv.Key, kv => kv.Value));
-            bool value = descriptor.Evaluate is { } lambda
+
+            // A predicate may answer Unknown directly; that is a normal value, not a fault. Only a throw
+            // (including a timeout or cancellation surfaced as an exception) is recorded as a Fault.
+            return descriptor.Evaluate is { } lambda
                 ? await lambda(this.context, args, this.cancellationToken).ConfigureAwait(false)
                 : await this.InvokeClassBasedAsync(descriptor, args).ConfigureAwait(false);
-            return value ? TruthValue.True : TruthValue.False;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !this.cancellationToken.IsCancellationRequested)
         {
@@ -360,7 +584,7 @@ internal sealed class Evaluator<TContext>(
         }
     }
 
-    private ValueTask<bool> InvokeClassBasedAsync(PredicateDescriptor<TContext> descriptor, PredicateArguments args)
+    private ValueTask<TruthValue> InvokeClassBasedAsync(PredicateDescriptor<TContext> descriptor, PredicateArguments args)
     {
         object? instance =
             this.services.GetService(descriptor.ImplementationType!)

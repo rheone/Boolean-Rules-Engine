@@ -23,8 +23,18 @@ public sealed class IsFeatureEnabled(IFeatureFlagService flags) : IPredicate<Rul
         );
 
     /// <inheritdoc />
-    public ValueTask<bool> EvaluateAsync(RuleTestContext context, PredicateArguments args, CancellationToken cancellationToken)
+    public ValueTask<TruthValue> EvaluateAsync(
+        RuleTestContext context,
+        PredicateArguments args,
+        CancellationToken cancellationToken
+    )
     {
-        return this.flags.IsEnabledAsync(args.GetString("flagKey"), cancellationToken);
+        return this.EvaluateCoreAsync(args.GetString("flagKey"), cancellationToken);
+    }
+
+    private async ValueTask<TruthValue> EvaluateCoreAsync(string flagKey, CancellationToken cancellationToken)
+    {
+        bool enabled = await this.flags.IsEnabledAsync(flagKey, cancellationToken);
+        return enabled ? TruthValue.True : TruthValue.False;
     }
 }

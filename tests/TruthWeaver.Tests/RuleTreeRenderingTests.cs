@@ -175,7 +175,7 @@ public sealed class RuleTreeRenderingTests
     }
 
     [Theory]
-    [InlineData(OperatorStyle.Word, "AND", "OR", "NOT", "XOR", "XNOR")]
+    [InlineData(OperatorStyle.Word, "AND", "OR", "NOT", "XOR", "EQUIVALENT")]
     [InlineData(OperatorStyle.Symbolic, "∧", "∨", "¬", "⊕", "↔")]
     [InlineData(OperatorStyle.CStyle, "&&", "||", "!", "^", "==")]
     public void PlainText_renders_operators_in_the_requested_style(
@@ -191,11 +191,11 @@ public sealed class RuleTreeRenderingTests
         Assert.Contains(or, PlainTextTreePrinter.Print(BinaryNode("OR"), style));
         Assert.Contains(not, PlainTextTreePrinter.Print(UnaryNode("NOT"), style));
         Assert.Contains(xor, PlainTextTreePrinter.Print(BinaryNode("XOR"), style));
-        Assert.Contains(xnor, PlainTextTreePrinter.Print(BinaryNode("XNOR"), style));
+        Assert.Contains(xnor, PlainTextTreePrinter.Print(BinaryNode("EQUIVALENT"), style));
     }
 
     [Theory]
-    [InlineData(OperatorStyle.Word, "AND", "OR", "NOT", "XOR", "XNOR")]
+    [InlineData(OperatorStyle.Word, "AND", "OR", "NOT", "XOR", "EQUIVALENT")]
     [InlineData(OperatorStyle.Symbolic, "∧", "∨", "¬", "⊕", "↔")]
     [InlineData(OperatorStyle.CStyle, "&&", "||", "!", "^", "==")]
     public void Mermaid_renders_operators_in_the_requested_style(
@@ -211,7 +211,29 @@ public sealed class RuleTreeRenderingTests
         Assert.Contains(or, MermaidTreePrinter.Print(BinaryNode("OR"), style));
         Assert.Contains(not, MermaidTreePrinter.Print(UnaryNode("NOT"), style));
         Assert.Contains(xor, MermaidTreePrinter.Print(BinaryNode("XOR"), style));
-        Assert.Contains(xnor, MermaidTreePrinter.Print(BinaryNode("XNOR"), style));
+        Assert.Contains(xnor, MermaidTreePrinter.Print(BinaryNode("EQUIVALENT"), style));
+    }
+
+    [Theory]
+    [InlineData(OperatorStyle.Word, "NAND", "NOR")]
+    [InlineData(OperatorStyle.Symbolic, "↑", "↓")]
+    [InlineData(OperatorStyle.CStyle, "NAND", "NOR")]
+    public void PlainText_and_Mermaid_render_nand_and_nor_in_the_requested_style(OperatorStyle style, string nand, string nor)
+    {
+        Assert.Contains(nand, PlainTextTreePrinter.Print(BinaryNode("NAND"), style));
+        Assert.Contains(nand, MermaidTreePrinter.Print(BinaryNode("NAND"), style));
+        Assert.Contains(nor, PlainTextTreePrinter.Print(BinaryNode("NOR"), style));
+        Assert.Contains(nor, MermaidTreePrinter.Print(BinaryNode("NOR"), style));
+    }
+
+    [Theory]
+    [InlineData(OperatorStyle.Word, "IMPLIES")]
+    [InlineData(OperatorStyle.Symbolic, "→")]
+    [InlineData(OperatorStyle.CStyle, "IMPLIES")]
+    public void PlainText_and_Mermaid_render_implies_in_the_requested_style(OperatorStyle style, string expected)
+    {
+        Assert.Contains(expected, PlainTextTreePrinter.Print(BinaryNode("IMPLIES"), style));
+        Assert.Contains(expected, MermaidTreePrinter.Print(BinaryNode("IMPLIES"), style));
     }
 
     [Theory]

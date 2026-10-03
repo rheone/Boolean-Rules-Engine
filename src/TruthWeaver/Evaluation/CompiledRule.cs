@@ -5,9 +5,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
+using TruthWeaver.Compilation;
 using TruthWeaver.Json;
 using TruthWeaver.Printing;
 using TruthWeaver.Registry;
+using TruthWeaver.Rewriting;
 
 /// <summary>
 /// The immutable, thread-safe result of compiling a rule's text (CONTEXT.md). Safe to cache and
@@ -21,13 +23,29 @@ public sealed class CompiledRule<TContext>
     private readonly ILogger logger;
     private readonly Lazy<string> canonicalText;
 
-    internal CompiledRule(Expression root, PredicateRegistry<TContext> registry, ILogger? logger = null)
+    internal CompiledRule(
+        Expression root,
+        PredicateRegistry<TContext> registry,
+        ILogger? logger = null,
+        CollapsePolicy? collapsePolicy = null
+    )
     {
         this.Root = root;
         this.registry = registry;
         this.logger = logger ?? NullLogger.Instance;
-        this.canonicalText = new Lazy<string>(() => CanonicalPrinter.Print(this.Root));
+        this.CollapsePolicy = collapsePolicy;
+        this.canonicalText = new Lazy<string>(() => CanonicalPrinter.Print(this.Root, this.CollapsePolicy));
     }
+
+    /// <summary>
+    /// Gets the policy of the outermost <c>Collapse(expr, policy)</c> this rule was written with, or
+    /// <see langword="null"/> if it declared none (ADR-0005 decision 14). When set, <see cref="EvaluateAsync"/> applies it
+    /// to produce <see cref="Decision.Outcome"/> (and, for the two lenient policies, a definite <see cref="Decision.Result"/>).
+    /// A policy is not part of the expression tree: it is the evaluation boundary around it, so the analyzer and the
+    /// operators see only the inner expression, while <see cref="Describe"/> and the evaluated tree show the boundary as
+    /// their root.
+    /// </summary>
+    public CollapsePolicy? CollapsePolicy { get; }
 
     /// <summary>Gets this rule's canonical printed DSL text — the form <c>RuleCompiler.Compile</c> reproduces a structurally equal tree from.</summary>
     public string CanonicalText => this.canonicalText.Value;
@@ -39,11 +57,191 @@ public sealed class CompiledRule<TContext>
     /// </summary>
     internal Expression Root { get; }
 
+    /// <summary>
+    /// Prints this rule as DSL text with the chosen grouping delimiters. <see cref="GroupingStyle.Parentheses"/> returns
+    /// exactly <see cref="CanonicalText"/>; <see cref="GroupingStyle.DepthCycling"/> varies the delimiter by nesting depth
+    /// for readability. Every style re-parses to a tree equal to this rule's, because the DSL treats <c>()</c>, <c>[]</c>
+    /// and <c>{}</c> as the same grouping.
+    /// </summary>
+    /// <param name="grouping">The grouping delimiters to print with.</param>
+    /// <returns>The DSL text.</returns>
+    public string PrintRuleText(GroupingStyle grouping)
+    {
+        return grouping == GroupingStyle.Parentheses
+            ? this.CanonicalText
+            : CanonicalPrinter.Print(this.Root, this.CollapsePolicy, grouping);
+    }
+
+    /// <summary>
+    /// Rewrites every derived operator into the primitive kernel — <c>NOT</c>, <c>AND</c>, <c>OR</c>, <c>AtLeast</c>,
+    /// <c>AtMost</c>, <c>Exactly</c> and <c>COALESCE</c> — and returns the result as a new rule (ADR-0005 decision 10). The
+    /// derived operators are <c>IMPLIES</c>, <c>EQUIVALENT</c>, <c>XOR</c>, <c>NAND</c>, <c>NOR</c>, <c>NXOR</c>,
+    /// <c>ExactlyOne</c>, <c>ANY</c>, <c>ALL</c>, <c>NONE</c>, <c>BETWEEN</c>, <c>GreaterThan</c>, <c>LessThan</c>,
+    /// <c>If</c>, the four inspections and <c>Project</c>; every one of them has a kernel definition, so nothing is left
+    /// unexpanded.
+    /// </summary>
+    /// <remarks>
+    /// The result evaluates to the same <see cref="TruthValue"/> as this rule for every assignment of its terms, and
+    /// records the same faults for predicates that throw. This rule is immutable and is not changed. The declared
+    /// <see cref="CollapsePolicy"/> is an evaluation boundary rather than a derived operator and is carried over
+    /// unchanged. The expanded rule prints canonical text that compiles back to the same tree, but it is usually larger:
+    /// an operator whose definition mentions an operand twice (<c>XOR</c>, <c>EQUIVALENT</c>, <c>If</c>, the inspections)
+    /// repeats that operand's text, so deeply nested rules grow quickly and may exceed
+    /// <see cref="CompilerOptions.MaxNodeCount"/> when recompiled with the default limits.
+    /// </remarks>
+    /// <returns>A new rule over the same predicates whose tree contains only primitive operators, constants and terms.</returns>
+    public CompiledRule<TContext> ExpandToPrimitives()
+    {
+        return new CompiledRule<TContext>(PrimitiveExpander.Expand(this.Root), this.registry, this.logger, this.CollapsePolicy);
+    }
+
+    /// <summary>
+    /// Rewrites this rule so its only logical operator is <c>NAND</c>, and returns it as a new rule (ADR-0005 decision 10):
+    /// <c>NOT a</c> becomes <c>a NAND a</c>, <c>a AND b</c> becomes <c>(a NAND b) NAND (a NAND b)</c> and <c>a OR b</c>
+    /// becomes <c>(a NAND a) NAND (b NAND b)</c>; every other operator is first expanded to the primitive kernel (see
+    /// <see cref="ExpandToPrimitives"/>).
+    /// </summary>
+    /// <remarks>
+    /// The result evaluates to the same <see cref="TruthValue"/> for every assignment of its terms; this rule is not
+    /// changed and the declared <see cref="CollapsePolicy"/> is carried over. <b>One documented boundary:</b>
+    /// <c>COALESCE</c> (and therefore <c>Project</c> and the inspections <c>IsTrue</c>, <c>IsFalse</c>, <c>IsUnknown</c>,
+    /// <c>IsKnown</c>, which expand to it) cannot be written with <c>NAND</c>, because every <c>NAND</c> circuit is monotone
+    /// in the information order and <c>COALESCE</c> is not. Such nodes stay as <c>COALESCE</c> with their operands rewritten,
+    /// so a rule without them is <c>NAND</c>-only. Thresholds become a disjunction over operand subsets, so wide
+    /// thresholds grow combinatorially.
+    /// </remarks>
+    /// <returns>A new rule over the same predicates whose logic is <c>NAND</c> (plus any <c>COALESCE</c> boundary).</returns>
+    public CompiledRule<TContext> ExpandToNand()
+    {
+        return new CompiledRule<TContext>(
+            UniversalGateExpander.ToNand(this.Root),
+            this.registry,
+            this.logger,
+            this.CollapsePolicy
+        );
+    }
+
+    /// <summary>
+    /// Rewrites this rule so its only logical operator is <c>NOR</c>, and returns it as a new rule (ADR-0005 decision 10):
+    /// <c>NOT a</c> becomes <c>a NOR a</c>, <c>a OR b</c> becomes <c>(a NOR b) NOR (a NOR b)</c> and <c>a AND b</c>
+    /// becomes <c>(a NOR a) NOR (b NOR b)</c>; every other operator is first expanded to the primitive kernel.
+    /// </summary>
+    /// <remarks>
+    /// Same guarantees, cost and <c>COALESCE</c> boundary as <see cref="ExpandToNand"/>.
+    /// </remarks>
+    /// <returns>A new rule over the same predicates whose logic is <c>NOR</c> (plus any <c>COALESCE</c> boundary).</returns>
+    public CompiledRule<TContext> ExpandToNor()
+    {
+        return new CompiledRule<TContext>(
+            UniversalGateExpander.ToNor(this.Root),
+            this.registry,
+            this.logger,
+            this.CollapsePolicy
+        );
+    }
+
+    /// <summary>
+    /// Rewrites this rule into readable derived operators wherever a Strong Kleene-sound pattern matches, and returns it as a
+    /// new rule (ADR-0005 decision 10). It is the inverse direction of <see cref="ExpandToPrimitives"/>: the usual input is
+    /// an expanded rule, but any rule is accepted.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The recognised patterns are <c>OR(NOT a, b)</c> to <c>IMPLIES</c>; <c>NOT(AND(a, b))</c> and <c>OR(NOT a, NOT b)</c>
+    /// to <c>NAND</c>; <c>NOT(OR(a, b))</c> and <c>AND(NOT a, NOT b)</c> to <c>NOR</c>; the exact <c>XOR</c>,
+    /// <c>EQUIVALENT</c>, <c>If</c> and <c>NXOR</c> shapes <see cref="ExpandToPrimitives"/> produces; <c>AtLeast(1)</c> to
+    /// <c>ANY</c>, <c>AtLeast(n)</c> to <c>ALL</c>, <c>AtMost(0)</c> to <c>NONE</c> and <c>Exactly(1)</c> to
+    /// <c>ExactlyOne</c>; a matching <c>AtLeast</c>/<c>AtMost</c> pair under <c>AND</c> to <c>BETWEEN</c>; and
+    /// <c>COALESCE(x, True/False)</c> to <c>Project</c> (or <c>IsFalse</c> for <c>COALESCE(NOT x, False)</c>), with the
+    /// <c>IsUnknown</c>/<c>IsKnown</c> pairs of those. Every pattern is an identity in Strong Kleene logic, checked against a
+    /// truth-table oracle; classical-only shortcuts are never used.
+    /// </para>
+    /// <para>
+    /// The result evaluates to the same value as this rule for every <c>True</c>/<c>False</c>/<c>Unknown</c> assignment, is
+    /// never larger (in nodes) than this rule, and compressing it again changes nothing. It is not guaranteed to recover the
+    /// exact rule that was expanded, only an equivalent, no larger one that uses derived operators. Operand order inside an
+    /// <c>OR</c>/<c>AND</c> pattern may change, so the order predicates are invoked in may differ; results do not.
+    /// </para>
+    /// </remarks>
+    /// <returns>A new rule over the same predicates, with derived operators where patterns matched.</returns>
+    public CompiledRule<TContext> CompressToDerived()
+    {
+        return new CompiledRule<TContext>(Compressor.Compress(this.Root), this.registry, this.logger, this.CollapsePolicy);
+    }
+
+    /// <summary>
+    /// Rewrites this rule into its canonical form (ADR-0005 decision 10): one deterministic representation shared by every
+    /// rule that is equivalent under a fixed set of Strong Kleene-sound rewrites, so rules can be compared and de-duplicated
+    /// by their <see cref="CanonicalText"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The rewrites, applied bottom-up and repeated until stable, are: (1) exact aliases collapse to one spelling
+    /// (<c>ANY</c> and <c>AtLeast(1)</c> become <c>OR</c>, <c>ALL</c> and <c>AtLeast(n)</c> become <c>AND</c>,
+    /// <c>GreaterThan(k)</c> becomes <c>AtLeast(k + 1)</c>, <c>LessThan(k)</c> becomes <c>AtMost(k - 1)</c>,
+    /// <c>ExactlyOne</c> becomes <c>Exactly(1)</c>); (2) <c>NOT (NOT x)</c> becomes <c>x</c>; (3) an <c>AND</c> directly
+    /// inside an <c>AND</c>, an <c>OR</c> inside an <c>OR</c> and a <c>COALESCE</c> inside a <c>COALESCE</c> are flattened; (4) the operands of the
+    /// commutative operators (<c>AND</c>, <c>OR</c>, <c>XOR</c>, <c>EQUIVALENT</c>, <c>NAND</c>, <c>NOR</c>, <c>NXOR</c> and
+    /// the threshold family including <c>BETWEEN</c>) are sorted by their canonical text, ordinally; (5) repeated operands of
+    /// <c>AND</c>/<c>OR</c> are removed (idempotence). Operators whose operand order carries meaning (<c>COALESCE</c>,
+    /// <c>IMPLIES</c>, <c>If</c>) keep it. Nothing is folded and no complement law is used: <c>a OR NOT a</c> is not
+    /// <c>True</c> in Strong Kleene logic, so it stays a two-operand <c>OR</c>.
+    /// </para>
+    /// <para>
+    /// The result evaluates to the same value as this rule for every <c>True</c>/<c>False</c>/<c>Unknown</c> assignment, is
+    /// never larger than this rule, and canonicalising it again changes nothing. <b>Evaluation order is not preserved.</b>
+    /// Reordering, deduplicating and flattening operands can change which predicate runs first, which predicates run at all
+    /// once a short-circuit applies, and therefore which faults are reported; the value never changes. Because the order is
+    /// text-based, a canonical rule is for comparison and storage keys, not for performance tuning.
+    /// </para>
+    /// </remarks>
+    /// <returns>A new rule over the same predicates in canonical form.</returns>
+    public CompiledRule<TContext> Canonicalize()
+    {
+        return new CompiledRule<TContext>(
+            Canonicalizer.Canonicalize(this.Root),
+            this.registry,
+            this.logger,
+            this.CollapsePolicy
+        );
+    }
+
+    /// <summary>
+    /// Replaces this rule with an equivalent, cheaper one using only Strong Kleene-sound rewrites, and returns it as a new
+    /// rule (ADR-0005 decision 10). Starts from <see cref="Canonicalize"/>, then folds and reduces until nothing changes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Applied rewrites: constant folding through the K3 tables; identity and annihilator laws with constants
+    /// (<c>a AND True = a</c>, <c>a AND False = False</c>, <c>a OR False = a</c>, <c>a OR True = True</c>; an
+    /// <c>Unknown</c> operand is kept); idempotence, double negation and flattening (from canonicalisation); absorption
+    /// (<c>a AND (a OR b) = a</c>); De Morgan and negation-pushing only where they remove nodes; <c>COALESCE</c> and
+    /// <c>Project</c> of a known or never-<c>Unknown</c> operand; inspections of constants or never-<c>Unknown</c> operands;
+    /// <c>If</c> with a constant condition or equal branches; derived operators with a constant operand; and threshold
+    /// operators with <c>True</c>/<c>False</c> operands. Classical-only laws are <b>never</b> applied: <c>a OR NOT a</c> is
+    /// not <c>True</c>, <c>a AND NOT a</c> is not <c>False</c>, <c>a IMPLIES a</c> and <c>a EQUIVALENT a</c> are not
+    /// <c>True</c>, and complement absorption (<c>a AND (NOT a OR b) = a AND b</c>) is rejected, because each fails when
+    /// <c>a</c> is <c>Unknown</c>.
+    /// </para>
+    /// <para>
+    /// The result evaluates to the same value as this rule for every <c>True</c>/<c>False</c>/<c>Unknown</c> assignment, is
+    /// never larger (in nodes), and simplifying it again changes nothing. <b>Evaluation order and side effects are not
+    /// preserved.</b> Operands may be reordered, merged or dropped (an annihilated <c>AND</c> never evaluates its other
+    /// operands), so a predicate the original would have invoked, and any fault it would have reported, may not run;
+    /// the value never changes.
+    /// </para>
+    /// </remarks>
+    /// <returns>A new rule over the same predicates, simplified.</returns>
+    public CompiledRule<TContext> Simplify()
+    {
+        return new CompiledRule<TContext>(Simplifier.Simplify(this.Root), this.registry, this.logger, this.CollapsePolicy);
+    }
+
     /// <summary>Prints this rule to the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
     /// <returns>The JSON text.</returns>
     public string PrintJson()
     {
-        return JsonTreePrinter.Print(this.Root);
+        return JsonTreePrinter.Print(this.Root, this.CollapsePolicy);
     }
 
     /// <summary>
@@ -55,7 +253,15 @@ public sealed class CompiledRule<TContext>
     /// <returns>The root node's description, with every operand described the same way.</returns>
     public RuleDescription Describe()
     {
-        return DescribeNode(this.Root, this.registry);
+        RuleDescription inner = DescribeNode(this.Root, this.registry);
+        if (this.CollapsePolicy is not { } policy)
+        {
+            return inner;
+        }
+
+        // A declared collapse is the root of the described tree, so it mirrors the evaluated tree EvaluateAsync returns.
+        OperatorDescriptor boundary = OperatorInfo.DescribeCollapse(policy);
+        return new RuleDescription(boundary.Label, boundary.Description, [inner]);
     }
 
     /// <summary>Renders this rule's structure as Mermaid <c>flowchart</c> text, for a diagram UI.</summary>
@@ -139,11 +345,11 @@ public sealed class CompiledRule<TContext>
                 timeoutSource.Token,
                 this.logger
             );
-            return await timedEvaluator.EvaluateAsync(this.Root).ConfigureAwait(false);
+            return this.ApplyCollapse(await timedEvaluator.EvaluateAsync(this.Root).ConfigureAwait(false));
         }
 
         Evaluator<TContext> evaluator = new(context, services, this.registry, effectiveOptions, cancellationToken, this.logger);
-        return await evaluator.EvaluateAsync(this.Root).ConfigureAwait(false);
+        return this.ApplyCollapse(await evaluator.EvaluateAsync(this.Root).ConfigureAwait(false));
     }
 
     /// <inheritdoc />
@@ -209,5 +415,32 @@ public sealed class CompiledRule<TContext>
                 "This decision has no EvaluatedTree to render — it must come from EvaluateAsync on this same rule.",
                 nameof(decision)
             );
+    }
+
+    /// <summary>
+    /// Applies this rule's declared collapse, if any, to a finished evaluation. The inner result stays reachable as the
+    /// single child of the wrapped evaluated tree, faults are never touched (a rejected outcome is not a fault), and
+    /// <see cref="CollapseOutcome.RejectedUnresolved"/> leaves <see cref="Decision.Result"/> as the three-valued
+    /// <see cref="TruthValue.Unknown"/> so <see cref="Decision.IsSatisfied"/> stays fail-closed.
+    /// </summary>
+    private Decision ApplyCollapse(Decision decision)
+    {
+        if (this.CollapsePolicy is not { } policy)
+        {
+            return decision;
+        }
+
+        CollapseOutcome outcome = decision.Collapse(policy);
+        TruthValue result = outcome switch
+        {
+            CollapseOutcome.True => TruthValue.True,
+            CollapseOutcome.False => TruthValue.False,
+            _ => TruthValue.Unknown,
+        };
+
+        EvaluatedNode? tree = decision.EvaluatedTree is { } inner
+            ? new EvaluatedNode(OperatorInfo.DescribeCollapse(policy).Label, result, false, [inner])
+            : null;
+        return decision with { Result = result, EvaluatedTree = tree, Outcome = outcome };
     }
 }

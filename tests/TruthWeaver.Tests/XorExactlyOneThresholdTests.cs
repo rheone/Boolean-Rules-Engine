@@ -76,7 +76,7 @@ public sealed class XorExactlyOneThresholdTests
         );
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.XorArityViolation);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.InfixArityViolation);
     }
 
     [Theory]
@@ -172,7 +172,7 @@ public sealed class XorExactlyOneThresholdTests
         CompilationResult<RuleTestContext> reparsed = compiler.CompileJson(json);
 
         Assert.True(reparsed.Succeeded);
-        Assert.Equal("(a XNOR b)", reparsed.CompiledRule!.CanonicalText);
+        Assert.Equal("(a EQUIVALENT b)", reparsed.CompiledRule!.CanonicalText);
     }
 
     [Theory]

@@ -59,7 +59,7 @@ public sealed class LoggingTests
             logger: logger
         );
 
-        compiler.Compile("a AND NOT a");
+        compiler.Compile("a AND FALSE");
 
         LoggerTestExtensions.LoggedCall call = Assert.Single(logger.GetLoggedCalls());
         Assert.Equal(LogLevel.Warning, call.Level);

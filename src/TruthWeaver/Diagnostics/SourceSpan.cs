@@ -14,4 +14,30 @@ public readonly record struct SourceSpan(int Start, int Length)
 
     /// <summary>Gets the offset one past the last character in this span.</summary>
     public int End => this.Start + this.Length;
+
+    /// <summary>
+    /// Converts the start of this span to a 1-based line and column in <paramref name="source"/>. The offsets in a span
+    /// are into the exact string that was compiled, so pass that same string; an offset past the end of the text is
+    /// clamped to the end.
+    /// </summary>
+    /// <param name="source">The rule text this span points into.</param>
+    /// <returns>The line and column of <see cref="Start"/>.</returns>
+    public SourceLocation GetLocation(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        int offset = Math.Clamp(this.Start, 0, source.Length);
+        int line = 1;
+        int lineStart = 0;
+        for (int i = 0; i < offset; i++)
+        {
+            // "\r\n" is one break: the '\r' is skipped and the '\n' that follows it ends the line.
+            if (source[i] == '\n' || (source[i] == '\r' && !(i + 1 < source.Length && source[i + 1] == '\n')))
+            {
+                line++;
+                lineStart = i + 1;
+            }
+        }
+
+        return new SourceLocation(line, offset - lineStart + 1);
+    }
 }

@@ -32,7 +32,7 @@ public sealed class PredicateRegistryBuilder<TContext>
     /// <exception cref="ArgumentException">A predicate with the same name (case-insensitive) is already registered.</exception>
     public PredicateRegistryBuilder<TContext> Add(
         PredicateSchema schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate
     )
     {
         this.AddDescriptor(schema.Name, new PredicateDescriptor<TContext>(schema, evaluate));

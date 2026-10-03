@@ -30,14 +30,36 @@ public sealed class CanonicalPrinterTests
         Assert.Equal("(isManager XOR isDepartmentHead)", rule.CanonicalText);
     }
 
+    [Theory]
+    [InlineData("isManager ↑ isDepartmentHead", "(isManager NAND isDepartmentHead)")]
+    [InlineData("isManager nor isDepartmentHead", "(isManager NOR isDepartmentHead)")]
+    public void Nand_and_nor_are_always_parenthesized_and_printed_with_the_word_operator(string text, string expected)
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile(text).CompiledRule!;
+
+        Assert.Equal(expected, rule.CanonicalText);
+    }
+
     [Fact]
-    public void Xnor_operand_is_always_parenthesized_even_when_unnecessary_for_precedence()
+    public void Implies_is_always_parenthesized_and_printed_with_the_word_operator()
+    {
+        RuleCompiler<RuleTestContext> compiler = CreateCompiler();
+
+        CompiledRule<RuleTestContext> rule = compiler.Compile("isManager → isDepartmentHead").CompiledRule!;
+
+        Assert.Equal("(isManager IMPLIES isDepartmentHead)", rule.CanonicalText);
+    }
+
+    [Fact]
+    public void Equivalent_operand_is_always_parenthesized_even_when_unnecessary_for_precedence()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
         CompiledRule<RuleTestContext> rule = compiler.Compile("isManager XNOR isDepartmentHead").CompiledRule!;
 
-        Assert.Equal("(isManager XNOR isDepartmentHead)", rule.CanonicalText);
+        Assert.Equal("(isManager EQUIVALENT isDepartmentHead)", rule.CanonicalText);
     }
 
     [Fact]
@@ -57,13 +79,26 @@ public sealed class CanonicalPrinterTests
     [InlineData("isManager OR isDepartmentHead")]
     [InlineData("NOT isManager")]
     [InlineData("(isManager XOR isDepartmentHead)")]
+    [InlineData("NXOR(isManager, isDepartmentHead, isManager)")]
+    [InlineData("ANY(isManager, isDepartmentHead, isManager)")]
+    [InlineData("ALL(isManager, isDepartmentHead, isManager)")]
+    [InlineData("NONE(isManager, isDepartmentHead, isManager)")]
+    [InlineData("BETWEEN(1, 2, isManager, isDepartmentHead, isManager)")]
+    [InlineData("COALESCE(isManager, isDepartmentHead, isManager)")]
+    [InlineData("If(isManager, isDepartmentHead, isManager)")]
+    [InlineData("IsTrue(isManager)")]
+    [InlineData("IsFalse(isManager AND isDepartmentHead)")]
+    [InlineData("IsUnknown(isManager)")]
+    [InlineData("IsKnown(NOT isManager)")]
+    [InlineData("Project(isManager, True)")]
+    [InlineData("Project(isManager AND isDepartmentHead, False)")]
     [InlineData("ExactlyOne(isManager, isDepartmentHead, isManager)")]
     [InlineData("AtLeast(2, isManager, isDepartmentHead, isManager)")]
     [InlineData("AtMost(1, isManager, isDepartmentHead, isManager)")]
     [InlineData("GreaterThan(1, isManager, isDepartmentHead, isManager)")]
     [InlineData("LessThan(2, isManager, isDepartmentHead, isManager)")]
     [InlineData("Exactly(2, isManager, isDepartmentHead, isManager)")]
-    [InlineData("(isManager XNOR isDepartmentHead)")]
+    [InlineData("(isManager EQUIVALENT isDepartmentHead)")]
     [InlineData("hasRole(role: \"Y\")")]
     [InlineData("true")]
     [InlineData("false")]

@@ -9,7 +9,7 @@ public sealed class DslParserTests
     [Fact]
     public void Trailing_garbage_after_a_complete_expression_raises_a_diagnostic_and_still_parses_the_valid_prefix()
     {
-        (RuleNode root, IReadOnlyList<Diagnostic> diagnostics) = DslParser.Parse("a AND b )");
+        (RuleNode root, IReadOnlyList<Diagnostic> diagnostics) = DslParser.Parse("a AND b c");
 
         Assert.IsType<AndNode>(root);
         Assert.Contains(
@@ -39,7 +39,7 @@ public sealed class DslParserTests
     {
         (RuleNode _, IReadOnlyList<Diagnostic> diagnostics) = DslParser.Parse("a XOR b XNOR c");
 
-        Assert.Contains(diagnostics, d => d.Message.Contains("Mixing XOR with XNOR"));
+        Assert.Contains(diagnostics, d => d.Message.Contains("Mixing XOR with EQUIVALENT"));
     }
 
     [Theory]
@@ -49,7 +49,7 @@ public sealed class DslParserTests
     {
         (RuleNode _, IReadOnlyList<Diagnostic> diagnostics) = DslParser.Parse(source);
 
-        Assert.DoesNotContain(diagnostics, d => d.Message.Contains("Mixing XOR with XNOR"));
+        Assert.DoesNotContain(diagnostics, d => d.Message.Contains("Mixing XOR with EQUIVALENT"));
     }
 
     [Theory]

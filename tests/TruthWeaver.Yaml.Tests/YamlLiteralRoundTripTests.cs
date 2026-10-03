@@ -24,7 +24,7 @@ public sealed class YamlLiteralRoundTripTests
                         "True iff 'id' equals the expected value.",
                         [new PredicateArgumentSchema("id", "The id to compare against.", LiteralKind.Guid)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetGuid("id") == id)
+                    (_, args, _) => ValueTask.FromResult(args.GetGuid("id") == id ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );
@@ -51,7 +51,8 @@ public sealed class YamlLiteralRoundTripTests
                         "True iff 'cutoff' equals the expected value.",
                         [new PredicateArgumentSchema("cutoff", "The cutoff to compare against.", LiteralKind.DateTimeOffset)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetDateTimeOffset("cutoff") == cutoff)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetDateTimeOffset("cutoff") == cutoff ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );
@@ -76,7 +77,8 @@ public sealed class YamlLiteralRoundTripTests
                         "True iff any of 'roles' matches.",
                         [new PredicateArgumentSchema("roles", "The role codes to check for.", LiteralKind.StringArray)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetStringArray("roles").Count > 0)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetStringArray("roles").Count > 0 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );
@@ -147,7 +149,8 @@ public sealed class YamlLiteralRoundTripTests
                         "True iff 'threshold' equals the expected value.",
                         [new PredicateArgumentSchema("threshold", "The threshold to compare against.", LiteralKind.Decimal)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetDecimal("threshold") == 12.5m)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetDecimal("threshold") == 12.5m ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );
@@ -173,7 +176,8 @@ public sealed class YamlLiteralRoundTripTests
                         "True iff any of 'codes' matches.",
                         [new PredicateArgumentSchema("codes", "The codes to check for.", LiteralKind.Int64Array)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetInt64Array("codes").Count > 0)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetInt64Array("codes").Count > 0 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );
@@ -199,7 +203,8 @@ public sealed class YamlLiteralRoundTripTests
                         "True iff any of 'flags' matches.",
                         [new PredicateArgumentSchema("flags", "The flags to check for.", LiteralKind.BooleanArray)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetBoolArray("flags").Count > 0)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetBoolArray("flags").Count > 0 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );

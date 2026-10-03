@@ -16,10 +16,22 @@ internal static class YamlTreePrinter
 {
     /// <summary>Prints an expression tree to YAML tree text.</summary>
     /// <param name="root">The tree to print.</param>
+    /// <param name="collapse">
+    /// The outermost <c>Collapse</c> policy the rule declared, or <see langword="null"/>. When present the tree is wrapped
+    /// in a <c>collapse</c> node carrying the <c>policy</c>, the only position the compiler accepts it.
+    /// </param>
     /// <returns>The YAML text.</returns>
-    public static string Print(Expression root)
+    public static string Print(Expression root, CollapsePolicy? collapse = null)
     {
-        YamlDocument document = new(ToNode(root));
+        YamlNode node = ToNode(root);
+        if (collapse is { } policy)
+        {
+            YamlMappingNode wrapper = OperatorNode(TreeFormatOpNames.ToTreeFormat("Collapse"), [node]);
+            wrapper.Add(new YamlScalarNode("policy"), Scalar(CollapsePolicyText.TreeFormat(policy), ScalarStyle.Plain));
+            node = wrapper;
+        }
+
+        YamlDocument document = new(node);
         YamlStream stream = new(document);
         using StringWriter writer = new();
         stream.Save(writer, assignAnchors: false);
@@ -30,7 +42,7 @@ internal static class YamlTreePrinter
     {
         if (node is ConstantExpression c)
         {
-            return Mapping(("const", Scalar(c.Value ? "true" : "false", ScalarStyle.Plain)));
+            return Mapping(("const", Scalar(TruthValueText.TreeFormat(c.Value), ScalarStyle.Plain)));
         }
 
         if (node is TermExpression t)
@@ -40,6 +52,26 @@ internal static class YamlTreePrinter
 
         NodeShape shape = ExpressionShape.Of(node);
         string op = TreeFormatOpNames.ToTreeFormat(shape.OpName);
+        if (shape.UnknownAs is { } unknownAs)
+        {
+            // Project carries its policy as a plain true/false scalar, like a True/False const.
+            YamlMappingNode project = OperatorNode(op, shape.Operands.Select(ToNode));
+            project.Add(
+                new YamlScalarNode("unknownAs"),
+                Scalar(TruthValueText.TreeFormat(unknownAs ? TruthValue.True : TruthValue.False), ScalarStyle.Plain)
+            );
+            return project;
+        }
+
+        if (shape is { K: { } min, Max: { } max })
+        {
+            // BETWEEN carries its two bounds as min/max instead of a single threshold k.
+            YamlMappingNode between = OperatorNode(op, shape.Operands.Select(ToNode));
+            between.Add(new YamlScalarNode("min"), Scalar(min.ToString(CultureInfo.InvariantCulture), ScalarStyle.Plain));
+            between.Add(new YamlScalarNode("max"), Scalar(max.ToString(CultureInfo.InvariantCulture), ScalarStyle.Plain));
+            return between;
+        }
+
         return shape.K is { } k
             ? OperatorNodeWithThreshold(op, k, shape.Operands.Select(ToNode))
             : OperatorNode(op, shape.Operands.Select(ToNode));

@@ -119,7 +119,7 @@ public sealed class YamlTreeTests
         CompiledRule<RuleTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
 
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
-        Assert.Contains("op: xnor", yaml, StringComparison.Ordinal);
+        Assert.Contains("op: equivalent", yaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -235,7 +235,7 @@ public sealed class YamlTreeTests
     [InlineData("not: [valid, yaml: [", "Malformed YAML:")]
     [InlineData("", "The YAML document is empty.")]
     [InlineData("- just\n- a\n- sequence", "Expected a YAML mapping node but found")]
-    [InlineData("const: notabool", "'const' must be a YAML boolean.")]
+    [InlineData("const: notabool", "'const' must be a YAML boolean or one of")]
     [InlineData("predicate: [not, a, string]", "'predicate' must be a YAML string.")]
     [InlineData("predicate: isManager\nargs: [not, a, mapping]", "'args' must be a YAML mapping.")]
     [InlineData("predicate: isManager\nargs:\n  ? [not, a, scalar]\n  : true", "An argument name must be a YAML string.")]

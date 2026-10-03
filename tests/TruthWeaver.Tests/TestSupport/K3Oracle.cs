@@ -1,0 +1,301 @@
+namespace TruthWeaver.Tests.TestSupport;
+
+using TruthWeaver.Abstractions;
+
+/// <summary>
+/// An independent Strong Kleene (K3) truth-table oracle for conformance tests. It computes the
+/// expected result of an operator from the primitive definitions only (<c>NOT</c>, <c>AND</c>,
+/// <c>OR</c>, and cardinality over the "definitely true / possibly true" interval) and deliberately
+/// shares no code with <c>Evaluator</c>, so a defect in the engine cannot also hide in its own
+/// expectation. See ADR-0005 and the k3-conformance spec.
+/// </summary>
+/// <remarks>
+/// <c>False &lt; Unknown &lt; True</c> is used here only as an implementation aid (min/max for
+/// <c>AND</c>/<c>OR</c>); it is not a numeric ordering of truth.
+/// </remarks>
+public static class K3Oracle
+{
+    /// <summary>Gets the three K3 values in a stable enumeration order.</summary>
+    public static IReadOnlyList<TruthValue> Values { get; } = [TruthValue.False, TruthValue.Unknown, TruthValue.True];
+
+    /// <summary>Every assignment of K3 values to <paramref name="arity"/> operands (3^arity rows).</summary>
+    /// <param name="arity">The number of operands.</param>
+    /// <returns>All assignments, first operand varying slowest.</returns>
+    public static IEnumerable<TruthValue[]> Assignments(int arity)
+    {
+        int rows = 1;
+        for (int i = 0; i < arity; i++)
+        {
+            rows *= Values.Count;
+        }
+
+        for (int row = 0; row < rows; row++)
+        {
+            TruthValue[] assignment = new TruthValue[arity];
+            int remainder = row;
+            for (int i = arity - 1; i >= 0; i--)
+            {
+                assignment[i] = Values[remainder % Values.Count];
+                remainder /= Values.Count;
+            }
+
+            yield return assignment;
+        }
+    }
+
+    /// <summary>Strong Kleene negation: swaps <c>True</c>/<c>False</c>, fixes <c>Unknown</c>.</summary>
+    public static TruthValue Not(TruthValue value)
+    {
+        return value switch
+        {
+            TruthValue.True => TruthValue.False,
+            TruthValue.False => TruthValue.True,
+            _ => TruthValue.Unknown,
+        };
+    }
+
+    /// <summary>Strong Kleene conjunction: <c>False</c> dominates, then <c>Unknown</c>, else <c>True</c>.</summary>
+    public static TruthValue And(IEnumerable<TruthValue> operands)
+    {
+        TruthValue result = TruthValue.True;
+        foreach (TruthValue operand in operands)
+        {
+            if (operand == TruthValue.False)
+            {
+                return TruthValue.False;
+            }
+
+            if (operand == TruthValue.Unknown)
+            {
+                result = TruthValue.Unknown;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>Strong Kleene disjunction: <c>True</c> dominates, then <c>Unknown</c>, else <c>False</c>.</summary>
+    public static TruthValue Or(IEnumerable<TruthValue> operands)
+    {
+        TruthValue result = TruthValue.False;
+        foreach (TruthValue operand in operands)
+        {
+            if (operand == TruthValue.True)
+            {
+                return TruthValue.True;
+            }
+
+            if (operand == TruthValue.Unknown)
+            {
+                result = TruthValue.Unknown;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>Binary XOR: <c>Unknown</c> if either operand is <c>Unknown</c>, else exclusive-or of the two.</summary>
+    public static TruthValue Xor(TruthValue left, TruthValue right)
+    {
+        return Or([And([left, Not(right)]), And([Not(left), right])]);
+    }
+
+    /// <summary>
+    /// N-ary parity: <c>Unknown</c> whenever any operand is <c>Unknown</c>, otherwise <c>True</c> for an odd number of
+    /// <c>True</c> operands. Built by folding <see cref="Xor"/>, which is itself defined from the primitives.
+    /// </summary>
+    /// <param name="operands">The operand values (at least one).</param>
+    public static TruthValue Nxor(IReadOnlyList<TruthValue> operands)
+    {
+        TruthValue result = operands[0];
+        for (int i = 1; i < operands.Count; i++)
+        {
+            result = Xor(result, operands[i]);
+        }
+
+        return result;
+    }
+
+    /// <summary>Strong Kleene material implication, defined from the primitives as <c>NOT left OR right</c>.</summary>
+    public static TruthValue Implies(TruthValue left, TruthValue right)
+    {
+        return Or([Not(left), right]);
+    }
+
+    /// <summary>Negated conjunction, defined from the primitives as <c>NOT (left AND right)</c>.</summary>
+    public static TruthValue Nand(TruthValue left, TruthValue right)
+    {
+        return Not(And([left, right]));
+    }
+
+    /// <summary>Negated disjunction, defined from the primitives as <c>NOT (left OR right)</c>.</summary>
+    public static TruthValue Nor(TruthValue left, TruthValue right)
+    {
+        return Not(Or([left, right]));
+    }
+
+    /// <summary>Binary biconditional: the negation of <see cref="Xor"/>.</summary>
+    public static TruthValue Equivalent(TruthValue left, TruthValue right)
+    {
+        return Not(Xor(left, right));
+    }
+
+    /// <summary>
+    /// Cardinality over the interval semantics: the true-count lies in
+    /// <c>[definitelyTrue, definitelyTrue + unknown]</c>. The result is <c>True</c> if every count in
+    /// that interval satisfies <paramref name="satisfies"/>, <c>False</c> if none does, else <c>Unknown</c>.
+    /// </summary>
+    /// <param name="satisfies">The predicate on the number of true operands.</param>
+    /// <param name="operands">The operand values.</param>
+    public static TruthValue Cardinality(Func<int, bool> satisfies, IReadOnlyList<TruthValue> operands)
+    {
+        int definitelyTrue = operands.Count(v => v == TruthValue.True);
+        int unknown = operands.Count(v => v == TruthValue.Unknown);
+
+        bool anySatisfies = false;
+        bool allSatisfy = true;
+        for (int count = definitelyTrue; count <= definitelyTrue + unknown; count++)
+        {
+            bool ok = satisfies(count);
+            anySatisfies |= ok;
+            allSatisfy &= ok;
+        }
+
+        if (allSatisfy)
+        {
+            return TruthValue.True;
+        }
+
+        return anySatisfies ? TruthValue.Unknown : TruthValue.False;
+    }
+
+    /// <summary><c>ANY</c>: <c>AtLeast(1, ...)</c> over the interval semantics.</summary>
+    public static TruthValue Any(IReadOnlyList<TruthValue> operands)
+    {
+        return Cardinality(c => c >= 1, operands);
+    }
+
+    /// <summary><c>ALL</c>: <c>AtLeast(n, ...)</c> for the <c>n</c> operands, over the interval semantics.</summary>
+    public static TruthValue All(IReadOnlyList<TruthValue> operands)
+    {
+        return Cardinality(c => c >= operands.Count, operands);
+    }
+
+    /// <summary><c>NONE</c>: <c>AtMost(0, ...)</c> over the interval semantics.</summary>
+    public static TruthValue None(IReadOnlyList<TruthValue> operands)
+    {
+        return Cardinality(c => c <= 0, operands);
+    }
+
+    /// <summary>
+    /// <c>BETWEEN(min, max, ...)</c>: <c>AND(AtLeast(min, ...), AtMost(max, ...))</c>, each side over the interval
+    /// semantics, combined with the primitive <see cref="And"/>.
+    /// </summary>
+    /// <param name="min">The inclusive lower bound on the true-count.</param>
+    /// <param name="max">The inclusive upper bound on the true-count.</param>
+    /// <param name="operands">The operand values.</param>
+    public static TruthValue Between(int min, int max, IReadOnlyList<TruthValue> operands)
+    {
+        return And([Cardinality(c => c >= min, operands), Cardinality(c => c <= max, operands)]);
+    }
+
+    /// <summary>
+    /// <c>COALESCE</c>: the first operand that is not <c>Unknown</c> (<c>True</c> and <c>False</c> pass through);
+    /// <c>Unknown</c> when every operand is <c>Unknown</c>. Defined directly because no K3 connective can detect
+    /// "is Unknown".
+    /// </summary>
+    /// <param name="operands">The operand values, in priority order.</param>
+    public static TruthValue Coalesce(IReadOnlyList<TruthValue> operands)
+    {
+        foreach (TruthValue operand in operands)
+        {
+            if (operand != TruthValue.Unknown)
+            {
+                return operand;
+            }
+        }
+
+        return TruthValue.Unknown;
+    }
+
+    /// <summary>
+    /// <c>If(condition, whenTrue, whenFalse)</c>, defined from the primitives as the multiplexer
+    /// <c>(c AND t) OR (NOT c AND f)</c> plus its consensus term <c>(t AND f)</c>. Without the consensus term an
+    /// <c>Unknown</c> condition would turn <c>If(U, T, T)</c> into <c>Unknown</c>; with it the result is the branch value
+    /// whenever both branches agree (the reference specification's "an Unknown condition does not guess a branch").
+    /// For a definite condition the consensus term never changes the multiplexer's value.
+    /// </summary>
+    /// <param name="condition">The condition's value.</param>
+    /// <param name="whenTrue">The value of the branch taken when the condition is <c>True</c>.</param>
+    /// <param name="whenFalse">The value of the branch taken when the condition is <c>False</c>.</param>
+    public static TruthValue If(TruthValue condition, TruthValue whenTrue, TruthValue whenFalse)
+    {
+        return Or([And([condition, whenTrue]), And([Not(condition), whenFalse]), And([whenTrue, whenFalse])]);
+    }
+
+    /// <summary><c>IsTrue</c>: <c>True</c> when the operand is <c>True</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsTrue(TruthValue value)
+    {
+        return value == TruthValue.True ? TruthValue.True : TruthValue.False;
+    }
+
+    /// <summary><c>IsFalse</c>: <c>True</c> when the operand is <c>False</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsFalse(TruthValue value)
+    {
+        return value == TruthValue.False ? TruthValue.True : TruthValue.False;
+    }
+
+    /// <summary><c>IsUnknown</c>: <c>True</c> when the operand is <c>Unknown</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsUnknown(TruthValue value)
+    {
+        return value == TruthValue.Unknown ? TruthValue.True : TruthValue.False;
+    }
+
+    /// <summary><c>IsKnown</c>: <c>True</c> when the operand is <c>True</c> or <c>False</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsKnown(TruthValue value)
+    {
+        return value == TruthValue.Unknown ? TruthValue.False : TruthValue.True;
+    }
+
+    /// <summary>
+    /// <c>Project(x, unknownAs)</c>: keeps <c>True</c>/<c>False</c> and replaces <c>Unknown</c> with
+    /// <paramref name="unknownAs"/>. Defined from the primitive <see cref="Coalesce"/> as <c>COALESCE(x, unknownAs)</c>
+    /// (ADR-0005 decision 12), so the result is always definite.
+    /// </summary>
+    /// <param name="value">The operand's value.</param>
+    /// <param name="unknownAs">The definite value that replaces <c>Unknown</c>.</param>
+    public static TruthValue Project(TruthValue value, TruthValue unknownAs)
+    {
+        return Coalesce([value, unknownAs]);
+    }
+
+    /// <summary>
+    /// The collapse boundary (ADR-0005 decision 14), defined from the inspections: <c>UnknownAsFalse</c> accepts only a
+    /// <c>True</c>, <c>UnknownAsTrue</c> refuses only a <c>False</c>, and <c>UnknownIsError</c> rejects exactly the
+    /// <c>Unknown</c> case.
+    /// </summary>
+    /// <param name="value">The K3 result being collapsed.</param>
+    /// <param name="policy">The collapse policy.</param>
+    public static CollapseOutcome Collapse(TruthValue value, CollapsePolicy policy)
+    {
+        if (IsUnknown(value) == TruthValue.True)
+        {
+            return policy switch
+            {
+                CollapsePolicy.UnknownAsFalse => CollapseOutcome.False,
+                CollapsePolicy.UnknownAsTrue => CollapseOutcome.True,
+                CollapsePolicy.UnknownIsError => CollapseOutcome.RejectedUnresolved,
+                _ => throw new ArgumentOutOfRangeException(nameof(policy)),
+            };
+        }
+
+        // A known value maps to itself under every policy.
+        return IsTrue(value) == TruthValue.True ? CollapseOutcome.True : CollapseOutcome.False;
+    }
+
+    /// <summary>Exactly-one-true over the interval semantics (not parity).</summary>
+    public static TruthValue ExactlyOne(IReadOnlyList<TruthValue> operands)
+    {
+        return Cardinality(c => c == 1, operands);
+    }
+}

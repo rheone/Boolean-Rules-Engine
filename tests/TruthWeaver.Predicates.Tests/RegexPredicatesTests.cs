@@ -8,43 +8,43 @@ public class RegexPredicatesTests
     [Fact]
     public async Task Matches_MatchingPattern_ReturnsTrue()
     {
-        (PredicateSchema schema, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (PredicateSchema schema, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             RegexPredicates.Matches<TestContext>("matchesEmail", c => c.Value);
 
-        bool result = await evaluate(
+        TruthValue result = await evaluate(
             new TestContext("alice@example.com"),
             Args("pattern", @"^\S+@\S+\.\S+$"),
             CancellationToken.None
         );
 
-        Assert.True(result);
+        Assert.Equal(TruthValue.True, result);
         Assert.Equal("matchesEmail", schema.Name);
     }
 
     [Fact]
     public async Task Matches_NonMatchingPattern_ReturnsFalse()
     {
-        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             RegexPredicates.Matches<TestContext>("matchesEmail", c => c.Value);
 
-        bool result = await evaluate(
+        TruthValue result = await evaluate(
             new TestContext("not-an-email"),
             Args("pattern", @"^\S+@\S+\.\S+$"),
             CancellationToken.None
         );
 
-        Assert.False(result);
+        Assert.Equal(TruthValue.False, result);
     }
 
     [Fact]
     public async Task Matches_NullSelectedValue_ReturnsFalse()
     {
-        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             RegexPredicates.Matches<TestContext>("matchesEmail", c => c.Value);
 
-        bool result = await evaluate(new TestContext(null), Args("pattern", @"^\S+@\S+\.\S+$"), CancellationToken.None);
+        TruthValue result = await evaluate(new TestContext(null), Args("pattern", @"^\S+@\S+\.\S+$"), CancellationToken.None);
 
-        Assert.False(result);
+        Assert.Equal(TruthValue.False, result);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class RegexPredicatesTests
         // ADR-0001's Kleene failure model: the predicate contract signals "cannot determine this" by
         // simply throwing, and the evaluator (not this package) is what turns that into Unknown. This
         // package's job here is only to confirm it does not silently swallow the invalid pattern.
-        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             RegexPredicates.Matches<TestContext>("matchesEmail", c => c.Value);
 
         return Assert.ThrowsAsync<RegexParseException>(async () =>
@@ -64,14 +64,14 @@ public class RegexPredicatesTests
     [Fact]
     public async Task Matches_SamePatternReusedAcrossCalls_UsesCachedRegex()
     {
-        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate) =
+        (_, Func<TestContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate) =
             RegexPredicates.Matches<TestContext>("matchesDigits", c => c.Value);
 
-        bool first = await evaluate(new TestContext("123"), Args("pattern", @"^\d+$"), CancellationToken.None);
-        bool second = await evaluate(new TestContext("456"), Args("pattern", @"^\d+$"), CancellationToken.None);
+        TruthValue first = await evaluate(new TestContext("123"), Args("pattern", @"^\d+$"), CancellationToken.None);
+        TruthValue second = await evaluate(new TestContext("456"), Args("pattern", @"^\d+$"), CancellationToken.None);
 
-        Assert.True(first);
-        Assert.True(second);
+        Assert.Equal(TruthValue.True, first);
+        Assert.Equal(TruthValue.True, second);
     }
 
     private static PredicateArguments Args(string name, string value)

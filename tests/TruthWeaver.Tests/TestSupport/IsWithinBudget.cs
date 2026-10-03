@@ -29,7 +29,7 @@ public sealed class IsWithinBudget(IBudgetLookupService budget) : IPredicate<Pur
         );
 
     /// <inheritdoc />
-    public async ValueTask<bool> EvaluateAsync(
+    public async ValueTask<TruthValue> EvaluateAsync(
         PurchaseRequestContext context,
         PredicateArguments args,
         CancellationToken cancellationToken
@@ -37,6 +37,6 @@ public sealed class IsWithinBudget(IBudgetLookupService budget) : IPredicate<Pur
     {
         string costCenterCode = args.GetString("costCenterCode");
         decimal limit = await this.budget.ResolveLimitAsync(costCenterCode, cancellationToken);
-        return context.Amount <= limit;
+        return context.Amount <= limit ? TruthValue.True : TruthValue.False;
     }
 }

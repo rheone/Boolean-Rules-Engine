@@ -15,7 +15,7 @@ public static class TestPredicates
     {
         return builder.Add(
             PredicateSchema.NoArguments(name, name, $"Test predicate '{name}', always {value}."),
-            (_, _, _) => ValueTask.FromResult(value)
+            (_, _, _) => ValueTask.FromResult(value ? TruthValue.True : TruthValue.False)
         );
     }
 
@@ -35,7 +35,11 @@ public static class TestPredicates
                 [new PredicateArgumentSchema(argumentName, $"The value to compare against '{matchValue}'.", LiteralKind.String)]
             ),
             (_, args, _) =>
-                ValueTask.FromResult(string.Equals(args.GetString(argumentName), matchValue, StringComparison.Ordinal))
+                ValueTask.FromResult(
+                    string.Equals(args.GetString(argumentName), matchValue, StringComparison.Ordinal)
+                        ? TruthValue.True
+                        : TruthValue.False
+                )
         );
     }
 }

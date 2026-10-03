@@ -100,7 +100,7 @@ public sealed class RuleBuilderTests
             .CompiledRule!;
 
         Assert.Equal("(a XOR b)", viaXorBuilder.CanonicalText);
-        Assert.Equal("(a XNOR b)", viaXnorBuilder.CanonicalText);
+        Assert.Equal("(a EQUIVALENT b)", viaXnorBuilder.CanonicalText);
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class RuleBuilderTests
 
         CompiledRule<RuleTestContext> rule = RuleBuilder.Constant(true).Compile(compiler).CompiledRule!;
 
-        Assert.Equal("true", rule.CanonicalText);
+        Assert.Equal("True", rule.CanonicalText);
     }
 
     [Theory]
@@ -242,7 +242,7 @@ public sealed class RuleBuilderTests
                         "True iff 'code' equals 7.",
                         [new PredicateArgumentSchema("code", "The code to compare against 7.", LiteralKind.Int64)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetInt64("code") == 7)
+                    (_, args, _) => ValueTask.FromResult(args.GetInt64("code") == 7 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );
@@ -271,7 +271,7 @@ public sealed class RuleBuilderTests
                         "True iff 'code' equals 7.",
                         [new PredicateArgumentSchema("code", "The code to compare against 7.", LiteralKind.Int64)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetInt64("code") == 7)
+                    (_, args, _) => ValueTask.FromResult(args.GetInt64("code") == 7 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );
@@ -365,7 +365,8 @@ public sealed class RuleBuilderTests
                         "True iff any of 'codes' matches.",
                         [new PredicateArgumentSchema("codes", "The codes to check for.", LiteralKind.Int64Array)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetInt64Array("codes").Count > 0)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetInt64Array("codes").Count > 0 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );

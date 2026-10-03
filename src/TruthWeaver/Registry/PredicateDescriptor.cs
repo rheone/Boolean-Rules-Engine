@@ -15,7 +15,7 @@ internal sealed class PredicateDescriptor<TContext>
     /// <param name="evaluate">The stateless evaluation function.</param>
     public PredicateDescriptor(
         PredicateSchema schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> evaluate
     )
     {
         this.Schema = schema;
@@ -35,7 +35,7 @@ internal sealed class PredicateDescriptor<TContext>
     public PredicateSchema Schema { get; }
 
     /// <summary>Gets the stateless evaluation lambda, if this descriptor was registered that way.</summary>
-    public Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>>? Evaluate { get; }
+    public Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>>? Evaluate { get; }
 
     /// <summary>Gets the class-based implementation type, if this descriptor was registered that way.</summary>
     public Type? ImplementationType { get; }

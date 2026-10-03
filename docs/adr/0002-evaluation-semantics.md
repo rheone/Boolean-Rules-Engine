@@ -26,14 +26,16 @@ public interface IPredicate<in TContext>
 {
     static abstract PredicateSchema Schema { get; }
 
-    ValueTask<bool> EvaluateAsync(
+    ValueTask<TruthValue> EvaluateAsync(
         TContext context,
         PredicateArguments args,
         CancellationToken cancellationToken);
 }
 ```
 
-Predicates return `ValueTask<bool>` and take a required `CancellationToken`
+Predicates return `ValueTask<TruthValue>` (originally `ValueTask<bool>`; changed by
+[ADR-0005](0005-strong-k3-language-surface.md) decision 15 so a predicate can answer
+`Unknown` directly) and take a required `CancellationToken`
 (no default-cancellation-token overload on the evaluation path). This engine's
 primary consumers do I/O — a database lookup, an HTTP call, a config read via
 `IOptions<T>` — and async is the only choice that doesn't force every
@@ -50,8 +52,9 @@ missing or mistyped argument is a compile diagnostic
 inside `EvaluateAsync`.
 
 A predicate signals a fault by throwing (see
-[ADR-0001](0001-kleene-failure-model.md)); it may also return a value from an
-explicit "unknown" pathway for authors who want to express indeterminacy
+[ADR-0001](0001-kleene-failure-model.md)); it may also return `TruthValue.Unknown`
+directly ([ADR-0005](0005-strong-k3-language-surface.md) decision 15, which makes the
+"explicit unknown pathway" a plain return value that records no fault) for authors who want to express indeterminacy
 without treating it as exceptional, but throwing on genuine failure (a
 timeout, a connection failure) is the expected, low-friction path and
 requires no special handling by the predicate author beyond letting the
@@ -77,6 +80,10 @@ internally); the engine has no special knowledge of time and makes no
 determinism claim spanning evaluations.
 
 ### Left-to-right, short-circuit, no implicit concurrency
+
+> **Extended by [ADR-0005](0005-strong-k3-language-surface.md):** `COALESCE` and `If` also
+> short-circuit (a known value, or the needed branch for a definite condition), and `NAND`/`NOR`
+> evaluate both operands. The rule below describes `AND`/`OR`, which are unchanged.
 
 Operands are evaluated strictly left to right. `AND` stops as soon as a
 `False` is reached (see the Kleene tables in

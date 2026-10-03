@@ -9,10 +9,11 @@ capabilities intentionally left out of the current design.
 
 ## What this is
 
-A general-purpose boolean expression engine for .NET. A **rule** is authored
-as text, compiled once into an immutable tree, and evaluated many times
-against an application-supplied context. It answers *"is this expression
-true right now, for this context?"* — nothing more.
+A general-purpose **Strong Kleene (K3)** expression engine for .NET. A **rule**
+is authored as text, compiled once into an immutable tree, and evaluated many
+times against an application-supplied context. It answers *"what is the truth
+value of this expression right now, for this context?"* — `True`, `False` or
+`Unknown` — nothing more.
 
 It is not an authorization engine, a workflow engine, or a policy engine.
 Those are all things you can *build on top of it* — permission checks
@@ -27,13 +28,18 @@ an authorization layer is intentionally out of scope.
 | Term | Definition |
 | --- | --- |
 | **Rule** | A named, versioned unit of persistence: metadata plus one `Expression`. |
-| **Expression** | The boolean tree: operators over terms and sub-expressions. |
+| **Expression** | The three-valued tree: operators over terms, constants and sub-expressions. Every expression evaluates to exactly one `TruthValue`. |
 | **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasTopping` or `lovesPineapple`. The *function*, not any particular call to it. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
-| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `true`/`false`. Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
+| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT` (aliases `IFF`, legacy `XNOR`), `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN(min, max)`, `COALESCE` (infix `??`), `If` (ternary `c ? t : f`), the inspections `IsTrue`/`IsFalse`/`IsUnknown`/`IsKnown`, `Project(x, True)`/`Project(x, False)`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `True`/`False`/`Unknown` (case-insensitive; printed upper camel). Operator names are case-insensitive on input and most have a symbol spelling (`&&` `||` `!` `∧` `∨` `¬` `⊕` `→` `↔` `↑` `↓` `??` `? :`); every spelling compiles to the same node and the canonical form is the upper camel word. Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
-| **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |
-| **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. |
+| **Collapse** | The final boundary (not an operator) that turns a three-valued result into a two-valued answer under a **CollapsePolicy** (`UnknownAsFalse`, `UnknownAsTrue`, `UnknownIsError`), producing a **CollapseOutcome** (`True`, `False`, `RejectedUnresolved`). Available as `Decision.Collapse(policy)` at the API, and as the DSL function `Collapse(expr, policy)`, which is accepted only as a rule's outermost expression (`NestedCollapse` otherwise). `RejectedUnresolved` means "not known"; it is a normal outcome, not a **Fault**, and `Decision.IsSatisfied` stays fail-closed (true only for `True`). |
+| **Inspection** | `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`: operators that test the K3 state of their operand. They always yield a definite `True`/`False`, so they never make the enclosing rule `Unknown`. |
+| **Project** | `Project(x, True)` / `Project(x, False)`: an in-tree boundary that keeps `True`/`False` and replaces only `Unknown` with the chosen constant. Equal to `COALESCE(x, value)`; may appear anywhere in a rule. |
+| **Rewrite** | An opt-in, value-preserving transform of a compiled rule that returns a new rule: `ExpandToPrimitives`, `ExpandToNand`, `ExpandToNor`, `CompressToDerived`, `Canonicalize`, `Simplify`. The compiler never rewrites on its own. Whitespace tidying of rule text (`RuleText.NormalizeWhitespace`) and depth-varying delimiters (`PrintRuleText(GroupingStyle)`) are text-level formatting, not rewrites. |
+| **Diagnostic** | One structured compile-time problem: a stable code, severity, message, source span (DSL) or `Path` (JSON/YAML), optional expected/found text and a `DiagnosticSuggestion` ("did you mean", or a hint). |
+| **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. A predicate returns one directly (`ValueTask<TruthValue>`); `Unknown` is never implicitly converted to `True` or `False` outside an explicit boundary (`Project`, `Collapse`, the `Decision` API). `False < Unknown < True` is an implementation aid, not a numeric order of truth. |
+| **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. A predicate that simply returns `Unknown` is a normal answer and records no fault. |
 | **CompiledRule** | The immutable, thread-safe result of compiling a rule's text. Safe to cache and share; compile once, evaluate many times. |
 | **PredicateRegistry** | Where predicate implementations are registered under a name, with their argument schema. Every predicate carries a required, read-only `Label` and `Description`; every argument carries a required `Description`. |
 
@@ -53,34 +59,69 @@ classDiagram
     class Expression {
         <<abstract>>
     }
-    class Term {
-        +string PredicateName
+    class TermExpression {
+        +TermIdentity Identity
     }
     class AndExpression
     class OrExpression
     class NotExpression
     class XorExpression
-    class XnorExpression
+    class EquivalentExpression
+    class ImpliesExpression
+    class NandExpression
+    class NorExpression
+    class NxorExpression
+    class AnyExpression
+    class AllExpression
+    class NoneExpression
+    class BetweenExpression {
+        +int Min
+        +int Max
+    }
+    class CoalesceExpression
+    class InspectionExpression {
+        +InspectionKind Kind
+    }
+    class ProjectExpression {
+        +bool UnknownAs
+    }
+    class IfExpression {
+        +Expression Condition
+        +Expression WhenTrue
+        +Expression WhenFalse
+    }
     class ExactlyOneExpression
     class ThresholdExpression {
         +int K
-        +ThresholdKind Kind
+        +ThresholdComparison Comparison
     }
     class ConstantExpression {
-        +bool Value
+        +TruthValue Value
     }
     class Predicate {
         <<Interface>>
-        +EvaluateAsync() bool
+        +EvaluateAsync() TruthValue
     }
 
     Rule "1" *-- "1" Expression : has
-    Expression <|-- Term
+    Expression <|-- TermExpression
     Expression <|-- AndExpression
     Expression <|-- OrExpression
     Expression <|-- NotExpression
     Expression <|-- XorExpression
-    Expression <|-- XnorExpression
+    Expression <|-- EquivalentExpression
+    Expression <|-- ImpliesExpression
+    Expression <|-- NandExpression
+    Expression <|-- NorExpression
+    Expression <|-- NxorExpression
+    Expression <|-- AnyExpression
+    Expression <|-- AllExpression
+    Expression <|-- NoneExpression
+    Expression <|-- BetweenExpression
+    Expression <|-- CoalesceExpression
+    Expression <|-- IfExpression
+    Expression <|-- InspectionExpression
+    Expression <|-- ProjectExpression
     Expression <|-- ExactlyOneExpression
     Expression <|-- ThresholdExpression
     Expression <|-- ConstantExpression
@@ -88,16 +129,29 @@ classDiagram
     OrExpression "1" o-- "2..*" Expression : operands
     NotExpression "1" o-- "1" Expression : operand
     XorExpression "1" o-- "2" Expression : operands
-    XnorExpression "1" o-- "2" Expression : operands
+    EquivalentExpression "1" o-- "2" Expression : operands
+    ImpliesExpression "1" o-- "2" Expression : antecedent, consequent
+    NandExpression "1" o-- "2" Expression : operands
+    NorExpression "1" o-- "2" Expression : operands
+    NxorExpression "1" o-- "2..*" Expression : operands
+    AnyExpression "1" o-- "2..*" Expression : operands
+    AllExpression "1" o-- "2..*" Expression : operands
+    NoneExpression "1" o-- "2..*" Expression : operands
+    BetweenExpression "1" o-- "2..*" Expression : operands
+    CoalesceExpression "1" o-- "2..*" Expression : operands
+    IfExpression "1" o-- "3" Expression : condition, whenTrue, whenFalse
+    InspectionExpression "1" o-- "1" Expression : operand
+    ProjectExpression "1" o-- "1" Expression : operand
     ExactlyOneExpression "1" o-- "2..*" Expression : operands
     ThresholdExpression "1" o-- "2..*" Expression : operands
-    Term "1" --> "1" Predicate : bound to
+    TermExpression "1" --> "1" Predicate : bound to
 ```
 
-The same shape, as a grammar:
+The same shape, as an abstract (tree) grammar. This is the shape of the tree, so binary operators are
+written as calls here; in the text DSL they are infix (`a XOR b`). The complete text grammar and
+precedence summary is in the [README](README.md#grammar).
 
 ```text
-Rule = Expression
 
 Expression =
       Term
@@ -105,14 +159,29 @@ Expression =
     | OR(Expression, Expression, ...)
     | NOT(Expression)
     | XOR(Expression, Expression)          // binary only
-    | XNOR(Expression, Expression)         // binary only; NOT(XOR(...))
+    | EQUIVALENT(Expression, Expression)   // binary only; NOT(XOR(...)); aliases IFF, XNOR
+    | IMPLIES(Expression, Expression)      // binary only; OR(NOT(antecedent), consequent)
+    | NAND(Expression, Expression)         // binary only; NOT(AND(...))
+    | NOR(Expression, Expression)          // binary only; NOT(OR(...))
+    | NXOR(Expression, Expression, ...)    // n-ary parity; Unknown if any operand is Unknown
+    | ANY(Expression, Expression, ...)     // AtLeast(1, ...)
+    | ALL(Expression, Expression, ...)     // AtLeast(n, ...)
+    | NONE(Expression, Expression, ...)    // AtMost(0, ...)
+    | BETWEEN(min, max, Expression, Expression, ...)  // AND(AtLeast(min, ...), AtMost(max, ...))
+    | COALESCE(Expression, Expression, ...)           // first non-Unknown operand; infix: a ?? b ?? c
+    | If(Expression, Expression, Expression)          // condition, whenTrue, whenFalse; ternary: c ? t : f
+    | IsTrue(Expression) | IsFalse(Expression) | IsUnknown(Expression) | IsKnown(Expression)  // always a definite True/False
+    | Project(Expression, True | False)               // keeps True/False, Unknown becomes the chosen constant; always definite
     | ExactlyOne(Expression, Expression, ...)
     | AtLeast(k, Expression, Expression, ...)
     | AtMost(k, Expression, Expression, ...)
     | GreaterThan(k, Expression, Expression, ...)
     | LessThan(k, Expression, Expression, ...)
     | Exactly(k, Expression, Expression, ...)
-    | true | false
+    | True | False | Unknown
+
+Rule = Expression
+     | Collapse(Expression, UnknownAsFalse | UnknownAsTrue | UnknownIsError)  // outermost only, never inside an Expression
 ```
 
 Every expression evaluates to exactly one `TruthValue`. At the API boundary,
@@ -136,7 +205,7 @@ arguments **are** order-sensitive.
 
 ## Equivalency rules
 
-The operator set above is intentionally closed, not minimal — several
+The operator set above is closed (no operator plug-in model) but not minimal — several
 operators (and threshold-family edge values) are semantically equivalent to
 a composition of others. These equivalences are recorded here so authors and
 reviewers can recognize them, and so the set is never accidentally widened
@@ -144,22 +213,28 @@ with an operator that would just be a synonym for one of these:
 
 | Expression | Equivalent to |
 | --- | --- |
-| `AtMost(0, ...)` | `NOT(OR(...))` (i.e. `NOR`) |
+| `AtMost(0, ...)` | `NOT(OR(...))` (also `NONE(...)`) |
+| `AtLeast(1, ...)` | `ANY(...)` (and, in K3, `OR(...)`) |
+| `AtLeast(n, ...)`, where `n` is the operand count | `ALL(...)` (and, in K3, `AND(...)`) |
+| `AND(AtLeast(min, ...), AtMost(max, ...))` | `BETWEEN(min, max, ...)` |
 | `Exactly(n, ...)`, where `n` is the operand count | `AND(...)` |
 | `Exactly(1, ...)` | `ExactlyOne(...)` |
-| `XNOR(a, b)` | `NOT(XOR(a, b))` |
+| `EQUIVALENT(a, b)` (`IFF`, legacy `XNOR`) | `NOT(XOR(a, b))` |
+| `IMPLIES(a, b)` | `OR(NOT(a), b)` |
+| `NAND(a, b)` | `NOT(AND(a, b))` |
+| `NOR(a, b)` | `NOT(OR(a, b))` |
 | `GreaterThan(0, ...)` | `OR(...)` |
 | `LessThan(n, ...)`, where `n` is the operand count | `NOT(AND(...))` |
 
-There are no `All`/`None` operators. `All(...)` would just be `AND(...)`
-and `None(...)` would just be `NOT(OR(...))` (see `AtMost(0, ...)` above) —
-adding them would mean a second spelling for an existing operator with no
-new semantics, the same reasoning [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)
-already applied when it declined to add `IMPLIES` or symbol aliases
-(`&&`, `||`).
+> **Superseded by [ADR-0005](docs/adr/0005-strong-k3-language-surface.md):** `ANY`, `ALL` and `NONE` now exist as first-class derived cardinality operators (`AtLeast(1, ...)`, `AtLeast(n, ...)`, `AtMost(0, ...)`), kept as their own nodes so a rule round-trips as written. ADR-0003's earlier "no `All`/`None`" reasoning no longer applies. `BETWEEN` is likewise a first-class node: `BETWEEN(min, max, ...)` is `AND(AtLeast(min, ...), AtMost(max, ...))` over the interval, with the two integer bounds written first. It needs two or more operands, `0 <= min <= max <= n`, and rejects the whole range `0..n` as an always-true constant (`InvalidThresholdValue`). `COALESCE(a, b, ...)` and the infix `a ?? b ?? c` are one node that replaces only `Unknown` with the next operand (`True`/`False` pass through, short-circuiting at the first known value); a chain of `??` is accepted as one n-ary node because the operator is associative, but `??` still follows the no-mixing rule against `AND`/`OR` and other infix operators. `If(condition, whenTrue, whenFalse)` and the ternary `c ? t : f` are one node: a definite condition picks its branch (the other is not evaluated), while an `Unknown` condition does not guess, giving a value only when both branches are the same definite value (`(c AND t) OR (NOT c AND f) OR (t AND f)`); the ternary may not be mixed with other infix operators or a nested ternary without parentheses. `IsTrue(x)`, `IsFalse(x)`, `IsUnknown(x)` and `IsKnown(x)` are one `InspectionExpression` node with a kind: they test the K3 state of `x` and always yield a definite `True`/`False` (never `Unknown`), so they never collapse or fault the enclosing rule. `Project(x, True)` / `Project(x, False)` is a `ProjectExpression`: it keeps `True`/`False` and replaces only `Unknown` with the chosen constant (a literal `True` or `False`, never `Unknown` or an expression), so the result is always definite and equals `COALESCE(x, value)`. `Collapse(expr, policy)` is deliberately not an `Expression` node: it is the evaluation boundary around one, remembered on the `CompiledRule` as its `CollapsePolicy` and applied when the rule is evaluated, so the analyzer and the operators only ever see the inner expression.
+
+`ANY(...)`, `ALL(...)` and `NONE(...)` take two or more operands, like `AND`/`OR`/`ExactlyOne`. In Strong K3 they happen to coincide with `OR(...)`, `AND(...)` and `NOT(OR(...))` (the cardinality interval collapses to the same truth tables); they exist as named, intent-revealing spellings.
 
 These equivalences are documentation, not a normalization pass: the compiler
-does not rewrite one form into the other, and both sides of each row remain
+does not rewrite one form into the other (the opt-in `CompiledRule.ExpandToPrimitives()`
+does, on request, returning a new rule built only from `NOT`, `AND`, `OR`, `AtLeast`,
+`AtMost`, `Exactly` and `COALESCE`; `CompressToDerived()` goes back to derived operators where a
+K3-sound pattern matches), and both sides of each row remain
 independently valid, distinct things a rule author can write. See the
 [threshold operator family amendment](docs/adr/0003-rule-syntax-and-serialization.md#threshold-operator-family-supersedes-the-single-atleastk-)
 in ADR-0003 for the full `AtLeast`/`AtMost`/`GreaterThan`/`LessThan`/`Exactly`
@@ -181,7 +256,7 @@ Nothing broader is claimed or enforced:
 - **Ambient state (clocks, timezones) is the predicate's problem, not the
   engine's.** `IsToday` is just a predicate that happens to read
   `TimeProvider` internally; the engine only ever sees and memoizes its
-  boolean answer. The engine does not claim overall determinism across time.
+  `TruthValue` answer. The engine does not claim overall determinism across time.
 - **IO volume and sequencing inside a predicate is the predicate author's
   responsibility.** The engine will not fan out or batch calls on a
   predicate's behalf; a predicate that makes 40 sequential HTTP calls is a
@@ -193,7 +268,7 @@ evaluation model this contract supports.
 ## Failure model (summary)
 
 Internally three-valued (Kleene), two-valued at the boundary. A predicate
-signals a fault by throwing; the evaluator catches it, records a `Fault`
+may answer `Unknown` directly (no fault) and signals a failure by throwing; the evaluator catches it, records a `Fault`
 (predicate identity + exception), and treats the term as `Unknown` rather
 than aborting evaluation. Evaluation continues wherever the logic can still
 reach a determinate answer (`Unknown OR True` is `True`), because a fault
@@ -204,17 +279,27 @@ Full reasoning and the truth tables: [ADR-0001](docs/adr/0001-kleene-failure-mod
 
 `Compile` never throws for authoring errors; it returns a `CompilationResult`
 of a nullable `CompiledRule` plus a list of diagnostics (code, severity,
-source span). **Nothing that fails compilation is ever persisted** — the
+message, source span or JSON/YAML path (`$.operands[1].op`), expected-versus-found pair and an
+optional "did you mean" suggestion; `CompilationResult.FormatDiagnostics`
+renders them as text). **Nothing that fails compilation is ever persisted** — the
 write path treats diagnostics as form-validation messages, and a rejected
 save leaves the previously persisted rule active. `CompiledRule` is
 immutable, so runtime rule changes are a compile-and-swap-a-reference: no
 locking, in-flight evaluations finish against the old rule. Full reasoning:
 [ADR-0002](docs/adr/0002-evaluation-semantics.md).
 
+The analyzer step reasons in Strong K3 too (dual-rail BDD: "definitely true" /
+"possibly true"). It warns (`BRE0012` tautology, `BRE0013` contradiction) only
+when a sub-expression is `True` (resp. `False`) for every
+`{True, False, Unknown}` assignment of its terms, so `A AND NOT A` and
+`A OR NOT A` are not reported: both are `Unknown` when `A` is.
+([ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 17.)
+
 ## Syntax and serialization (summary)
 
-The string DSL (word operators, `NOT > AND > OR` precedence, `XOR`/`XNOR`
-never mixed with `AND`/`OR` or with each other without parentheses) is
+The string DSL (word operators, plus the symbol aliases `&&`, `||`, `!`, `∧`, `∨`,
+`¬`, `⊕`, `→`, `↔`, `↑`, `↓`, `??` and the ternary `? :` that compile to the same nodes and are never printed; `NOT > AND > OR` precedence, every infix operator other than `NOT`/`AND`/`OR`
+never mixed with `AND`/`OR` or with a different infix operator without parentheses; `()`, `[]` and `{}` are interchangeable grouping delimiters that the tree does not retain; `CanonicalText` prints parentheses only, `PrintRuleText(GroupingStyle.DepthCycling)` is the opt-in depth-varying rendering; `RuleText.NormalizeWhitespace` tidies the spacing of text as written) is
 canonical and is what gets persisted. JSON and YAML are interchange/tooling
 formats that compile to the same AST and round-trip losslessly with the DSL.
 A rule can also be assembled programmatically via `RuleBuilder`
@@ -231,7 +316,9 @@ and schema: [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md).
 argument schema, `TruthValue`, `Decision` — zero dependencies, shared across
 projects that only *implement* predicates), `TruthWeaver` (AST,
 parser, compiler, analyzer, evaluator, System.Text.Json support, DI
-extensions), `TruthWeaver.Yaml` (YamlDotNet only). Full reasoning:
+extensions), `TruthWeaver.Yaml` (YamlDotNet only), plus two optional add-ons that depend on the kernel alone:
+`TruthWeaver.Predicates` (ready-made predicate factories) and `TruthWeaver.Testing` (`Decision`
+assertions, fake predicates). Full reasoning:
 [ADR-0004](docs/adr/0004-package-boundaries-and-extensibility.md).
 
 ## AOT / trim compatibility
@@ -278,4 +365,5 @@ publishing themselves.
 - [ADR-0002: Evaluation semantics](docs/adr/0002-evaluation-semantics.md)
 - [ADR-0003: Rule syntax and serialization](docs/adr/0003-rule-syntax-and-serialization.md)
 - [ADR-0004: Package boundaries and extensibility](docs/adr/0004-package-boundaries-and-extensibility.md)
+- [ADR-0005: Strong K3 language surface](docs/adr/0005-strong-k3-language-surface.md)
 - [README.md](README.md)

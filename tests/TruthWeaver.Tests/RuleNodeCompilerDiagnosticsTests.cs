@@ -99,7 +99,11 @@ public sealed class RuleNodeCompilerDiagnosticsTests
                         ]
                     ),
                     (_, args, _) =>
-                        ValueTask.FromResult(string.Equals(args.GetString("role"), "GUEST", StringComparison.Ordinal))
+                        ValueTask.FromResult(
+                            string.Equals(args.GetString("role"), "GUEST", StringComparison.Ordinal)
+                                ? TruthValue.True
+                                : TruthValue.False
+                        )
                 )
                 .Build()
         );

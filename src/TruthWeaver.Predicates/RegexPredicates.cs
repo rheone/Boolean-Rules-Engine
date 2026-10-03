@@ -34,7 +34,7 @@ public static class RegexPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) Matches<TContext>(
         string name,
         Func<TContext, string?> selector,
@@ -63,11 +63,11 @@ public static class RegexPredicates
                 string? selected = selector(context);
                 if (selected is null)
                 {
-                    return ValueTask.FromResult(false);
+                    return PredicateResult.FromBoolAsync(false);
                 }
 
                 string pattern = args.GetString(argumentName);
-                return ValueTask.FromResult(CompiledPattern(pattern).IsMatch(selected));
+                return PredicateResult.FromBoolAsync(CompiledPattern(pattern).IsMatch(selected));
             }
         );
     }

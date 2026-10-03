@@ -69,7 +69,7 @@ public sealed class ArgumentsAndMemoizationTests
                         new PredicateArgumentSchema("b", "Second argument.", LiteralKind.String),
                     ]
                 ),
-                (_, _, _) => ValueTask.FromResult(true)
+                (_, _, _) => ValueTask.FromResult(true ? TruthValue.True : TruthValue.False)
             );
         RuleCompiler<RuleTestContext> compiler = new(builder.Build());
 
@@ -141,7 +141,7 @@ public sealed class ArgumentsAndMemoizationTests
                     "Test predicate, always true.",
                     [new PredicateArgumentSchema("roles", "The roles to check.", LiteralKind.StringArray)]
                 ),
-                (_, _, _) => ValueTask.FromResult(true)
+                (_, _, _) => ValueTask.FromResult(true ? TruthValue.True : TruthValue.False)
             );
         RuleCompiler<RuleTestContext> compiler = new(builder.Build());
 
@@ -166,7 +166,11 @@ public sealed class ArgumentsAndMemoizationTests
                 (_, args, _) =>
                 {
                     invocationLog.Add($"hasRole(role: \"{args.GetString("role")}\")");
-                    return ValueTask.FromResult(string.Equals(args.GetString("role"), "Y", StringComparison.Ordinal));
+                    return ValueTask.FromResult(
+                        string.Equals(args.GetString("role"), "Y", StringComparison.Ordinal)
+                            ? TruthValue.True
+                            : TruthValue.False
+                    );
                 }
             );
 

@@ -14,7 +14,7 @@ public static class MermaidTreePrinter
 {
     /// <summary>Prints a rule's structure only, with no evaluation coloring.</summary>
     /// <param name="root">The rule's described tree.</param>
-    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/EQUIVALENT operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
     /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>Mermaid <c>flowchart</c> text.</returns>
     public static string Print(RuleDescription root, OperatorStyle style = OperatorStyle.Word, bool showArgumentValues = true)
@@ -25,7 +25,7 @@ public static class MermaidTreePrinter
     /// <summary>Prints a rule's structure, colored by one evaluation's result and short-circuit path.</summary>
     /// <param name="root">The rule's described tree.</param>
     /// <param name="evaluatedTree">The matching <see cref="Decision.EvaluatedTree"/> from that evaluation.</param>
-    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/EQUIVALENT operator labels. Defaults to <see cref="OperatorStyle.Word"/>.</param>
     /// <param name="showArgumentValues">Whether to include each term's rule-text argument values in its label. Defaults to <see langword="true"/>.</param>
     /// <returns>Mermaid <c>flowchart</c> text.</returns>
     public static string Print(

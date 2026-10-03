@@ -87,7 +87,11 @@ public sealed class JsonTreeTests
         CompiledRule<RuleTestContext> reparsed = compiler.CompileJson(json).CompiledRule!;
 
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
-        Assert.Contains("\"op\":\"xnor\"", json.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Contains(
+            "\"op\":\"equivalent\"",
+            json.Replace(" ", string.Empty, StringComparison.Ordinal),
+            StringComparison.Ordinal
+        );
     }
 
     [Fact]
@@ -131,7 +135,7 @@ public sealed class JsonTreeTests
     [Theory]
     [InlineData("not even json", "Malformed JSON:")]
     [InlineData("""{"nothingRecognized": true}""", "must have a 'const', 'predicate', or 'op' key")]
-    [InlineData("""{"const": "notabool"}""", "'const' must be a JSON boolean.")]
+    [InlineData("""{"const": "notabool"}""", "'const' must be a JSON boolean or one of")]
     [InlineData("""{"predicate": 123}""", "'predicate' must be a JSON string.")]
     [InlineData("""{"predicate": "isManager", "args": [1, 2]}""", "'args' must be a JSON object.")]
     [InlineData("""{"predicate": "isManager", "args": {"x": {"weird": 1}}}""", "Unsupported literal JSON value kind")]
@@ -357,7 +361,8 @@ public sealed class JsonTreeTests
                         "True iff any of 'codes' matches.",
                         [new PredicateArgumentSchema("codes", "The codes to check for.", LiteralKind.Int64Array)]
                     ),
-                    (_, args, _) => ValueTask.FromResult(args.GetInt64Array("codes").Count > 0)
+                    (_, args, _) =>
+                        ValueTask.FromResult(args.GetInt64Array("codes").Count > 0 ? TruthValue.True : TruthValue.False)
                 )
                 .Build()
         );

@@ -1,5 +1,6 @@
 namespace TruthWeaver.Parsing;
 
+using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
 using TruthWeaver.Diagnostics;
 
@@ -18,16 +19,28 @@ using TruthWeaver.Diagnostics;
 /// something tested for and hoped to remain true.
 /// </summary>
 /// <param name="Span">This node's location in the source it was parsed from.</param>
-internal abstract record RuleNode(SourceSpan Span);
+internal abstract record RuleNode(SourceSpan Span)
+{
+    /// <summary>
+    /// Gets where this node sits in the JSON or YAML document it came from, such as <c>$.operands[1]</c>, or
+    /// <see langword="null"/> for DSL text (which is located by <see cref="Span"/>). The tree front ends set it, and the
+    /// compiler copies it onto the diagnostics it raises for the node.
+    /// </summary>
+    public string? Path { get; init; }
+}
 
-/// <summary>The literal <see langword="true"/>/<see langword="false"/> constant.</summary>
-internal sealed record ConstantNode(bool Value, SourceSpan Span) : RuleNode(Span);
+/// <summary>The literal K3 constant: <c>True</c>, <c>False</c> or <c>Unknown</c>.</summary>
+internal sealed record ConstantNode(TruthValue Value, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>A raw predicate reference with its (not yet validated) named arguments.</summary>
 internal sealed record TermNode(string PredicateName, IReadOnlyList<ArgumentNode> Arguments, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>One raw named argument of a <see cref="TermNode"/>.</summary>
-internal sealed record ArgumentNode(string Name, RawLiteral Value, SourceSpan Span);
+internal sealed record ArgumentNode(string Name, RawLiteral Value, SourceSpan Span)
+{
+    /// <summary>Gets the argument's JSON or YAML path, such as <c>$.args.role</c>, or <see langword="null"/> for DSL text.</summary>
+    public string? Path { get; init; }
+}
 
 /// <summary>Logical negation.</summary>
 internal sealed record NotNode(RuleNode Operand, SourceSpan Span) : RuleNode(Span);
@@ -47,11 +60,46 @@ internal sealed record OrNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span)
 internal sealed record XorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>
-/// A raw <c>XNOR</c> reference (logical biconditional / <c>IFF</c>). Same operand-count validation
+/// A raw <c>EQUIVALENT</c> reference (logical biconditional; <c>IFF</c> and the legacy <c>XNOR</c> are aliases that
+/// parse to this same node). Same operand-count validation
 /// story as <see cref="XorNode"/>: <c>RuleNodeCompiler</c> uniformly rejects anything other than
 /// exactly two operands.
 /// </summary>
-internal sealed record XnorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+internal sealed record EquivalentNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// A raw <c>IMPLIES</c> reference (material implication). Operand count is validated by
+/// <c>RuleNodeCompiler</c> (exactly two), like <see cref="XorNode"/>, so a DSL chain
+/// (<c>a IMPLIES b IMPLIES c</c>) and a malformed JSON/YAML node are rejected the same way.
+/// </summary>
+internal sealed record ImpliesNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// A raw <c>NAND</c> reference (negated conjunction). Operand count is validated by <c>RuleNodeCompiler</c>
+/// (exactly two), like <see cref="XorNode"/>, so a DSL chain and a malformed JSON/YAML node are rejected the same way.
+/// </summary>
+internal sealed record NandNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>A raw <c>NOR</c> reference (negated disjunction); validated exactly like <see cref="NandNode"/>.</summary>
+internal sealed record NorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// N-ary parity reference (<c>NXOR(a, b, ...)</c>). Operand count (at least two) is validated by <c>RuleNodeCompiler</c>
+/// like the other n-ary operators.
+/// </summary>
+internal sealed record NxorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// N-ary <c>ANY(...)</c> reference (at least one operand is true). Operand count (at least two) is validated by
+/// <c>RuleNodeCompiler</c> like the other n-ary operators.
+/// </summary>
+internal sealed record AnyNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>N-ary <c>ALL(...)</c> reference (every operand is true); validated like <see cref="AnyNode"/>.</summary>
+internal sealed record AllNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>N-ary <c>NONE(...)</c> reference (no operand is true); validated like <see cref="AnyNode"/>.</summary>
+internal sealed record NoneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>N-ary "exactly one of these is true".</summary>
 internal sealed record ExactlyOneNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
@@ -62,6 +110,46 @@ internal sealed record ExactlyOneNode(IReadOnlyList<RuleNode> Operands, SourceSp
 /// </summary>
 internal sealed record ThresholdNode(ThresholdComparison Comparison, int K, IReadOnlyList<RuleNode> Operands, SourceSpan Span)
     : RuleNode(Span);
+
+/// <summary>
+/// <c>BETWEEN(min, max, ...)</c> reference: the true-operand count lies in <c>[min, max]</c>. The bounds' valid range and
+/// the operand count (at least two) are validated by the compiler, not the parser.
+/// </summary>
+internal sealed record BetweenNode(int Min, int Max, IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// <c>IsTrue(x)</c> / <c>IsFalse(x)</c> / <c>IsUnknown(x)</c> / <c>IsKnown(x)</c> reference. The operand count (exactly one)
+/// is validated by <c>RuleNodeCompiler</c>, so <c>IsTrue(a, b)</c> and a malformed JSON/YAML node are rejected the same way.
+/// </summary>
+internal sealed record InspectionNode(InspectionKind Kind, IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// <c>Collapse(x, policy)</c> reference. Only valid as the outermost node of a rule (ADR-0005 decision 14):
+/// <c>RuleCompiler</c> peels a root collapse into the compiled rule's policy and reports every other occurrence as
+/// <see cref="Diagnostics.DiagnosticCodes.NestedCollapse"/>, so the parsers build it freely wherever the text puts it. The
+/// operand count (exactly one) is validated there too, so a malformed JSON/YAML node is rejected the same way as an
+/// inspection.
+/// </summary>
+internal sealed record CollapseNode(IReadOnlyList<RuleNode> Operands, CollapsePolicy Policy, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// <c>Project(x, True|False)</c> reference: <see cref="UnknownAs"/> is the value <c>Unknown</c> becomes. The operand count
+/// (exactly one) is validated by <c>RuleNodeCompiler</c>, so a malformed JSON/YAML node is rejected the same way as an
+/// inspection; the DSL parser has already rejected a missing or non-constant value.
+/// </summary>
+internal sealed record ProjectNode(IReadOnlyList<RuleNode> Operands, bool UnknownAs, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// <c>If(condition, whenTrue, whenFalse)</c> / ternary <c>c ? t : f</c> reference. The operand count (exactly three) is
+/// validated by <c>RuleNodeCompiler</c>, so a malformed JSON/YAML node or <c>If(a, b)</c> is rejected the same way.
+/// </summary>
+internal sealed record IfNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// N-ary <c>COALESCE(...)</c> / infix <c>??</c> reference (first operand that is not <c>Unknown</c>). Operand count
+/// (at least two) is validated by <c>RuleNodeCompiler</c> like the other n-ary operators.
+/// </summary>
+internal sealed record CoalesceNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>
 /// A placeholder produced only after a syntax/structure error has already been reported, so parsing

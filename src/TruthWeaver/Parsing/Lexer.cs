@@ -3,7 +3,7 @@ namespace TruthWeaver.Parsing;
 using TruthWeaver.Diagnostics;
 
 /// <summary>
-/// Hand-written tokenizer for the word-operator DSL (ADR-0003 notes this is a hand-written
+/// Hand-written tokenizer for the word-operator DSL, which also accepts symbolic operator aliases (ADR-0005; ADR-0003 notes this is a hand-written
 /// recursive-descent parser, not Roslyn-based — there is no C# involved in rule text).
 /// </summary>
 internal sealed class Lexer(string source)
@@ -63,6 +63,12 @@ internal sealed class Lexer(string source)
             case ']':
                 this.position++;
                 return new Token(TokenKind.RBracket, "]", new SourceSpan(start, 1));
+            case '{':
+                this.position++;
+                return new Token(TokenKind.LBrace, "{", new SourceSpan(start, 1));
+            case '}':
+                this.position++;
+                return new Token(TokenKind.RBrace, "}", new SourceSpan(start, 1));
             case ',':
                 this.position++;
                 return new Token(TokenKind.Comma, ",", new SourceSpan(start, 1));
@@ -71,6 +77,18 @@ internal sealed class Lexer(string source)
                 return new Token(TokenKind.Colon, ":", new SourceSpan(start, 1));
             case '"':
                 return this.ReadString(start);
+            case '!' or '¬' or '∧' or '∨' or '⊕' or '→' or '↔' or '↑' or '↓':
+                this.position++;
+                return new Token(TokenKind.Operator, c.ToString(), new SourceSpan(start, 1));
+            case '&' or '|' or '?' when this.position + 1 < this.source.Length && this.source[this.position + 1] == c:
+                // Doubled form only (&&, ||, ??): a lone '&' or '|' is not an operator and falls through to the
+                // unexpected-character diagnostic below (a lone '?' is the ternary token, handled by the next case).
+                this.position += 2;
+                return new Token(TokenKind.Operator, new string(c, 2), new SourceSpan(start, 2));
+            case '?':
+                // A lone '?' separates the condition from the branches of the ternary conditional (a ? b : c).
+                this.position++;
+                return new Token(TokenKind.Question, "?", new SourceSpan(start, 1));
         }
 
         if (
@@ -87,8 +105,20 @@ internal sealed class Lexer(string source)
         }
 
         this.position++;
+
+        // A lone '&' or '|' is almost always half of the doubled symbol, so say which one.
+        DiagnosticSuggestion? suggestion = DslVocabulary.DoubledSymbolFor(c) is { } doubled
+            ? new DiagnosticSuggestion(DiagnosticSuggestionKind.Replacement, doubled)
+            : null;
         this.Diagnostics.Add(
-            Diagnostic.Error(DiagnosticCodes.SyntaxError, $"Unexpected character '{c}'.", new SourceSpan(start, 1))
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                $"Unexpected character '{c}'.",
+                new SourceSpan(start, 1),
+                expected: "a term, operator or delimiter",
+                found: $"'{c}'",
+                suggestion: suggestion
+            )
         );
         return this.NextToken();
     }
@@ -171,7 +201,9 @@ internal sealed class Lexer(string source)
                             Diagnostic.Error(
                                 DiagnosticCodes.InvalidEscapeSequence,
                                 $"Unrecognized escape sequence '\\{next}' in string literal.",
-                                new SourceSpan(this.position, 2)
+                                new SourceSpan(this.position, 2),
+                                expected: "one of \\\", \\\\, \\n, \\t",
+                                found: $"\\{next}"
                             )
                         );
                         builder.Append(next);
@@ -193,7 +225,9 @@ internal sealed class Lexer(string source)
                 Diagnostic.Error(
                     DiagnosticCodes.SyntaxError,
                     "Unterminated string literal.",
-                    new SourceSpan(start, this.position - start)
+                    new SourceSpan(start, this.position - start),
+                    expected: "a closing '\"'",
+                    found: "end of rule"
                 )
             );
         }

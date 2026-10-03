@@ -29,7 +29,7 @@ public static class CollectionPredicates
     /// <returns>The predicate's schema and stateless evaluation delegate, ready for <c>PredicateRegistryBuilder&lt;TContext&gt;.Add</c>.</returns>
     public static (
         PredicateSchema Schema,
-        Func<TContext, PredicateArguments, CancellationToken, ValueTask<bool>> Evaluate
+        Func<TContext, PredicateArguments, CancellationToken, ValueTask<TruthValue>> Evaluate
     ) SetEquals<TContext>(
         string name,
         Func<TContext, IReadOnlyCollection<string>?> selector,
@@ -60,7 +60,7 @@ public static class CollectionPredicates
                     ? new(StringComparer.Ordinal)
                     : new(selected, StringComparer.Ordinal);
                 HashSet<string> targetSet = new(args.GetStringArray(argumentName), StringComparer.Ordinal);
-                return ValueTask.FromResult(selectedSet.SetEquals(targetSet));
+                return PredicateResult.FromBoolAsync(selectedSet.SetEquals(targetSet));
             }
         );
     }

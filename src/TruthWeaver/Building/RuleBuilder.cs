@@ -1,6 +1,8 @@
 namespace TruthWeaver.Building;
 
 using System.Text.Json.Nodes;
+using TruthWeaver.Abstractions;
+using TruthWeaver.Ast;
 using TruthWeaver.Compilation;
 
 /// <summary>
@@ -10,17 +12,25 @@ using TruthWeaver.Compilation;
 /// flat, key-discriminated JSON tree shape ADR-0003 defines and compiles through
 /// <see cref="RuleCompiler{TContext}.CompileJson(string)"/>, so a builder-assembled rule receives
 /// every diagnostic a hand-written one would (unknown predicate, bad argument, invalid threshold,
-/// XOR/XNOR arity, resource limits, structural tautology/contradiction) — nothing here bypasses the
+/// XOR/EQUIVALENT arity, resource limits, structural tautology/contradiction) — nothing here bypasses the
 /// Validate/Analyze stages of the compilation pipeline.
 /// </summary>
 public abstract class RuleBuilder
 {
     private RuleBuilder() { }
 
-    /// <summary>Creates a builder for the literal <see langword="true"/>/<see langword="false"/> constant.</summary>
+    /// <summary>Creates a builder for the literal <c>True</c>/<c>False</c> constant.</summary>
     /// <param name="value">The constant's value.</param>
     /// <returns>A builder for the constant.</returns>
     public static RuleBuilder Constant(bool value)
+    {
+        return new ConstantBuilder(value ? TruthValue.True : TruthValue.False);
+    }
+
+    /// <summary>Creates a builder for a literal K3 constant, including <see cref="TruthValue.Unknown"/>.</summary>
+    /// <param name="value">The constant's value.</param>
+    /// <returns>A builder for the constant.</returns>
+    public static RuleBuilder Constant(TruthValue value)
     {
         return new ConstantBuilder(value);
     }
@@ -80,13 +90,84 @@ public abstract class RuleBuilder
         return new OperatorBuilder("xor", [left, right]);
     }
 
-    /// <summary>Creates a builder for binary exclusive-nor (logical biconditional / <c>IFF</c>).</summary>
+    /// <summary>Creates a builder for the binary logical biconditional (<c>EQUIVALENT</c>, also written <c>IFF</c> or <c>↔</c>).</summary>
     /// <param name="left">The left operand.</param>
     /// <param name="right">The right operand.</param>
-    /// <returns>A builder for the <c>XNOR</c> expression.</returns>
+    /// <returns>A builder for the <c>EQUIVALENT</c> expression.</returns>
+    public static RuleBuilder Equivalent(RuleBuilder left, RuleBuilder right)
+    {
+        return new OperatorBuilder("equivalent", [left, right]);
+    }
+
+    /// <summary>
+    /// Creates a builder for the biconditional under its pre-ADR-0005 name. Forwards to <see cref="Equivalent"/>
+    /// (same rule, same canonical text); kept so existing callers keep compiling.
+    /// </summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>A builder for the <c>EQUIVALENT</c> expression.</returns>
     public static RuleBuilder Xnor(RuleBuilder left, RuleBuilder right)
     {
-        return new OperatorBuilder("xnor", [left, right]);
+        return Equivalent(left, right);
+    }
+
+    /// <summary>Creates a builder for material implication (<c>NOT antecedent OR consequent</c>).</summary>
+    /// <param name="antecedent">The "if" operand.</param>
+    /// <param name="consequent">The "then" operand.</param>
+    /// <returns>A builder for the <c>IMPLIES</c> expression.</returns>
+    public static RuleBuilder Implies(RuleBuilder antecedent, RuleBuilder consequent)
+    {
+        return new OperatorBuilder("implies", [antecedent, consequent]);
+    }
+
+    /// <summary>Creates a builder for negated conjunction (<c>NOT (left AND right)</c>, also written <c>NAND</c> or <c>↑</c>).</summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>A builder for the <c>NAND</c> expression.</returns>
+    public static RuleBuilder Nand(RuleBuilder left, RuleBuilder right)
+    {
+        return new OperatorBuilder("nand", [left, right]);
+    }
+
+    /// <summary>Creates a builder for negated disjunction (<c>NOT (left OR right)</c>, also written <c>NOR</c> or <c>↓</c>).</summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>A builder for the <c>NOR</c> expression.</returns>
+    public static RuleBuilder Nor(RuleBuilder left, RuleBuilder right)
+    {
+        return new OperatorBuilder("nor", [left, right]);
+    }
+
+    /// <summary>Creates a builder for n-ary parity (<c>NXOR(a, b, ...)</c>): <c>Unknown</c> if any operand is <c>Unknown</c>, otherwise <c>True</c> for an odd number of <c>True</c> operands.</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>NXOR</c> expression.</returns>
+    public static RuleBuilder Nxor(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("nxor", operands);
+    }
+
+    /// <summary>Creates a builder for <c>ANY(...)</c>: at least one operand is true (<c>AtLeast(1, ...)</c>).</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>ANY</c> expression.</returns>
+    public static RuleBuilder Any(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("any", operands);
+    }
+
+    /// <summary>Creates a builder for <c>ALL(...)</c>: every operand is true (<c>AtLeast(n, ...)</c>).</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>ALL</c> expression.</returns>
+    public static RuleBuilder All(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("all", operands);
+    }
+
+    /// <summary>Creates a builder for <c>NONE(...)</c>: no operand is true (<c>AtMost(0, ...)</c>).</summary>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>NONE</c> expression.</returns>
+    public static RuleBuilder None(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("none", operands);
     }
 
     /// <summary>Creates a builder for the n-ary "exactly one of these is true" operator.</summary>
@@ -95,6 +176,113 @@ public abstract class RuleBuilder
     public static RuleBuilder ExactlyOne(params RuleBuilder[] operands)
     {
         return new OperatorBuilder("exactlyOne", operands);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>COALESCE(...)</c>: the first operand that is not <c>Unknown</c> (<c>True</c> and
+    /// <c>False</c> pass through).
+    /// </summary>
+    /// <param name="operands">The operands in priority order (at least two).</param>
+    /// <returns>A builder for the <c>COALESCE</c> expression.</returns>
+    public static RuleBuilder Coalesce(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("coalesce", operands);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>IsTrue(operand)</c>: <c>True</c> iff the operand is <c>True</c>, otherwise <c>False</c>
+    /// (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsTrue</c> expression.</returns>
+    public static RuleBuilder IsTrue(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isTrue", [operand]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>IsFalse(operand)</c>: <c>True</c> iff the operand is <c>False</c>, otherwise <c>False</c>
+    /// (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsFalse</c> expression.</returns>
+    public static RuleBuilder IsFalse(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isFalse", [operand]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>IsUnknown(operand)</c>: <c>True</c> iff the operand is <c>Unknown</c>, otherwise <c>False</c>
+    /// (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsUnknown</c> expression.</returns>
+    public static RuleBuilder IsUnknown(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isUnknown", [operand]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>IsKnown(operand)</c>: <c>True</c> iff the operand is <c>True</c> or <c>False</c>, otherwise
+    /// <c>False</c> (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsKnown</c> expression.</returns>
+    public static RuleBuilder IsKnown(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isKnown", [operand]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>If(condition, whenTrue, whenFalse)</c>: <paramref name="whenTrue"/> when the condition is
+    /// <c>True</c>, <paramref name="whenFalse"/> when it is <c>False</c>, and for an <c>Unknown</c> condition the branch value
+    /// only if both branches are the same definite value, otherwise <c>Unknown</c>.
+    /// </summary>
+    /// <param name="condition">The condition.</param>
+    /// <param name="whenTrue">The result when the condition is <c>True</c>.</param>
+    /// <param name="whenFalse">The result when the condition is <c>False</c>.</param>
+    /// <returns>A builder for the <c>If</c> expression.</returns>
+    public static RuleBuilder If(RuleBuilder condition, RuleBuilder whenTrue, RuleBuilder whenFalse)
+    {
+        return new OperatorBuilder("if", [condition, whenTrue, whenFalse]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>BETWEEN(min, max, ...)</c>: the number of true operands lies in the inclusive range
+    /// <c>[min, max]</c> (<c>AtLeast(min, ...) AND AtMost(max, ...)</c>).
+    /// </summary>
+    /// <param name="min">The inclusive lower bound (at least 0).</param>
+    /// <param name="max">The inclusive upper bound (at least <paramref name="min"/>, at most the operand count).</param>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>BETWEEN</c> expression.</returns>
+    public static RuleBuilder Between(int min, int max, params RuleBuilder[] operands)
+    {
+        return new BetweenBuilder(min, max, operands);
+    }
+
+    /// <summary>
+    /// Creates a builder for the outermost <c>Collapse(operand, policy)</c> boundary. It is valid only as the root of a
+    /// rule: used as an operand of another builder it compiles to the nested-collapse diagnostic.
+    /// </summary>
+    /// <param name="operand">The rule whose three-valued result the policy collapses.</param>
+    /// <param name="policy">How an <c>Unknown</c> result is resolved.</param>
+    /// <returns>A builder for the collapsed rule.</returns>
+    public static RuleBuilder Collapse(RuleBuilder operand, CollapsePolicy policy)
+    {
+        return new CollapseBuilder(operand, policy);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>Project(operand, unknownAs)</c>: <c>True</c> and <c>False</c> pass through and
+    /// <c>Unknown</c> is replaced by <paramref name="unknownAs"/>, so the result is always definite (the same value as
+    /// <c>COALESCE(operand, unknownAs)</c>).
+    /// </summary>
+    /// <param name="operand">The expression whose <c>Unknown</c> result is replaced.</param>
+    /// <param name="unknownAs"><see langword="true"/> to project <c>Unknown</c> to <c>True</c>, <see langword="false"/> to <c>False</c>.</param>
+    /// <returns>A builder for the <c>Project</c> expression.</returns>
+    public static RuleBuilder Project(RuleBuilder operand, bool unknownAs)
+    {
+        return new ProjectBuilder(operand, unknownAs);
     }
 
     /// <summary>Creates a builder for "at least <paramref name="k"/> of these operands are true".</summary>
@@ -201,13 +389,19 @@ public abstract class RuleBuilder
         return array;
     }
 
-    private sealed class ConstantBuilder(bool value) : RuleBuilder
+    private sealed class ConstantBuilder(TruthValue value) : RuleBuilder
     {
-        private readonly bool value = value;
+        private readonly TruthValue value = value;
 
         private protected override JsonNode ToNode()
         {
-            return new JsonObject { ["const"] = this.value };
+            // Same shape JsonTreePrinter writes: booleans for True/False, the string "unknown" otherwise.
+            return this.value switch
+            {
+                TruthValue.True => new JsonObject { ["const"] = true },
+                TruthValue.False => new JsonObject { ["const"] = false },
+                _ => new JsonObject { ["const"] = TruthValueText.TreeFormat(this.value) },
+            };
         }
     }
 
@@ -242,6 +436,57 @@ public abstract class RuleBuilder
         private protected override JsonNode ToNode()
         {
             return new JsonObject { ["op"] = this.op, ["operands"] = OperandsNode(this.operands) };
+        }
+    }
+
+    private sealed class BetweenBuilder(int min, int max, IReadOnlyList<RuleBuilder> operands) : RuleBuilder
+    {
+        private readonly int min = min;
+        private readonly int max = max;
+        private readonly IReadOnlyList<RuleBuilder> operands = operands;
+
+        private protected override JsonNode ToNode()
+        {
+            return new JsonObject
+            {
+                ["op"] = "between",
+                ["min"] = this.min,
+                ["max"] = this.max,
+                ["operands"] = OperandsNode(this.operands),
+            };
+        }
+    }
+
+    private sealed class CollapseBuilder(RuleBuilder operand, CollapsePolicy policy) : RuleBuilder
+    {
+        private readonly RuleBuilder operand = operand;
+        private readonly CollapsePolicy policy = policy;
+
+        private protected override JsonNode ToNode()
+        {
+            return new JsonObject
+            {
+                ["op"] = "collapse",
+                ["policy"] = CollapsePolicyText.TreeFormat(this.policy),
+                ["operands"] = OperandsNode([this.operand]),
+            };
+        }
+    }
+
+    private sealed class ProjectBuilder(RuleBuilder operand, bool unknownAs) : RuleBuilder
+    {
+        private readonly RuleBuilder operand = operand;
+        private readonly bool unknownAs = unknownAs;
+
+        private protected override JsonNode ToNode()
+        {
+            // Same shape JsonTreePrinter writes: the policy is a plain JSON boolean next to the single operand.
+            return new JsonObject
+            {
+                ["op"] = "project",
+                ["unknownAs"] = this.unknownAs,
+                ["operands"] = OperandsNode([this.operand]),
+            };
         }
     }
 
