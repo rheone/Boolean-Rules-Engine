@@ -75,7 +75,7 @@ public sealed class TruthValueConstantsTests
     [InlineData("exactlyone(true, unknown, false)", "ExactlyOne(True, Unknown, False)")]
     [InlineData("ATLEAST(1, true, unknown)", "AtLeast(1, True, Unknown)")]
     [InlineData("(true xor unknown)", "(True XOR Unknown)")]
-    [InlineData("(true Xnor unknown)", "(True XNOR Unknown)")]
+    [InlineData("(true Xnor unknown)", "(True EQUIVALENT Unknown)")]
     public void Compile_MixedCaseConstantsAndOperators_ProducesSameCanonicalTextAsCanonicalSpelling_Test(
         string mixed,
         string canonical

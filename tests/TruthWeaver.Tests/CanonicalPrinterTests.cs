@@ -41,13 +41,13 @@ public sealed class CanonicalPrinterTests
     }
 
     [Fact]
-    public void Xnor_operand_is_always_parenthesized_even_when_unnecessary_for_precedence()
+    public void Equivalent_operand_is_always_parenthesized_even_when_unnecessary_for_precedence()
     {
         RuleCompiler<RuleTestContext> compiler = CreateCompiler();
 
         CompiledRule<RuleTestContext> rule = compiler.Compile("isManager XNOR isDepartmentHead").CompiledRule!;
 
-        Assert.Equal("(isManager XNOR isDepartmentHead)", rule.CanonicalText);
+        Assert.Equal("(isManager EQUIVALENT isDepartmentHead)", rule.CanonicalText);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public sealed class CanonicalPrinterTests
     [InlineData("GreaterThan(1, isManager, isDepartmentHead, isManager)")]
     [InlineData("LessThan(2, isManager, isDepartmentHead, isManager)")]
     [InlineData("Exactly(2, isManager, isDepartmentHead, isManager)")]
-    [InlineData("(isManager XNOR isDepartmentHead)")]
+    [InlineData("(isManager EQUIVALENT isDepartmentHead)")]
     [InlineData("hasRole(role: \"Y\")")]
     [InlineData("true")]
     [InlineData("false")]

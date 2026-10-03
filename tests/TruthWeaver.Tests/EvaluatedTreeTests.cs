@@ -199,7 +199,7 @@ public sealed class EvaluatedTreeTests
     }
 
     [Fact]
-    public async Task Skipped_xnor_subtree_is_described_as_XNOR()
+    public async Task Skipped_equivalent_subtree_is_described_as_EQUIVALENT()
     {
         // "a AND (b XNOR c)" with a = false short-circuits before the (b XNOR c) XnorExpression is
         // evaluated, so its skipped EvaluatedNode is labelled from the node's static shape alone.
@@ -224,7 +224,7 @@ public sealed class EvaluatedTreeTests
 
         EvaluatedNode skippedSubtree = decision.EvaluatedTree!.Children[1];
         Assert.True(skippedSubtree.NotEvaluated);
-        Assert.Equal("XNOR", skippedSubtree.NodeDescription);
+        Assert.Equal("EQUIVALENT", skippedSubtree.NodeDescription);
     }
 
     [Fact]

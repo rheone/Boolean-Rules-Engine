@@ -219,8 +219,8 @@ internal static class YamlTreeParser
                 return new NotNode(operands[0], SourceSpan.None);
             case "Xor":
                 return new XorNode(operands, SourceSpan.None);
-            case "Xnor":
-                return new XnorNode(operands, SourceSpan.None);
+            case "Equivalent":
+                return new EquivalentNode(operands, SourceSpan.None);
             case "Implies":
                 return new ImpliesNode(operands, SourceSpan.None);
             case "ExactlyOne":

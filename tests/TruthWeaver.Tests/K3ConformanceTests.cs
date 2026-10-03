@@ -57,9 +57,9 @@ public sealed class K3ConformanceTests
         Assert.Empty(mismatches);
     }
 
-    /// <summary>Binary XNOR (the current spelling of the biconditional) matches the oracle for every assignment.</summary>
+    /// <summary>Binary EQUIVALENT (legacy XNOR, symbol and IFF spellings) matches the oracle for every assignment.</summary>
     [Fact]
-    public async Task Evaluate_XnorOverAllAssignments_MatchesOracle_Test()
+    public async Task Evaluate_EquivalentOverAllAssignments_MatchesOracle_Test()
     {
         List<string> mismatches = await MismatchesAsync("a XNOR b", 2, v => K3Oracle.Equivalent(v[0], v[1]));
 

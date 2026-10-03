@@ -12,7 +12,7 @@ using TruthWeaver.Compilation;
 /// flat, key-discriminated JSON tree shape ADR-0003 defines and compiles through
 /// <see cref="RuleCompiler{TContext}.CompileJson(string)"/>, so a builder-assembled rule receives
 /// every diagnostic a hand-written one would (unknown predicate, bad argument, invalid threshold,
-/// XOR/XNOR arity, resource limits, structural tautology/contradiction) — nothing here bypasses the
+/// XOR/EQUIVALENT arity, resource limits, structural tautology/contradiction) — nothing here bypasses the
 /// Validate/Analyze stages of the compilation pipeline.
 /// </summary>
 public abstract class RuleBuilder
@@ -90,13 +90,25 @@ public abstract class RuleBuilder
         return new OperatorBuilder("xor", [left, right]);
     }
 
-    /// <summary>Creates a builder for binary exclusive-nor (logical biconditional / <c>IFF</c>).</summary>
+    /// <summary>Creates a builder for the binary logical biconditional (<c>EQUIVALENT</c>, also written <c>IFF</c> or <c>↔</c>).</summary>
     /// <param name="left">The left operand.</param>
     /// <param name="right">The right operand.</param>
-    /// <returns>A builder for the <c>XNOR</c> expression.</returns>
+    /// <returns>A builder for the <c>EQUIVALENT</c> expression.</returns>
+    public static RuleBuilder Equivalent(RuleBuilder left, RuleBuilder right)
+    {
+        return new OperatorBuilder("equivalent", [left, right]);
+    }
+
+    /// <summary>
+    /// Creates a builder for the biconditional under its pre-ADR-0005 name. Forwards to <see cref="Equivalent"/>
+    /// (same rule, same canonical text); kept so existing callers keep compiling.
+    /// </summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>A builder for the <c>EQUIVALENT</c> expression.</returns>
     public static RuleBuilder Xnor(RuleBuilder left, RuleBuilder right)
     {
-        return new OperatorBuilder("xnor", [left, right]);
+        return Equivalent(left, right);
     }
 
     /// <summary>Creates a builder for material implication (<c>NOT antecedent OR consequent</c>).</summary>

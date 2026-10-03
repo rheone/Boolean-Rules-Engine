@@ -44,9 +44,9 @@ public static class OperatorInfo
                 "XOR",
                 "True iff exactly one of the two operands is true. Unknown if either operand is Unknown."
             ),
-            "Xnor" => new OperatorDescriptor(
-                "XNOR",
-                "Logical biconditional (IFF) — true iff both operands agree (both true or both false). The negation of XOR."
+            "Equivalent" => new OperatorDescriptor(
+                "EQUIVALENT",
+                "Logical biconditional (IFF, formerly XNOR) — true iff both operands agree (both true or both false). The negation of XOR; Unknown if either operand is Unknown."
             ),
             "Implies" => new OperatorDescriptor(
                 "IMPLIES",

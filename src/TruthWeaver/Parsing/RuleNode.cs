@@ -48,11 +48,12 @@ internal sealed record OrNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span)
 internal sealed record XorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>
-/// A raw <c>XNOR</c> reference (logical biconditional / <c>IFF</c>). Same operand-count validation
+/// A raw <c>EQUIVALENT</c> reference (logical biconditional; <c>IFF</c> and the legacy <c>XNOR</c> are aliases that
+/// parse to this same node). Same operand-count validation
 /// story as <see cref="XorNode"/>: <c>RuleNodeCompiler</c> uniformly rejects anything other than
 /// exactly two operands.
 /// </summary>
-internal sealed record XnorNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+internal sealed record EquivalentNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>
 /// A raw <c>IMPLIES</c> reference (material implication). Operand count is validated by

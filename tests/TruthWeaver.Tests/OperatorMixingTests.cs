@@ -58,9 +58,9 @@ public sealed class OperatorMixingTests
 
     /// <summary>The message names the operators involved so the author knows which pair is ambiguous.</summary>
     [Theory]
-    [InlineData("a XOR b XNOR c", "XOR", "XNOR")]
-    [InlineData("a XNOR b ⊕ c", "XNOR", "XOR")]
-    [InlineData("a XNOR b AND c", "XNOR", "AND/OR")]
+    [InlineData("a XOR b XNOR c", "XOR", "EQUIVALENT")]
+    [InlineData("a XNOR b ⊕ c", "EQUIVALENT", "XOR")]
+    [InlineData("a XNOR b AND c", "EQUIVALENT", "AND/OR")]
     public void Compile_AmbiguousMixing_NamesTheOperatorsInvolved_Test(string text, string first, string second)
     {
         Diagnostic diagnostic = SingleMixingDiagnostic(text);

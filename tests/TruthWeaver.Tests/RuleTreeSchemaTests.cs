@@ -56,6 +56,8 @@ public sealed class RuleTreeSchemaTests
             """{"predicate": "hasAnyRole", "args": {"roles": ["Y", "Z"]}}""",
             """{"op": "not", "operands": [{"const": true}]}""",
             """{"op": "xnor", "operands": [{"predicate": "isManager"}, {"predicate": "isDepartmentHead"}]}""",
+            """{"op": "equivalent", "operands": [{"predicate": "isManager"}, {"predicate": "isDepartmentHead"}]}""",
+            """{"op": "iff", "operands": [{"predicate": "isManager"}, {"predicate": "isDepartmentHead"}]}""",
             """{"op": "implies", "operands": [{"predicate": "isManager"}, {"predicate": "isDepartmentHead"}]}""",
             """{"op": "exactlyOne", "operands": [{"const": true}, {"const": false}, {"const": true}]}""",
             """{"op": "atLeast", "k": 2, "operands": [{"const": true}, {"const": true}, {"const": false}]}""",

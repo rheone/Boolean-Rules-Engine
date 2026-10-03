@@ -21,7 +21,7 @@ internal static class RuleRenderTree
 {
     /// <summary>Builds a purely structural render tree, with no evaluation coloring.</summary>
     /// <param name="description">The rule's described tree.</param>
-    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/EQUIVALENT operator labels.</param>
     /// <param name="showArgumentValues">Whether to include a term's <see cref="RuleDescription.ArgumentText"/> in its rendered label.</param>
     /// <returns>The render tree.</returns>
     public static RenderNode Build(
@@ -36,7 +36,7 @@ internal static class RuleRenderTree
     /// <summary>Builds a render tree colored by one evaluation's result tree.</summary>
     /// <param name="description">The rule's described tree.</param>
     /// <param name="evaluated">The root of the matching <see cref="Decision.EvaluatedTree"/>.</param>
-    /// <param name="style">How to render the AND/OR/NOT/XOR/XNOR operator labels.</param>
+    /// <param name="style">How to render the AND/OR/NOT/XOR/EQUIVALENT operator labels.</param>
     /// <param name="showArgumentValues">Whether to include a term's <see cref="RuleDescription.ArgumentText"/> in its rendered label.</param>
     /// <returns>The render tree.</returns>
     public static RenderNode Build(
@@ -80,7 +80,7 @@ internal static class RuleRenderTree
     /// Renders <paramref name="description"/>'s label in <paramref name="style"/>, with its
     /// <see cref="RuleDescription.ArgumentText"/> appended when <paramref name="showArgumentValues"/>
     /// is <see langword="true"/> and the term has any. Only an operator node's exact word-form label
-    /// (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>XNOR</c>, <c>IMPLIES</c>) with at least one operand is
+    /// (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>EQUIVALENT</c>, <c>IMPLIES</c>) with at least one operand is
     /// eligible for restyling — a term or constant leaf (always zero operands) is never restyled even
     /// if a predicate's authored label happens to collide with one of those words, and
     /// <c>ExactlyOne</c>/threshold labels (e.g. <c>AtLeast(3)</c>) fall through unchanged in every
@@ -108,7 +108,7 @@ internal static class RuleRenderTree
                 "OR" => "∨",
                 "NOT" => "¬",
                 "XOR" => "⊕",
-                "XNOR" => "↔",
+                "EQUIVALENT" => "↔",
                 "IMPLIES" => "→",
                 _ => description.Label,
             },
@@ -118,7 +118,7 @@ internal static class RuleRenderTree
                 "OR" => "||",
                 "NOT" => "!",
                 "XOR" => "^",
-                "XNOR" => "==",
+                "EQUIVALENT" => "==",
                 _ => description.Label,
             },
             _ => throw new InvalidOperationException($"Unhandled operator style '{style}'."),

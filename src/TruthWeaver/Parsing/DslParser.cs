@@ -20,6 +20,8 @@ internal sealed class DslParser
         "OR",
         "NOT",
         "XOR",
+        "EQUIVALENT",
+        "IFF",
         "XNOR",
         "IMPLIES",
         "TRUE",
@@ -35,7 +37,7 @@ internal sealed class DslParser
 
     // Infix operators that sit outside the NOT > AND > OR precedence chain: they may not be mixed with
     // each other or with AND/OR at one nesting level without parentheses (ADR-0005 decision 8).
-    private static readonly string[] InfixOperators = ["XOR", "XNOR", "IMPLIES"];
+    private static readonly string[] InfixOperators = ["XOR", "EQUIVALENT", "IMPLIES"];
 
     private readonly IReadOnlyList<Token> tokens;
     private readonly List<Diagnostic> diagnostics;
@@ -99,6 +101,20 @@ internal sealed class DslParser
             "!" or "¬" => "NOT",
             "⊕" => "XOR",
             "→" => "IMPLIES",
+            "↔" => "EQUIVALENT",
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Maps a word alias to the canonical operator it stands for: <c>IFF</c> and the legacy <c>XNOR</c> both mean
+    /// <c>EQUIVALENT</c> (ADR-0005 decision 5), so persisted rules written with <c>XNOR</c> keep compiling.
+    /// </summary>
+    private static string? WordAlias(string word)
+    {
+        return word.ToUpperInvariant() switch
+        {
+            "IFF" or "XNOR" => "EQUIVALENT",
             _ => null,
         };
     }
@@ -107,7 +123,8 @@ internal sealed class DslParser
     {
         return this.Current.Kind switch
         {
-            TokenKind.Identifier => string.Equals(this.Current.Text, keyword, StringComparison.OrdinalIgnoreCase),
+            TokenKind.Identifier => string.Equals(this.Current.Text, keyword, StringComparison.OrdinalIgnoreCase)
+                || WordAlias(this.Current.Text) == keyword,
             TokenKind.Operator => SymbolAlias(this.Current.Text) == keyword,
             _ => false,
         };
@@ -214,7 +231,7 @@ internal sealed class DslParser
         RuleNode result = chainOperator switch
         {
             "XOR" => new XorNode(operands, span),
-            "XNOR" => new XnorNode(operands, span),
+            "EQUIVALENT" => new EquivalentNode(operands, span),
             "IMPLIES" => new ImpliesNode(operands, span),
             _ => throw new InvalidOperationException($"Unhandled infix operator '{chainOperator}'."),
         };

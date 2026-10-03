@@ -79,7 +79,7 @@ internal static class Analyzer
                 CollectTerms(x.Left, terms);
                 CollectTerms(x.Right, terms);
                 break;
-            case XnorExpression xn:
+            case EquivalentExpression xn:
                 CollectTerms(xn.Left, terms);
                 CollectTerms(xn.Right, terms);
                 break;
@@ -255,7 +255,7 @@ internal static class Analyzer
                     Build(x.Right, bdd, variableIndex, diagnostics)
                 );
                 break;
-            case XnorExpression xn:
+            case EquivalentExpression xn:
                 rail = Not(
                     bdd,
                     Xor(bdd, Build(xn.Left, bdd, variableIndex, diagnostics), Build(xn.Right, bdd, variableIndex, diagnostics))

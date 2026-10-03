@@ -99,6 +99,22 @@ the aliases are cheap once the canonical form stays single.
     style renders `→`, while the C-style has no spelling for it and keeps
     `IMPLIES`.
 
+    Implemented in k3-conformance 10: `EQUIVALENT` is
+    `{"op": "equivalent", "operands": [left, right]}` (exactly two operands,
+    compile-time checked with the shared infix arity code); `xnor` and `iff`
+    are read-only aliases in both formats (the shared op-name table has a
+    separate read table) and the printers always write `equivalent`;
+    `rule-tree.schema.json` lists `equivalent`, `iff` and `xnor`. The DSL
+    accepts `EQUIVALENT`, `IFF`, `XNOR` and `↔` (all reserved words, any
+    case) and the canonical printer writes `(a EQUIVALENT b)`; the tree
+    printers use `EQUIVALENT` / `↔` / `==` for the word / symbolic / C-style
+    operator styles. **Public API break (pre-1.0):** the AST record
+    `XnorExpression` is renamed `EquivalentExpression` (a record cannot be
+    type-aliased), its `NodeShape` op-name is `Equivalent`, and the
+    description/evaluated-node label is `EQUIVALENT` instead of `XNOR`.
+    `RuleBuilder.Xnor` is kept as a forwarding member of the new
+    `RuleBuilder.Equivalent`.
+
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,
     `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a

@@ -125,7 +125,7 @@ public sealed class AnalyzerTests
     /// </summary>
     [Theory]
     [InlineData("(a AND FALSE) XOR (b AND FALSE)", false)]
-    [InlineData("(a AND FALSE) XNOR (b AND FALSE)", true)]
+    [InlineData("(a AND FALSE) EQUIVALENT (b AND FALSE)", true)]
     [InlineData("(a AND FALSE) IMPLIES b", true)]
     [InlineData("a IMPLIES (b OR TRUE)", true)]
     [InlineData("(a OR TRUE) IMPLIES (b AND FALSE)", false)]
@@ -153,8 +153,8 @@ public sealed class AnalyzerTests
     /// </summary>
     [Theory]
     [InlineData("a XOR NOT a")]
-    [InlineData("a XNOR NOT a")]
-    [InlineData("a XNOR a")]
+    [InlineData("a EQUIVALENT NOT a")]
+    [InlineData("a EQUIVALENT a")]
     [InlineData("a IMPLIES a")]
     [InlineData("a IMPLIES NOT a")]
     [InlineData("ExactlyOne(a, NOT a)")]
@@ -356,7 +356,7 @@ public sealed class AnalyzerTests
                 GeneratedRule el = Child();
                 GeneratedRule er = Child();
                 return new GeneratedRule(
-                    $"({el.Text} XNOR {er.Text})",
+                    $"({el.Text} EQUIVALENT {er.Text})",
                     v => K3Oracle.Equivalent(el.Eval(v), er.Eval(v)),
                     [el, er]
                 );

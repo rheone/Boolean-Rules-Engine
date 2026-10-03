@@ -69,7 +69,7 @@ public sealed class DslRoundTripPropertyTests
 
     /// <summary>
     /// The full recursive expression generator — every operator (<c>AND</c>/<c>OR</c>/<c>NOT</c>/
-    /// <c>XOR</c>/<c>XNOR</c>/<c>ExactlyOne</c>/the threshold family) plus leaves, arity/threshold-range
+    /// <c>XOR</c>/<c>EQUIVALENT</c>/<c>ExactlyOne</c>/the threshold family) plus leaves, arity/threshold-range
     /// constrained to mirror <c>RuleNodeCompiler</c>'s own validation exactly, so no generated tree is
     /// ever rejected for a reason unrelated to round-tripping.
     /// </summary>
@@ -87,7 +87,7 @@ public sealed class DslRoundTripPropertyTests
                 .Select(operands => (Expression)new OrExpression(new EquatableArray<Expression>(operands)));
             Gen<Expression> genNot = self.Select(operand => (Expression)new NotExpression(operand));
             Gen<Expression> genXor = self.Select(self, (left, right) => (Expression)new XorExpression(left, right));
-            Gen<Expression> genXnor = self.Select(self, (left, right) => (Expression)new XnorExpression(left, right));
+            Gen<Expression> genXnor = self.Select(self, (left, right) => (Expression)new EquivalentExpression(left, right));
             Gen<Expression> genImplies = self.Select(self, (left, right) => (Expression)new ImpliesExpression(left, right));
             Gen<Expression> genExactlyOne = self.Array[2, 4]
                 .Select(operands => (Expression)new ExactlyOneExpression(new EquatableArray<Expression>(operands)));

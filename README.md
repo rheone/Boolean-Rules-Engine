@@ -43,7 +43,7 @@ anything else.
 ## What it is (and isn't)
 
 `TruthWeaver` answers one question: *is this expression true right
-now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `IMPLIES`,
+now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`,
 `ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
 `LessThan`/`Exactly`), terms, and evaluation. It does not know about
 permissions, workflows, or policies — those are things you build *on top* of
@@ -56,7 +56,7 @@ engine, not what the engine itself is.
 | **Expression** | The boolean tree — operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation, e.g. `hasTopping`, `lovesPineapple`. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")` — the tree's leaf node. |
-| **Operator** | `AND` `OR` `NOT` `XOR` `XNOR` `IMPLIES` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
+| **Operator** | `AND` `OR` `NOT` `XOR` `EQUIVALENT` `IMPLIES` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
 | **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
 
 Full vocabulary and the predicate-author contract: [CONTEXT.md](CONTEXT.md).
@@ -350,6 +350,7 @@ prints the named form.
 | `NOT` | `!`, `¬` |
 | `XOR` | `⊕` |
 | `IMPLIES` | `→` |
+| `EQUIVALENT` | `↔` (words `IFF` and the legacy `XNOR` are accepted too) |
 
 Symbols and words mix freely (`a && b OR c`) and follow the same precedence
 and no-mixing rules as the named operators. A lone `&` or `|` is a syntax error.
@@ -370,7 +371,7 @@ their head.
 `lovesPineapple AND NOT isBanned OR isVip` therefore parses as
 `(lovesPineapple AND (NOT isBanned)) OR isVip`.
 
-Every infix operator other than `NOT`/`AND`/`OR` (today `XOR`, `XNOR` and `IMPLIES`)
+Every infix operator other than `NOT`/`AND`/`OR` (today `XOR`, `EQUIVALENT` and `IMPLIES`)
 is **not** part of this precedence chain: mixing one with `AND`/`OR`, or with
 a *different* infix operator, at the same syntactic level without explicit
 parentheses is a **compile error** (`AmbiguousOperatorMixing`) rather than
@@ -388,7 +389,7 @@ not grouping, so they never participate in precedence at all.
 | Arity | Operators | Notes |
 | --- | --- | --- |
 | **Unary** | `NOT` | Takes exactly one operand. |
-| **Binary only** | `XOR`, `XNOR`, `IMPLIES` | Always exactly two operands — a compile error otherwise (`XorArityViolation`). `XOR`/`XNOR` are deliberately not generalized to n-ary parity (see [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)); a chain `a IMPLIES b IMPLIES c` is rejected too — parenthesize it. |
+| **Binary only** | `XOR`, `EQUIVALENT`, `IMPLIES` | Always exactly two operands — a compile error otherwise (`XorArityViolation`). `XOR`/`EQUIVALENT` are deliberately not generalized to n-ary parity (see [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)); a chain `a IMPLIES b IMPLIES c` is rejected too — parenthesize it. |
 | **N-ary (≥ 2)** | `AND`, `OR`, `ExactlyOne`, `AtLeast`, `AtMost`, `GreaterThan`, `LessThan`, `Exactly` | Take two or more operands. `AND`/`OR` are commonly thought of as "binary" from C-family languages, but this engine treats them as flat n-ary chains (`AND(a, b, c)`, not `AND(AND(a, b), c)`). |
 | **0-ary** | `True`, `False`, `Unknown` | Constants, not operators over operands. Written in any letter case; printed upper camel. |
 
@@ -400,7 +401,7 @@ not grouping, so they never participate in precedence at all.
 | `OR` | n-ary | True iff at least one operand is true. Short-circuits at the first `True`. |
 | `NOT` | unary | Logical negation. `Unknown` stays `Unknown`. |
 | `XOR(a, b)` | binary | True iff exactly one of the two operands is true. `Unknown` if either operand is `Unknown`. |
-| `XNOR(a, b)` | binary | Logical biconditional (`IFF`) — true iff both operands agree (both true or both false). The negation of `XOR`. |
+| `EQUIVALENT(a, b)` / `a ↔ b` | binary | Logical biconditional — true iff both operands agree (both true or both false). The negation of `XOR`; `Unknown` if either operand is `Unknown`. `IFF` and the legacy `XNOR` are accepted on input and compile to the same node; the canonical printer writes `EQUIVALENT`. |
 | `IMPLIES(a, b)` / `a → b` | binary | Strong Kleene material implication, `NOT a OR b`. `True` when `a` is `False` or `b` is `True`; `False` only for `True → False`; otherwise `Unknown`. |
 | `ExactlyOne(...)` | n-ary | True iff exactly one operand is true — the unambiguous name for what `XOR` only means at exactly two operands. |
 | `AtLeast(k, ...)` | n-ary | True iff at least `k` operands are true. |
@@ -430,7 +431,7 @@ write and read each one:
 | **Compile with** | `compiler.Compile(text)` | `compiler.CompileJson(json)` | `compiler.CompileYaml(yaml)` |
 | **Print with** | `rule.CanonicalText` | `rule.PrintJson()` | `rule.PrintYaml()` |
 | **Round-trips losslessly?** | Yes, by definition. | Yes — `parse(print(x))` is structurally equal to `x` (ticket 07). | Yes — same guarantee (ticket 08). |
-| **Nesting for `AND`/`OR`/`XOR`/`XNOR`/`IMPLIES`** | Infix with precedence (see [Operators](#operators)); `XOR`/`XNOR`/`IMPLIES` mixed with `AND`/`OR`, or with each other, needs explicit parens. | Explicit `{"op": "...", "operands": [...]}` nodes — no precedence to get wrong. | Same explicit `op`/`operands` shape as JSON. |
+| **Nesting for `AND`/`OR`/`XOR`/`EQUIVALENT`/`IMPLIES`** | Infix with precedence (see [Operators](#operators)); `XOR`/`EQUIVALENT`/`IMPLIES` mixed with `AND`/`OR`, or with each other, needs explicit parens. | Explicit `{"op": "...", "operands": [...]}` nodes — no precedence to get wrong. | Same explicit `op`/`operands` shape as JSON. |
 | **Comments** | No | No (JSON has none) | Yes (`#`) — a practical reason to prefer YAML for hand-maintained rule files. |
 
 See [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md) for the full
@@ -718,7 +719,7 @@ above) when it isn't.
 ## Examples
 
 Seven examples, each adding one more piece — a single predicate, combining
-predicates, named arguments, `XOR`/`XNOR`/`ExactlyOne`/the threshold family,
+predicates, named arguments, `XOR`/`EQUIVALENT`/`ExactlyOne`/the threshold family,
 the full worked example in all three formats, assembling that same rule with
 `RuleBuilder` instead of writing text, and matching a value against one or
 several constants — plus a bonus on turning a denial into a human-readable
@@ -827,7 +828,7 @@ exact same term identity — argument order in the source text still never
 matters, however many arguments a predicate declares (see
 [Term identity](CONTEXT.md#term-identity)).
 
-### 4. `XOR`, `XNOR`, `ExactlyOne`, and the threshold family
+### 4. `XOR`, `EQUIVALENT`, `ExactlyOne`, and the threshold family
 
 ```text
 AtLeast(2, approvedByAlice, approvedByBob, approvedByCarol)
@@ -845,10 +846,10 @@ operands, rather than relying on `XOR`'s parity-generalization (which is
 almost never what an author means past two operands — see
 [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)).
 
-`XNOR` is `XOR`'s counterpart — "these two must agree":
+`EQUIVALENT` (`IFF`, `↔`) is `XOR`'s counterpart — "these two must agree":
 
 ```text
-isPrimaryReviewer XNOR isBackupReviewer
+isPrimaryReviewer EQUIVALENT isBackupReviewer
 ```
 
 reads as "exactly one of primary/backup reviewer status, or neither" — true
@@ -862,7 +863,7 @@ isContractor IMPLIES hasSignedNda
 
 It is `NOT isContractor OR hasSignedNda`, so a non-contractor passes
 regardless of the NDA, and when `isContractor` is `True` the result is just
-`hasSignedNda`. Like `XOR`/`XNOR` it is binary and must be parenthesized
+`hasSignedNda`. Like `XOR`/`EQUIVALENT` it is binary and must be parenthesized
 next to `AND`/`OR` or another infix operator
 (`(isContractor IMPLIES hasSignedNda) AND isActive`); in JSON/YAML it is
 `{"op": "implies", "operands": [antecedent, consequent]}`.
@@ -1065,7 +1066,7 @@ method renders to the exact same flat JSON tree shape [ADR-0003](docs/adr/0003-r
 defines, and `Compile` hands that JSON to the same `CompileJson` any other
 JSON-producing tool would use. A builder-assembled rule therefore gets every
 diagnostic a hand-written one would — an unknown predicate, a bad argument,
-an out-of-range threshold, `XOR`/`XNOR`/`IMPLIES` arity, resource limits, structural
+an out-of-range threshold, `XOR`/`EQUIVALENT`/`IMPLIES` arity, resource limits, structural
 tautology/contradiction — nothing here bypasses the Validate/Analyze stages
 of the [compilation pipeline](#compilation-pipeline). See
 [Building rules programmatically](#building-rules-programmatically) below
@@ -1250,7 +1251,7 @@ on `TruthWeaver.Building.RuleBuilder`:
 | `OR` | `RuleBuilder.Or(params RuleBuilder[] operands)` |
 | `NOT` | `RuleBuilder.Not(RuleBuilder operand)` |
 | `XOR` | `RuleBuilder.Xor(RuleBuilder left, RuleBuilder right)` |
-| `XNOR` | `RuleBuilder.Xnor(RuleBuilder left, RuleBuilder right)` |
+| `EQUIVALENT` | `RuleBuilder.Equivalent(RuleBuilder left, RuleBuilder right)` (`RuleBuilder.Xnor` is kept and forwards to it) |
 | `IMPLIES` | `RuleBuilder.Implies(RuleBuilder antecedent, RuleBuilder consequent)` |
 | `ExactlyOne` | `RuleBuilder.ExactlyOne(params RuleBuilder[] operands)` |
 | `AtLeast(k)` / `AtMost(k)` / `GreaterThan(k)` / `LessThan(k)` / `Exactly(k)` | `RuleBuilder.AtLeast(int k, params RuleBuilder[] operands)` (and the four siblings, same shape) |
@@ -1464,7 +1465,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `IMPLIES(a, b)` / `→` | Strong Kleene material implication, `NOT a OR b`; a first-class binary node that prints as written (`(a IMPLIES b)`). Mixing it with `AND`/`OR` or another infix operator without parentheses is a compile error. See [Operators](#operators). |
 | Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
-| Operator | `AND`, `OR`, `NOT`, `XOR`, `XNOR`, `IMPLIES`, `ExactlyOne`, the threshold family, and the `True`/`False`/`Unknown` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
+| Operator | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `ExactlyOne`, the threshold family, and the `True`/`False`/`Unknown` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
 | `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`TruthWeaver.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
 | Predicate | A registered, reusable implementation (e.g. `hasTopping`, `lovesPineapple`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Label` and `Description`; see [Predicate types](#predicate-types). |
 | `PredicateArguments` | The non-generic accessor (`GetString`, `GetInt64`, ...) a predicate uses to read its own term's arguments inside `EvaluateAsync`. |
@@ -1479,15 +1480,15 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | Term identity | What makes two term references "the same variable": predicate name (normalized to registered casing) plus arguments sorted by name and compared by exact, case-sensitive value. Argument order in source text never matters; array-valued arguments are order-sensitive. |
 | `Trace` | An ordered, literal record of every node an evaluation visited or explicitly skipped — the "why was this denied" explanation. |
 | `TruthValue` | The three-valued result type: `True`, `False`, or `Unknown`. Never `bool?`. |
-| `XNOR(a, b)` | Binary exclusive-nor (logical biconditional / `IFF`) — the negation of `XOR`, deliberately not generalized to n-ary parity for the same reason `XOR` isn't. Mixing `XNOR` with `AND`/`OR`, or with `XOR`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-xnor-exactlyone-and-the-threshold-family). |
-| `XOR(a, b)` | Binary exclusive-or, deliberately not generalized to n-ary parity. Mixing `XOR` with `AND`/`OR`, or with `XNOR`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-xnor-exactlyone-and-the-threshold-family). |
+| `EQUIVALENT(a, b)` / `↔` | The Strong Kleene biconditional (`IFF`; formerly and still readable as `XNOR`) — the negation of `XOR`, deliberately binary. Mixing `EQUIVALENT` with `AND`/`OR`, or with `XOR`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-equivalent-exactlyone-and-the-threshold-family). |
+| `XOR(a, b)` | Binary exclusive-or, deliberately not generalized to n-ary parity. Mixing `XOR` with `AND`/`OR`, or with `EQUIVALENT`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-equivalent-exactlyone-and-the-threshold-family). |
 
 ## Appendix: Truth tables
 
 Kleene three-valued truth tables for every binary/unary operator, in both
 logical-name and boolean-algebra notation. `T` = `TruthValue.True`, `F` =
 `TruthValue.False`, `?` = `TruthValue.Unknown`. Algebra notation: `∧` = AND,
-`∨` = OR, `¬` = NOT, `⊕` = XOR, `↔` = XNOR (biconditional / IFF), `→` = IMPLIES, `1` = true,
+`∨` = OR, `¬` = NOT, `⊕` = XOR, `↔` = EQUIVALENT (biconditional / IFF / legacy XNOR), `→` = IMPLIES, `1` = true,
 `0` = false. Full reasoning: [ADR-0001](docs/adr/0001-kleene-failure-model.md).
 
 ### Unary: `NOT`
@@ -1540,9 +1541,9 @@ logical-name and boolean-algebra notation. `T` = `TruthValue.True`, `F` =
 | ? | F | ? | ?⊕0 = ? |
 | ? | ? | ? | ?⊕? = ? |
 
-### Binary: `XNOR` (`NOT (a XOR b)`)
+### Binary: `EQUIVALENT` (`NOT (a XOR b)`)
 
-| a | b | `a XNOR b` | a↔b |
+| a | b | `a EQUIVALENT b` | a↔b |
 | :-: | :-: | :-: | :-: |
 | T | T | T | 1↔1 = 1 |
 | T | F | F | 1↔0 = 0 |

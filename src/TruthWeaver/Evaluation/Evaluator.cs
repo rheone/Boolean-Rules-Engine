@@ -62,7 +62,7 @@ internal sealed class Evaluator<TContext>(
             "And" => "AND",
             "Or" => "OR",
             "Xor" => "XOR",
-            "Xnor" => "XNOR",
+            "Equivalent" => "EQUIVALENT",
             "Implies" => "IMPLIES",
             "ExactlyOne" => "ExactlyOne",
             _ => $"{shape.OpName}({shape.K})",
@@ -111,7 +111,7 @@ internal sealed class Evaluator<TContext>(
         return (left == TruthValue.True) ^ (right == TruthValue.True) ? TruthValue.True : TruthValue.False;
     }
 
-    private static TruthValue KleeneXnor(TruthValue left, TruthValue right)
+    private static TruthValue KleeneEquivalent(TruthValue left, TruthValue right)
     {
         return KleeneNot(KleeneXor(left, right));
     }
@@ -234,12 +234,12 @@ internal sealed class Evaluator<TContext>(
                 return new EvalResult(value, new EvaluatedNode("XOR", value, false, [.. results.Select(r => r.Node)]));
             }
 
-            case XnorExpression:
+            case EquivalentExpression:
             {
                 NodeShape shape = ExpressionShape.Of(node);
                 IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
-                TruthValue value = KleeneXnor(results[0].Value, results[1].Value);
-                return new EvalResult(value, new EvaluatedNode("XNOR", value, false, [.. results.Select(r => r.Node)]));
+                TruthValue value = KleeneEquivalent(results[0].Value, results[1].Value);
+                return new EvalResult(value, new EvaluatedNode("EQUIVALENT", value, false, [.. results.Select(r => r.Node)]));
             }
 
             case ImpliesExpression:

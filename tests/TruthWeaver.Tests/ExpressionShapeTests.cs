@@ -60,13 +60,13 @@ public sealed class ExpressionShapeTests
     }
 
     [Fact]
-    public void Xnor_shape_exposes_left_then_right_as_operands()
+    public void Equivalent_shape_exposes_left_then_right_as_operands()
     {
-        XnorExpression node = new(TermA, TermB);
+        EquivalentExpression node = new(TermA, TermB);
 
         NodeShape shape = ExpressionShape.Of(node);
 
-        Assert.Equal("Xnor", shape.OpName);
+        Assert.Equal("Equivalent", shape.OpName);
         Assert.Equal([TermA, TermB], shape.Operands);
     }
 

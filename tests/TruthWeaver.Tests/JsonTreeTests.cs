@@ -87,7 +87,11 @@ public sealed class JsonTreeTests
         CompiledRule<RuleTestContext> reparsed = compiler.CompileJson(json).CompiledRule!;
 
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
-        Assert.Contains("\"op\":\"xnor\"", json.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Contains(
+            "\"op\":\"equivalent\"",
+            json.Replace(" ", string.Empty, StringComparison.Ordinal),
+            StringComparison.Ordinal
+        );
     }
 
     [Fact]

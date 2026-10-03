@@ -131,7 +131,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 operands => new OrExpression(new EquatableArray<Expression>(operands))
             ),
             XorNode x => this.BuildXor(x, depth),
-            XnorNode xn => this.BuildXnor(xn, depth),
+            EquivalentNode eq => this.BuildEquivalent(eq, depth),
             ImpliesNode i => this.BuildImplies(i, depth),
             ExactlyOneNode e => this.BuildVariadic(
                 e.Operands,
@@ -193,23 +193,20 @@ internal sealed class RuleNodeCompiler<TContext>
         return new XorExpression(left, right);
     }
 
-    private Expression BuildXnor(XnorNode node, int depth)
+    private Expression BuildEquivalent(EquivalentNode node, int depth)
     {
         if (node.Operands.Count != 2)
         {
-            this.diagnostics.Add(
-                Diagnostic.Error(
-                    DiagnosticCodes.XorArityViolation,
-                    $"XNOR is binary only; found {node.Operands.Count} operands.",
-                    node.Span
-                )
-            );
+            string message =
+                $"EQUIVALENT is binary only; found {node.Operands.Count} operands. "
+                + "Add parentheses (or nest EQUIVALENT nodes) to say how chained equivalences group.";
+            this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.XorArityViolation, message, node.Span));
             return FailedNode.Placeholder;
         }
 
         Expression left = this.Build(node.Operands[0], depth + 1);
         Expression right = this.Build(node.Operands[1], depth + 1);
-        return new XnorExpression(left, right);
+        return new EquivalentExpression(left, right);
     }
 
     private Expression BuildImplies(ImpliesNode node, int depth)

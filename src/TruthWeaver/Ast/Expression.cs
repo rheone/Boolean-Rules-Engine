@@ -70,12 +70,14 @@ public sealed record OrExpression(EquatableArray<Expression> Operands) : Express
 public sealed record XorExpression(Expression Left, Expression Right) : Expression;
 
 /// <summary>
-/// Binary exclusive-nor (logical biconditional / <c>IFF</c>) — the negation of <see cref="XorExpression"/>,
-/// deliberately not generalized to n-ary parity for the same reason <c>XOR</c> isn't (ADR-0003).
+/// The Strong Kleene biconditional (<c>EQUIVALENT</c>, written <c>IFF</c> or <c>↔</c> as well; the legacy name is
+/// <c>XNOR</c>) — the negation of <see cref="XorExpression"/>, so it is <c>Unknown</c> whenever either operand is.
+/// Deliberately binary: it is not generalized to n-ary parity for the same reason <c>XOR</c> isn't (ADR-0003).
+/// Formerly <c>XnorExpression</c> (renamed by ADR-0005 decision 5).
 /// </summary>
 /// <param name="Left">The left operand.</param>
 /// <param name="Right">The right operand.</param>
-public sealed record XnorExpression(Expression Left, Expression Right) : Expression;
+public sealed record EquivalentExpression(Expression Left, Expression Right) : Expression;
 
 /// <summary>
 /// Strong Kleene material implication, <c>NOT antecedent OR consequent</c> (ADR-0005). It is a first-class node

@@ -100,7 +100,7 @@ public sealed class RuleBuilderTests
             .CompiledRule!;
 
         Assert.Equal("(a XOR b)", viaXorBuilder.CanonicalText);
-        Assert.Equal("(a XNOR b)", viaXnorBuilder.CanonicalText);
+        Assert.Equal("(a EQUIVALENT b)", viaXnorBuilder.CanonicalText);
     }
 
     [Fact]

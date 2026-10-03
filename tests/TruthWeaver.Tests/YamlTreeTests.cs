@@ -119,7 +119,7 @@ public sealed class YamlTreeTests
         CompiledRule<RuleTestContext> reparsed = compiler.CompileYaml(yaml).CompiledRule!;
 
         Assert.Equal(original.CanonicalText, reparsed.CanonicalText);
-        Assert.Contains("op: xnor", yaml, StringComparison.Ordinal);
+        Assert.Contains("op: equivalent", yaml, StringComparison.Ordinal);
     }
 
     [Fact]

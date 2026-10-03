@@ -7,7 +7,7 @@ using TruthWeaver.Ast;
 /// parenthesized for clarity wherever an operator is mixed with a different one, even where
 /// precedence alone would make the meaning unambiguous (e.g. <c>a AND b OR c</c> prints as
 /// <c>(a AND b) OR c</c>) — the point is to make a large nested rule easy for a human to read at a
-/// glance, not merely to avoid a parser error. <c>XOR</c>/<c>XNOR</c>/<c>IMPLIES</c> are always parenthesized
+/// glance, not merely to avoid a parser error. <c>XOR</c>/<c>EQUIVALENT</c>/<c>IMPLIES</c> are always parenthesized
 /// regardless of context. This is the exact form <c>parse</c> reproduces a structurally equal tree
 /// from (ticket 06).
 /// </summary>
@@ -35,7 +35,7 @@ internal static class CanonicalPrinter
         return (node, context) switch
         {
             (XorExpression, _) => true,
-            (XnorExpression, _) => true,
+            (EquivalentExpression, _) => true,
             (ImpliesExpression, _) => true,
             (
                 AndExpression,
@@ -67,8 +67,8 @@ internal static class CanonicalPrinter
             XorExpression x => PrintNode(x.Left, PrintContext.InfixOperand)
                 + " XOR "
                 + PrintNode(x.Right, PrintContext.InfixOperand),
-            XnorExpression xn => PrintNode(xn.Left, PrintContext.InfixOperand)
-                + " XNOR "
+            EquivalentExpression xn => PrintNode(xn.Left, PrintContext.InfixOperand)
+                + " EQUIVALENT "
                 + PrintNode(xn.Right, PrintContext.InfixOperand),
             ImpliesExpression im => PrintNode(im.Antecedent, PrintContext.InfixOperand)
                 + " IMPLIES "

@@ -39,7 +39,7 @@ public sealed class DslParserTests
     {
         (RuleNode _, IReadOnlyList<Diagnostic> diagnostics) = DslParser.Parse("a XOR b XNOR c");
 
-        Assert.Contains(diagnostics, d => d.Message.Contains("Mixing XOR with XNOR"));
+        Assert.Contains(diagnostics, d => d.Message.Contains("Mixing XOR with EQUIVALENT"));
     }
 
     [Theory]
@@ -49,7 +49,7 @@ public sealed class DslParserTests
     {
         (RuleNode _, IReadOnlyList<Diagnostic> diagnostics) = DslParser.Parse(source);
 
-        Assert.DoesNotContain(diagnostics, d => d.Message.Contains("Mixing XOR with XNOR"));
+        Assert.DoesNotContain(diagnostics, d => d.Message.Contains("Mixing XOR with EQUIVALENT"));
     }
 
     [Theory]
