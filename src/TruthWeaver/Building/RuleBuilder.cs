@@ -260,6 +260,19 @@ public abstract class RuleBuilder
         return new BetweenBuilder(min, max, operands);
     }
 
+    /// <summary>
+    /// Creates a builder for <c>Project(operand, unknownAs)</c>: <c>True</c> and <c>False</c> pass through and
+    /// <c>Unknown</c> is replaced by <paramref name="unknownAs"/>, so the result is always definite (the same value as
+    /// <c>COALESCE(operand, unknownAs)</c>).
+    /// </summary>
+    /// <param name="operand">The expression whose <c>Unknown</c> result is replaced.</param>
+    /// <param name="unknownAs"><see langword="true"/> to project <c>Unknown</c> to <c>True</c>, <see langword="false"/> to <c>False</c>.</param>
+    /// <returns>A builder for the <c>Project</c> expression.</returns>
+    public static RuleBuilder Project(RuleBuilder operand, bool unknownAs)
+    {
+        return new ProjectBuilder(operand, unknownAs);
+    }
+
     /// <summary>Creates a builder for "at least <paramref name="k"/> of these operands are true".</summary>
     /// <param name="k">The threshold.</param>
     /// <param name="operands">The operands.</param>
@@ -428,6 +441,23 @@ public abstract class RuleBuilder
                 ["min"] = this.min,
                 ["max"] = this.max,
                 ["operands"] = OperandsNode(this.operands),
+            };
+        }
+    }
+
+    private sealed class ProjectBuilder(RuleBuilder operand, bool unknownAs) : RuleBuilder
+    {
+        private readonly RuleBuilder operand = operand;
+        private readonly bool unknownAs = unknownAs;
+
+        private protected override JsonNode ToNode()
+        {
+            // Same shape JsonTreePrinter writes: the policy is a plain JSON boolean next to the single operand.
+            return new JsonObject
+            {
+                ["op"] = "project",
+                ["unknownAs"] = this.unknownAs,
+                ["operands"] = OperandsNode([this.operand]),
             };
         }
     }

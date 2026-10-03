@@ -112,6 +112,13 @@ internal sealed record BetweenNode(int Min, int Max, IReadOnlyList<RuleNode> Ope
 internal sealed record InspectionNode(InspectionKind Kind, IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>
+/// <c>Project(x, True|False)</c> reference: <see cref="UnknownAs"/> is the value <c>Unknown</c> becomes. The operand count
+/// (exactly one) is validated by <c>RuleNodeCompiler</c>, so a malformed JSON/YAML node is rejected the same way as an
+/// inspection; the DSL parser has already rejected a missing or non-constant value.
+/// </summary>
+internal sealed record ProjectNode(IReadOnlyList<RuleNode> Operands, bool UnknownAs, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
 /// <c>If(condition, whenTrue, whenFalse)</c> / ternary <c>c ? t : f</c> reference. The operand count (exactly three) is
 /// validated by <c>RuleNodeCompiler</c>, so a malformed JSON/YAML node or <c>If(a, b)</c> is rejected the same way.
 /// </summary>

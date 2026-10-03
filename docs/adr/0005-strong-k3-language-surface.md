@@ -255,6 +255,38 @@ the aliases are cheap once the canonical form stays single.
     read, one operand checked by the compiler; the schema lists them in the
     unary node). `RuleBuilder.IsTrue`/`IsFalse`/`IsUnknown`/`IsKnown` are new.
 
+    Implemented in k3-conformance 18: `Project(expr, True|False)` is a
+    first-class `ProjectExpression(Operand, UnknownAs)` node (`UnknownAs` is a
+    `bool`, so an `Unknown` replacement cannot even be represented). It keeps
+    `True`/`False` and replaces `Unknown` with the chosen constant, so it is
+    always definite and is the same value as `COALESCE(expr, value)`; the
+    operand's own faults are recorded as usual (a faulting predicate is
+    `Unknown` plus a `Fault`, the projection makes the *value* definite but does
+    not hide the fault). **Syntax:** `Project` is a reserved function-call word
+    (any case) taking exactly two arguments, an expression and the literal
+    constant `True` or `False` (any case). The second argument is parsed as a
+    full expression and then checked, so every bad shape is a `SyntaxError` over
+    the offending argument's span: `Unknown` gets a dedicated message ("Project
+    replaces Unknown, so it needs the constant True or False to replace it
+    with"), any other non-constant (`Project(a, b)`, `Project(a, NOT True)`)
+    says it must be the constant `True` or `False`, and a missing or third
+    argument names the expected shape. **JSON/YAML:** `{"op": "project",
+    "unknownAs": true, "operands": [x]}` (YAML `op: project`, `unknownAs:
+    true`): the policy rides in an `unknownAs` field next to the single operand,
+    as `BETWEEN` carries `min`/`max` and the threshold family `k`, so it is not
+    an operand. It is written as a plain boolean (like a `True`/`False` `const`)
+    and read as a boolean or the string `"true"`/`"false"` in any letter case; a
+    missing, `"unknown"` or non-boolean value is `MalformedTree`, and the operand
+    count (exactly one) is a compiler `MalformedTree` like the inspections.
+    `rule-tree.schema.json` has a `projectOperatorNode`. `NodeShape` gained an
+    optional `UnknownAs`. **Analyzer:** both rails are the same BDD, `P` (the
+    operand's possible rail) for `Project(x, True)` and `D` for `Project(x,
+    False)`, so `Project(a, True) OR NOT Project(a, True)` is a genuine
+    tautology. The canonical printer writes `Project(a, True)`; the evaluated and
+    description label is `Project(True)` / `Project(False)`, kept as a word in
+    every `OperatorStyle`. `RuleBuilder.Project(operand, unknownAs)` is new.
+    Unlike `Collapse` (decision 14) it may appear anywhere in a rule.
+
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,
     `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a

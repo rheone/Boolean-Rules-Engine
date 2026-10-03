@@ -242,6 +242,8 @@ internal static class JsonTreeParser
                 return new InspectionNode(InspectionKind.IsUnknown, operands, SourceSpan.None);
             case "IsKnown":
                 return new InspectionNode(InspectionKind.IsKnown, operands, SourceSpan.None);
+            case "Project":
+                return ParseProject(element, op, operands, diagnostics);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":
@@ -278,6 +280,44 @@ internal static class JsonTreeParser
         }
 
         return new ThresholdNode(comparison, kElement.GetInt32(), operands, SourceSpan.None);
+    }
+
+    /// <summary>
+    /// Reads <c>Project</c>'s <c>unknownAs</c>: a JSON boolean or the string <c>"true"</c>/<c>"false"</c> in any letter
+    /// case (like <c>const</c>). <c>Unknown</c> is rejected because projecting <c>Unknown</c> to itself is no projection.
+    /// </summary>
+    private static RuleNode? ParseProject(JsonElement element, string op, List<RuleNode> operands, List<Diagnostic> diagnostics)
+    {
+        bool? unknownAs = null;
+        if (element.TryGetProperty("unknownAs", out JsonElement valueElement))
+        {
+            if (valueElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                unknownAs = valueElement.GetBoolean();
+            }
+            else if (
+                valueElement.ValueKind == JsonValueKind.String
+                && TruthValueText.TryParse(valueElement.GetString(), out TruthValue parsed)
+                && parsed != TruthValue.Unknown
+            )
+            {
+                unknownAs = parsed == TruthValue.True;
+            }
+        }
+
+        if (unknownAs is not { } value)
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"'{op}' requires 'unknownAs' to be true or false (a JSON boolean or the string \"true\"/\"false\").",
+                    SourceSpan.None
+                )
+            );
+            return null;
+        }
+
+        return new ProjectNode(operands, value, SourceSpan.None);
     }
 
     private static RuleNode? ParseBetween(JsonElement element, string op, List<RuleNode> operands, List<Diagnostic> diagnostics)

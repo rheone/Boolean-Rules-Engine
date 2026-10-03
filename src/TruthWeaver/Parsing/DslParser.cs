@@ -40,6 +40,7 @@ internal sealed class DslParser
         "ISFALSE",
         "ISUNKNOWN",
         "ISKNOWN",
+        "PROJECT",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -479,6 +480,11 @@ internal sealed class DslParser
             }
         }
 
+        if (this.IsKeyword("PROJECT"))
+        {
+            return this.ParseProject();
+        }
+
         if (this.IsKeyword("IF"))
         {
             return this.ParseOperandCall((operands, span) => new IfNode(operands, span));
@@ -703,6 +709,92 @@ internal sealed class DslParser
         int end = this.Current.Span.End;
         this.Expect(TokenKind.RParen, "')'");
         return new BetweenNode(min, max, operands, SpanCovering(start, end));
+    }
+
+    /// <summary>
+    /// Parses <c>Project(expr, True|False)</c>: one operand expression, then the constant <c>True</c> or <c>False</c> that
+    /// replaces <c>Unknown</c>. Every malformed shape (no value, <c>Unknown</c>, a non-constant, extra arguments) is a
+    /// <see cref="DiagnosticCodes.SyntaxError"/> at the offending argument, and parsing continues for recovery.
+    /// </summary>
+    private RuleNode ParseProject()
+    {
+        int start = this.Current.Span.Start;
+        this.position++;
+        this.Expect(TokenKind.LParen, "'('");
+
+        List<RuleNode> operands = [];
+        bool unknownAs = false;
+        if (this.Current.Kind == TokenKind.RParen)
+        {
+            this.ReportProjectShape(this.Current.Span);
+        }
+        else
+        {
+            operands.Add(this.ParseExpression());
+            if (this.Current.Kind == TokenKind.Comma)
+            {
+                this.position++;
+                unknownAs = this.ParseProjectValue();
+            }
+            else
+            {
+                this.ReportProjectShape(this.Current.Span);
+            }
+
+            // A third argument is a mistake, not a silent ignore; it is parsed (and dropped) so the closing ')' is found.
+            while (this.Current.Kind == TokenKind.Comma)
+            {
+                this.position++;
+                RuleNode extra = this.ParseExpression();
+                this.diagnostics.Add(
+                    Diagnostic.Error(
+                        DiagnosticCodes.SyntaxError,
+                        "Project takes exactly two arguments: an expression and the constant True or False.",
+                        extra.Span
+                    )
+                );
+            }
+        }
+
+        int end = this.Current.Span.End;
+        this.Expect(TokenKind.RParen, "')'");
+        return new ProjectNode(operands, unknownAs, SpanCovering(start, end));
+    }
+
+    /// <summary>
+    /// Reads <c>Project</c>'s second argument, which must be the literal constant <c>True</c> or <c>False</c> (any letter
+    /// case). The argument is parsed as a full expression first so a rejected value is reported over its whole text.
+    /// </summary>
+    private bool ParseProjectValue()
+    {
+        RuleNode value = this.ParseExpression();
+        if (value is ConstantNode { Value: TruthValue.True })
+        {
+            return true;
+        }
+
+        if (value is ConstantNode { Value: TruthValue.False })
+        {
+            return false;
+        }
+
+        string message =
+            value is ConstantNode
+                ? "Project's value cannot be Unknown: Project replaces Unknown, so it needs the constant True or False to replace it with."
+                : "Project's second argument must be the constant True or False (the value that replaces Unknown), not an expression.";
+        this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.SyntaxError, message, value.Span));
+        return false;
+    }
+
+    private void ReportProjectShape(SourceSpan at)
+    {
+        this.diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                $"Project requires two arguments: an expression and the constant True or False, as in Project(expr, True) (found '{this.Current.Text}').",
+                at
+            )
+        );
     }
 
     /// <summary>

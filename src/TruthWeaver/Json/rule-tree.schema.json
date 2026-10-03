@@ -56,12 +56,13 @@
       "additionalProperties": false
     },
     "operatorNode": {
-      "description": "An operator node: a unary operator (NOT or an inspection), an n-ary boolean operator, or an n-ary threshold operator.",
+      "description": "An operator node: a unary operator (NOT or an inspection), an n-ary boolean operator, an n-ary threshold operator, BETWEEN or Project.",
       "oneOf": [
         { "$ref": "#/$defs/unaryOperatorNode" },
         { "$ref": "#/$defs/naryOperatorNode" },
         { "$ref": "#/$defs/thresholdOperatorNode" },
-        { "$ref": "#/$defs/betweenOperatorNode" }
+        { "$ref": "#/$defs/betweenOperatorNode" },
+        { "$ref": "#/$defs/projectOperatorNode" }
       ]
     },
     "unaryOperatorNode": {
@@ -119,6 +120,24 @@
         "max": { "type": "integer" }
       },
       "required": ["op", "operands", "min", "max"],
+      "additionalProperties": false
+    },
+    "projectOperatorNode": {
+      "description": "Project: keeps a true or false operand and replaces unknown with 'unknownAs' (a JSON boolean, or the string \"true\"/\"false\" in any letter case on read; unknown is not allowed). Exactly one operand (compile-time checked). The result is always definite.",
+      "type": "object",
+      "properties": {
+        "op": { "const": "project" },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "unknownAs": {
+          "oneOf": [{ "type": "boolean" }, { "enum": ["true", "false"] }]
+        }
+      },
+      "required": ["op", "operands", "unknownAs"],
       "additionalProperties": false
     }
   }

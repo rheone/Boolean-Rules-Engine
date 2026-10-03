@@ -190,6 +190,19 @@ public sealed record BetweenExpression(int Min, int Max, EquatableArray<Expressi
 public sealed record InspectionExpression(InspectionKind Kind, Expression Operand) : Expression;
 
 /// <summary>
+/// <c>Project(x, unknownAs)</c>: keeps a <c>True</c> or <c>False</c> operand and replaces <c>Unknown</c> with the chosen
+/// definite value, so the result is never <c>Unknown</c> (ADR-0005 decision 12). It is the same value as
+/// <c>COALESCE(x, unknownAs)</c> and exists as a named, intent-revealing form. Unlike a final <c>Collapse</c> it can sit
+/// anywhere inside a rule.
+/// </summary>
+/// <param name="Operand">The expression whose <c>Unknown</c> result is replaced.</param>
+/// <param name="UnknownAs">
+/// The value <c>Unknown</c> becomes: <see langword="true"/> for <c>True</c>, <see langword="false"/> for <c>False</c>.
+/// A <see cref="bool"/> rather than a <c>TruthValue</c> so an <c>Unknown</c> replacement cannot be represented.
+/// </param>
+public sealed record ProjectExpression(Expression Operand, bool UnknownAs) : Expression;
+
+/// <summary>
 /// <c>If(condition, whenTrue, whenFalse)</c> (ternary <c>condition ? whenTrue : whenFalse</c>): a K3-aware conditional.
 /// A <c>True</c> condition yields <paramref name="WhenTrue"/>, a <c>False</c> one yields <paramref name="WhenFalse"/>, and an
 /// <c>Unknown</c> condition does not guess a branch: the result is the branch value when both branches are the same

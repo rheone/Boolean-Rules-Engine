@@ -247,6 +247,8 @@ internal static class YamlTreeParser
                 return new InspectionNode(InspectionKind.IsUnknown, operands, SourceSpan.None);
             case "IsKnown":
                 return new InspectionNode(InspectionKind.IsKnown, operands, SourceSpan.None);
+            case "Project":
+                return ParseProject(mapping, op, operands, diagnostics);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":
@@ -287,6 +289,37 @@ internal static class YamlTreeParser
         }
 
         return new ThresholdNode(comparison, k, operands, SourceSpan.None);
+    }
+
+    /// <summary>
+    /// Reads <c>Project</c>'s <c>unknownAs</c>: <c>true</c> or <c>false</c> in any letter case. <c>Unknown</c> is rejected
+    /// because projecting <c>Unknown</c> to itself is no projection.
+    /// </summary>
+    private static RuleNode? ParseProject(
+        YamlMappingNode mapping,
+        string op,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
+    {
+        if (
+            !TryGetChild(mapping, "unknownAs", out YamlNode? valueNode)
+            || valueNode is not YamlScalarNode { Value: { } valueText }
+            || !TruthValueText.TryParse(valueText, out TruthValue parsed)
+            || parsed == TruthValue.Unknown
+        )
+        {
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"'{op}' requires 'unknownAs' to be true or false.",
+                    SourceSpan.None
+                )
+            );
+            return null;
+        }
+
+        return new ProjectNode(operands, parsed == TruthValue.True, SourceSpan.None);
     }
 
     private static RuleNode? ParseBetween(

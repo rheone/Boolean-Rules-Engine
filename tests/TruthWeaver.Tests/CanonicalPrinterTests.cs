@@ -90,6 +90,8 @@ public sealed class CanonicalPrinterTests
     [InlineData("IsFalse(isManager AND isDepartmentHead)")]
     [InlineData("IsUnknown(isManager)")]
     [InlineData("IsKnown(NOT isManager)")]
+    [InlineData("Project(isManager, True)")]
+    [InlineData("Project(isManager AND isDepartmentHead, False)")]
     [InlineData("ExactlyOne(isManager, isDepartmentHead, isManager)")]
     [InlineData("AtLeast(2, isManager, isDepartmentHead, isManager)")]
     [InlineData("AtMost(1, isManager, isDepartmentHead, isManager)")]

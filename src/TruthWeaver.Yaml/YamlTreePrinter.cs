@@ -40,6 +40,17 @@ internal static class YamlTreePrinter
 
         NodeShape shape = ExpressionShape.Of(node);
         string op = TreeFormatOpNames.ToTreeFormat(shape.OpName);
+        if (shape.UnknownAs is { } unknownAs)
+        {
+            // Project carries its policy as a plain true/false scalar, like a True/False const.
+            YamlMappingNode project = OperatorNode(op, shape.Operands.Select(ToNode));
+            project.Add(
+                new YamlScalarNode("unknownAs"),
+                Scalar(TruthValueText.TreeFormat(unknownAs ? TruthValue.True : TruthValue.False), ScalarStyle.Plain)
+            );
+            return project;
+        }
+
         if (shape is { K: { } min, Max: { } max })
         {
             // BETWEEN carries its two bounds as min/max instead of a single threshold k.

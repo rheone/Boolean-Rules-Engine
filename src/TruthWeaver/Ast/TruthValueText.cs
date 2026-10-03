@@ -23,6 +23,14 @@ internal static class TruthValueText
         };
     }
 
+    /// <summary>Gets the canonical spelling of a definite value given as a <see cref="bool"/> (a <c>Project</c> policy).</summary>
+    /// <param name="value"><see langword="true"/> for <c>True</c>, <see langword="false"/> for <c>False</c>.</param>
+    /// <returns><c>True</c> or <c>False</c>.</returns>
+    public static string Canonical(bool value)
+    {
+        return value ? "True" : "False";
+    }
+
     /// <summary>Gets the lower-case spelling written to JSON/YAML trees when a constant is not a plain boolean.</summary>
     /// <param name="value">The constant's value.</param>
     /// <returns><c>true</c>, <c>false</c> or <c>unknown</c>.</returns>

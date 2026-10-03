@@ -75,6 +75,7 @@ internal sealed class Evaluator<TContext>(
             "Coalesce" => "COALESCE",
             "If" => "If",
             "IsTrue" or "IsFalse" or "IsUnknown" or "IsKnown" => shape.OpName,
+            "Project" => $"Project({TruthValueText.Canonical(shape.UnknownAs == true)})",
             _ => $"{shape.OpName}({shape.K})",
         };
     }
@@ -308,6 +309,17 @@ internal sealed class Evaluator<TContext>(
                 EvalResult operand = await this.EvalAsync(inspection.Operand).ConfigureAwait(false);
                 TruthValue value = Inspect(inspection.Kind, operand.Value);
                 return new EvalResult(value, new EvaluatedNode(inspection.Kind.ToString(), value, false, [operand.Node]));
+            }
+
+            case ProjectExpression project:
+            {
+                EvalResult operand = await this.EvalAsync(project.Operand).ConfigureAwait(false);
+
+                // Only Unknown is replaced; a faulting operand is Unknown with its Fault already recorded, so the
+                // projection makes the value definite without hiding the fault.
+                TruthValue replacement = project.UnknownAs ? TruthValue.True : TruthValue.False;
+                TruthValue value = operand.Value == TruthValue.Unknown ? replacement : operand.Value;
+                return new EvalResult(value, new EvaluatedNode(Describe(project), value, false, [operand.Node]));
             }
 
             case IfExpression ifNode:

@@ -100,6 +100,10 @@ public static class OperatorInfo
                 "IsKnown",
                 "Inspection: True iff the operand is True or False; False if it is Unknown. The result is never Unknown, so it never collapses the enclosing rule."
             ),
+            "Project" => new OperatorDescriptor(
+                $"Project({TruthValueText.Canonical(shape.UnknownAs == true)})",
+                $"Projection: True and False pass through unchanged and Unknown becomes {TruthValueText.Canonical(shape.UnknownAs == true)}. The result is never Unknown (the same as COALESCE with that value), so it does not collapse the enclosing rule."
+            ),
             "If" => new OperatorDescriptor(
                 "If",
                 "Conditional: the second operand when the condition is True, the third when it is False. An Unknown condition does not pick a branch: the result is the branch value when both branches are the same definite value, otherwise Unknown. Only the needed branch is evaluated for a definite condition."

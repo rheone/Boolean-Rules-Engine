@@ -83,7 +83,7 @@ internal static class RuleRenderTree
     /// (<c>AND</c>, <c>OR</c>, <c>NOT</c>, <c>XOR</c>, <c>EQUIVALENT</c>, <c>IMPLIES</c>, <c>NAND</c>, <c>NOR</c>) with at least one operand is
     /// eligible for restyling — a term or constant leaf (always zero operands) is never restyled even
     /// if a predicate's authored label happens to collide with one of those words, and
-    /// <c>ExactlyOne</c>/threshold/<c>BETWEEN</c>/<c>If</c>/inspection labels (e.g. <c>AtLeast(3)</c>) fall through unchanged in every
+    /// <c>ExactlyOne</c>/threshold/<c>BETWEEN</c>/<c>If</c>/inspection/<c>Project</c> labels (e.g. <c>AtLeast(3)</c>) fall through unchanged in every
     /// style, since they have no symbolic or C-style spelling. <c>COALESCE</c> renders as <c>??</c> in both the
     /// symbolic and the C-style form. <c>IMPLIES</c> has a symbolic spelling
     /// (<c>→</c>) but no C-family one, so it keeps its word form in <see cref="OperatorStyle.CStyle"/>; <c>NAND</c>/<c>NOR</c> behave the same way (<c>↑</c>/<c>↓</c>).

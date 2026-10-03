@@ -257,6 +257,18 @@ public static class K3Oracle
         return value == TruthValue.Unknown ? TruthValue.False : TruthValue.True;
     }
 
+    /// <summary>
+    /// <c>Project(x, unknownAs)</c>: keeps <c>True</c>/<c>False</c> and replaces <c>Unknown</c> with
+    /// <paramref name="unknownAs"/>. Defined from the primitive <see cref="Coalesce"/> as <c>COALESCE(x, unknownAs)</c>
+    /// (ADR-0005 decision 12), so the result is always definite.
+    /// </summary>
+    /// <param name="value">The operand's value.</param>
+    /// <param name="unknownAs">The definite value that replaces <c>Unknown</c>.</param>
+    public static TruthValue Project(TruthValue value, TruthValue unknownAs)
+    {
+        return Coalesce([value, unknownAs]);
+    }
+
     /// <summary>Exactly-one-true over the interval semantics (not parity).</summary>
     public static TruthValue ExactlyOne(IReadOnlyList<TruthValue> operands)
     {

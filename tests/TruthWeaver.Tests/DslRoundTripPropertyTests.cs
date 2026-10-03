@@ -108,6 +108,10 @@ public sealed class DslRoundTripPropertyTests
 
             Gen<Expression> genInspection = Gen.Enum<InspectionKind>()
                 .Select(self, (kind, operand) => (Expression)new InspectionExpression(kind, operand));
+            Gen<Expression> genProject = Gen.Bool.Select(
+                self,
+                (unknownAs, operand) => (Expression)new ProjectExpression(operand, unknownAs)
+            );
             Gen<Expression> genIf = self.Array[3]
                 .Select(operands => (Expression)new IfExpression(operands[0], operands[1], operands[2]));
 
@@ -130,7 +134,8 @@ public sealed class DslRoundTripPropertyTests
                 (1, genBetween),
                 (1, genCoalesce),
                 (1, genIf),
-                (1, genInspection)
+                (1, genInspection),
+                (1, genProject)
             );
         }
     );

@@ -154,6 +154,9 @@ internal static class Analyzer
             case InspectionExpression ins:
                 CollectTerms(ins.Operand, terms);
                 break;
+            case ProjectExpression pr:
+                CollectTerms(pr.Operand, terms);
+                break;
             case IfExpression iff:
                 CollectTerms(iff.Condition, terms);
                 CollectTerms(iff.WhenTrue, terms);
@@ -262,6 +265,17 @@ internal static class Analyzer
             InspectionKind.IsKnown => bdd.Or(x.Definite, bdd.Not(x.Possible)),
             _ => throw new InvalidOperationException($"Unhandled inspection kind '{kind}'."),
         };
+        return new DualRail(isTrue, isTrue);
+    }
+
+    /// <summary>
+    /// <c>Project(x, unknownAs)</c> on the rails. <c>Unknown</c> becomes a definite value, so both result rails are the
+    /// same BDD: projecting to <c>True</c> is true exactly when <c>x</c> is possibly true (<c>True</c> or <c>Unknown</c>,
+    /// rail <c>P</c>), projecting to <c>False</c> exactly when <c>x</c> is definitely true (rail <c>D</c>).
+    /// </summary>
+    private static DualRail Project(DualRail x, bool unknownAs)
+    {
+        int isTrue = unknownAs ? x.Possible : x.Definite;
         return new DualRail(isTrue, isTrue);
     }
 
@@ -448,6 +462,9 @@ internal static class Analyzer
                 break;
             case InspectionExpression ins:
                 rail = Inspect(bdd, ins.Kind, Build(ins.Operand, bdd, variableIndex, diagnostics));
+                break;
+            case ProjectExpression pr:
+                rail = Project(Build(pr.Operand, bdd, variableIndex, diagnostics), pr.UnknownAs);
                 break;
             case IfExpression iff:
                 rail = If(

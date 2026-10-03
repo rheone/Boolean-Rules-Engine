@@ -33,6 +33,8 @@ public sealed class OperatorInfoTests
     [InlineData("IsFalse(a)", "IsFalse")]
     [InlineData("IsUnknown(a)", "IsUnknown")]
     [InlineData("IsKnown(a)", "IsKnown")]
+    [InlineData("Project(a, True)", "Project(True)")]
+    [InlineData("Project(a, False)", "Project(False)")]
     [InlineData("ExactlyOne(a, b)", "ExactlyOne")]
     [InlineData("AtLeast(1, a, b)", "AtLeast(1)")]
     [InlineData("AtMost(1, a, b)", "AtMost(1)")]

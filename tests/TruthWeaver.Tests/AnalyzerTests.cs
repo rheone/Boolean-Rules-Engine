@@ -166,6 +166,10 @@ public sealed class AnalyzerTests
     [InlineData("IsUnknown((a AND FALSE))", false)]
     [InlineData("IsKnown((a AND FALSE))", true)]
     [InlineData("IsKnown((a OR TRUE))", true)]
+    [InlineData("Project((a OR TRUE), True)", true)]
+    [InlineData("Project((a OR TRUE), False)", true)]
+    [InlineData("Project((a AND FALSE), True)", false)]
+    [InlineData("Project((a AND FALSE), False)", false)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -213,6 +217,9 @@ public sealed class AnalyzerTests
     [InlineData("IsFalse(NOT a)")]
     [InlineData("IsUnknown(a)")]
     [InlineData("IsKnown(a)")]
+    [InlineData("Project(a, True)")]
+    [InlineData("Project(a, False)")]
+    [InlineData("Project(a, True) AND Project(a, False)")]
     [InlineData("IsUnknown(a AND NOT a)")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
@@ -386,7 +393,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(19))
+        switch (random.Next(20))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -481,6 +488,15 @@ public sealed class AnalyzerTests
                     $"COALESCE({string.Join(", ", coalesced.Select(o => o.Text))})",
                     v => K3Oracle.Coalesce([.. coalesced.Select(o => o.Eval(v))]),
                     coalesced
+                );
+            case 19:
+                GeneratedRule projected = Child();
+                bool unknownAs = random.Next(2) == 0;
+                TruthValue replacement = unknownAs ? TruthValue.True : TruthValue.False;
+                return new GeneratedRule(
+                    $"Project({projected.Text}, {replacement})",
+                    v => K3Oracle.Project(projected.Eval(v), replacement),
+                    [projected]
                 );
             case 18:
                 GeneratedRule inspected = Child();

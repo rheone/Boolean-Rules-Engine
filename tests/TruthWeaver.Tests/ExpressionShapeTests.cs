@@ -196,6 +196,22 @@ public sealed class ExpressionShapeTests
         Assert.Equal([TermA], shape.Operands);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Project_shape_carries_its_one_operand_and_its_unknown_policy(bool unknownAs)
+    {
+        ProjectExpression node = new(TermA, unknownAs);
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Project", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Null(shape.Max);
+        Assert.Equal(unknownAs, shape.UnknownAs);
+        Assert.Equal([TermA], shape.Operands);
+    }
+
     [Fact]
     public void Coalesce_shape_carries_its_operands_in_order()
     {
