@@ -32,6 +32,11 @@ Two specific traps drove several of the decisions below:
 
 ### Operator set
 
+> **Superseded by [ADR-0005](0005-strong-k3-language-surface.md) (decisions 3, 4, 5, 6):** the operator
+> set is no longer this list. `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`/`ALL`/`NONE`/`BETWEEN`,
+> `COALESCE`, `If`, the inspections and `Project` exist, `EQUIVALENT` replaces `XNOR`, and `Unknown` is
+> a constant. The text below is kept as the original decision.
+
 `AND`, `OR`, `NOT`, `XOR` (**binary only** — a compile error if given more
 than two operands), `ExactlyOne(...)` (n-ary, true iff exactly one operand is
 `True`), `AtLeast(k, ...)` (n-ary threshold, e.g. "any two of these three
@@ -40,13 +45,20 @@ approvals"), and the constants `true`/`false`. See
 family (`AtMost`/`GreaterThan`/`LessThan`/`Exactly`), added after this ADR
 was first accepted.
 
-`IMPLIES` is deliberately **not** included — it saves two characters over
+> **Superseded by ADR-0005 (decision 3):** `IMPLIES` is now an operator (Strong Kleene material implication).
+
+`IMPLIES` was deliberately **not** included — it saves two characters over
 `OR(NOT(a), b)` and rule authors reliably get its truth table wrong, so the
 "convenience" is negative value. N-ary `XOR` is not supported under that
 name at all — the ambiguity above is resolved by giving the "exactly one"
 meaning its own explicit name (`ExactlyOne`) instead of overloading `XOR`.
 
 ### String DSL — canonical form
+
+> **Superseded in part by ADR-0005 (decisions 2, 8, 9):** symbol aliases and `[]`/`{}` grouping are
+> accepted on input (the canonical form is still the upper camel word with parentheses), and every
+> infix operator other than `NOT`/`AND`/`OR` follows the no-mixing rule, not just `XOR`. The
+> `NOT` > `AND` > `OR` precedence below stands.
 
 Word operators only (`AND`, `OR`, `NOT`, `XOR`, `ExactlyOne`, `AtLeast`),
 matched case-insensitively on input. No symbol aliases (`&&`, `||`) — one
@@ -147,6 +159,7 @@ schema against the compiler's own valid and malformed JSON fixtures.
 
 The `true`/`false` constant (user story 11) uses the same discrimination
 principle with a third key: `{"const": true}` / `{"const": false}`.
+(ADR-0005 decision 16 adds `{"const": "unknown"}`; the DSL constants are `True`/`False`/`Unknown`.)
 
 Both `RuleCompiler.CompileJson` and `CompileYaml` also accept an
 already-materialized node (`System.Text.Json.JsonElement` /
@@ -260,6 +273,9 @@ the full table and why no `All`/`None` operators exist to duplicate them.
 
 ### `XNOR` (logical biconditional / `IFF`)
 
+> **Superseded by ADR-0005 (decision 5):** the node is now `EQUIVALENT` (aliases `IFF` and `XNOR`);
+> JSON/YAML write `equivalent` and still read `xnor`. `IFF` is accepted, contrary to the paragraph below.
+
 Added as `XOR`'s natural counterpart: binary-only for the same reason `XOR`
 is (the n-ary generalization is a parity operator nobody means when they
 write `XNOR(a, b, c)`), always parenthesized by the canonical printer
@@ -345,4 +361,5 @@ lower-trust path that could drift out of sync with the validated one.
 
 - [ADR-0001: Kleene failure model](0001-kleene-failure-model.md)
 - [ADR-0002: Evaluation semantics](0002-evaluation-semantics.md)
+- [ADR-0005: Strong K3 language surface](0005-strong-k3-language-surface.md)
 - [CONTEXT.md](../../CONTEXT.md)

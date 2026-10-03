@@ -4,7 +4,9 @@
 [![.NET](https://img.shields.io/badge/.NET-11.0-512BD4)](global.json)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-A general-purpose boolean expression engine for .NET. Author a rule once as
+A general-purpose **Strong Kleene (K3)** expression engine for .NET. Every
+expression evaluates to one of three values — `True`, `False` or `Unknown` — and
+`Unknown` is never silently turned into `True` or `False`. Author a rule once as
 text, compile it into an immutable tree, and evaluate it many times against
 whatever application context you supply — a user, a request, a resource, or
 anything else.
@@ -19,9 +21,20 @@ anything else.
 - [Packages](#packages)
 - [Features](#features)
 - [Operators](#operators)
+  - [Symbol notation](#symbol-notation)
+  - [Grammar](#grammar)
   - [Order of operations](#order-of-operations)
+  - [Grouping delimiters](#grouping-delimiters)
+  - [Whitespace](#whitespace)
   - [Binary vs. unary operators](#binary-vs-unary-operators)
   - [All operators](#all-operators)
+  - [Collapse: the final boundary](#collapse-the-final-boundary)
+- [Rewriting rules](#rewriting-rules)
+  - [Expand to primitives](#expand-to-primitives)
+  - [NAND-only and NOR-only](#nand-only-and-nor-only)
+  - [Compress to derived operators](#compress-to-derived-operators)
+  - [Canonical form](#canonical-form)
+  - [Simplify](#simplify)
 - [Choosing a rule format](#choosing-a-rule-format)
 - [Predicate types](#predicate-types)
 - [Examples](#examples)
@@ -33,6 +46,7 @@ anything else.
 - [Evaluation flow](#evaluation-flow)
 - [Compilation pipeline](#compilation-pipeline)
 - [Reading diagnostics](#reading-diagnostics)
+  - [JSON and YAML rules](#json-and-yaml-rules)
 - [Benchmarks](#benchmarks)
 - [Glossary](#glossary)
 - [Appendix: Truth tables](#appendix-truth-tables)
@@ -43,8 +57,8 @@ anything else.
 
 ## What it is (and isn't)
 
-`TruthWeaver` answers one question: *is this expression true right
-now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`,
+`TruthWeaver` answers one question: *what is the truth value of this expression
+right now, for this context?* — `True`, `False` or `Unknown`. It knows about `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`,
 `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `If`, `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`, `Project`, `ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
 `LessThan`/`Exactly`), terms, and evaluation. It does not know about
 permissions, workflows, or policies — those are things you build *on top* of
@@ -54,11 +68,11 @@ engine, not what the engine itself is.
 | Concept | Meaning |
 | --- | --- |
 | **Rule** | A named unit of persistence: metadata + one expression. |
-| **Expression** | The boolean tree — operators over terms and sub-expressions. |
+| **Expression** | The three-valued tree — operators over terms, constants and sub-expressions. |
 | **Predicate** | A registered, reusable implementation, e.g. `hasTopping`, `lovesPineapple`. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")` — the tree's leaf node. |
-| **Operator** | `AND` `OR` `NOT` `XOR` `EQUIVALENT` `IMPLIES` `NAND` `NOR` `NXOR` `ANY` `ALL` `NONE` `BETWEEN(min, max)` `COALESCE` `If` `IsTrue` `IsFalse` `IsUnknown` `IsKnown` `Project(x, True)` `Project(x, False)` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
-| **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
+| **Operator** | `AND` `OR` `NOT` `XOR` `EQUIVALENT` `IMPLIES` `NAND` `NOR` `NXOR` `ANY` `ALL` `NONE` `BETWEEN(min, max)` `COALESCE` `If` `IsTrue` `IsFalse` `IsUnknown` `IsKnown` `Project(x, True)` `Project(x, False)` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus the constants `True`/`False`/`Unknown`. Operators are case-insensitive and most have a symbol spelling (`&&`, `||`, `!`, `∧`, `∨`, `¬`, `⊕`, `→`, `↔`, `↑`, `↓`, `??`, `? :`). `Collapse(x, policy)` is the final boundary, not an operator. See [Operators](#operators) below. |
+| **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. `IsSatisfied` is fail-closed: only `True` is satisfied. |
 
 Full vocabulary and the predicate-author contract: [CONTEXT.md](CONTEXT.md).
 
@@ -148,14 +162,15 @@ flowchart TD
         direction TB
         Parsing["Parsing<br/>DSL lexer + parser"]
         Ast["Ast<br/>Expression tree, operator metadata"]
+        Rewriting["Rewriting<br/>expand, compress, canonicalize, simplify"]
         Compilation["Compilation<br/>RuleCompiler, CompilerOptions"]
         Analysis["Analysis<br/>BddManager, constant/contradiction analyzer"]
         Building["Building<br/>RuleBuilder (assemble without text)"]
         Registry["Registry<br/>PredicateRegistry(Builder)"]
         Evaluation["Evaluation<br/>Evaluator, CompiledRule, EvaluationOptions"]
-        Diagnostics["Diagnostics<br/>Diagnostic, DiagnosticSeverity"]
+        Diagnostics["Diagnostics<br/>Diagnostic, suggestions, DiagnosticFormatter"]
         Json["Json<br/>JSON tree parser/printer + schema"]
-        Printing["Printing<br/>CanonicalPrinter, MermaidTreePrinter"]
+        Printing["Printing<br/>CanonicalPrinter, RuleText, MermaidTreePrinter"]
         Diffing["Diffing<br/>RuleDiff, RuleDiffPrinter"]
         Logging["Logging<br/>structured log events"]
         Metrics["Metrics<br/>TruthWeaverMetrics (Meter)"]
@@ -170,6 +185,7 @@ flowchart TD
         Analysis --> Diagnostics
         Compilation --> Diagnostics
         Ast --> Evaluation
+        Ast --> Rewriting
         Ast --> Printing
         Ast --> Diffing
     end
@@ -200,6 +216,8 @@ Starting points for common tasks:
 | Understand constant/contradiction detection | [`BddManager`](src/TruthWeaver/Analysis/BddManager.cs), [`Analyzer`](src/TruthWeaver/Analysis/Analyzer.cs) |
 | Understand evaluation and short-circuiting | [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs), [`CompiledRule`](src/TruthWeaver/Evaluation/CompiledRule.cs) |
 | Assemble a rule without hand-writing text | [`RuleBuilder`](src/TruthWeaver/Building/RuleBuilder.cs) |
+| Rewrite a rule (expand, compress, canonicalize, simplify) | [`CompiledRule`](src/TruthWeaver/Evaluation/CompiledRule.cs) and [`Rewriting`](src/TruthWeaver/Rewriting) |
+| Understand compile diagnostics and "did you mean" | [`Diagnostic`](src/TruthWeaver/Diagnostics/Diagnostic.cs), [`DiagnosticFormatter`](src/TruthWeaver/Diagnostics/DiagnosticFormatter.cs) |
 | Print or diagram a compiled rule | [`CanonicalPrinter`](src/TruthWeaver/Printing/CanonicalPrinter.cs), [`MermaidTreePrinter`](src/TruthWeaver/Printing/MermaidTreePrinter.cs) |
 | Diff two compiled rules | [`RuleDiff`](src/TruthWeaver/Diffing/RuleDiff.cs) |
 | Wire into a DI container | [`TruthWeaverServiceCollectionExtensions`](src/TruthWeaver/DependencyInjection/TruthWeaverServiceCollectionExtensions.cs) |
@@ -279,8 +297,27 @@ A service that only *implements* domain predicates references
 - **Kleene three-valued logic.** Every operator follows the three-valued
   truth tables in [ADR-0001](docs/adr/0001-kleene-failure-model.md) (full
   tables: [Appendix](#appendix-truth-tables)) — a predicate fault becomes
-  `Unknown`, never a thrown exception or a silently coerced `false`. Entry
+  `Unknown`, never a thrown exception or a silently coerced `false`, and a
+  predicate can also answer `Unknown` directly. Entry
   point: [`Evaluator`](src/TruthWeaver/Evaluation/Evaluator.cs).
+- **A complete Strong K3 language.** Primitive and derived logic (`NOT`, `AND`,
+  `OR`, `IMPLIES`, `EQUIVALENT`, `XOR`, `NXOR`, `NAND`, `NOR`), cardinality
+  (`AtLeast`/`AtMost`/`Exactly`, `ANY`/`ALL`/`NONE`/`BETWEEN`), value operations
+  (`COALESCE`/`??`, `If`/`? :`), inspections (`IsTrue`, `IsFalse`, `IsUnknown`,
+  `IsKnown`) and `Unknown` as a constant. Operators are case-insensitive, have
+  symbol spellings, and every notation compiles to the same tree with one
+  canonical form. See [Operators](#operators).
+- **Explicit boundaries.** `Project(x, True|False)` resolves `Unknown` anywhere
+  inside a rule; `Collapse(x, policy)` is the single, outermost step that turns a
+  three-valued result into a two-valued answer. See
+  [Collapse](#collapse-the-final-boundary).
+- **Rule rewriting.** Opt-in, value-preserving transforms return a new rule:
+  expand to primitives, to NAND-only or NOR-only, compress back to derived
+  operators, canonicalize, simplify, plus whitespace normalization. See
+  [Rewriting rules](#rewriting-rules).
+- **Readable diagnostics.** Every authoring error is a structured `Diagnostic`
+  (code, span or JSON/YAML path, expected/found, "did you mean") with a
+  plain-text formatter. See [Reading diagnostics](#reading-diagnostics).
 - **Per-evaluation memoization.** A term referenced from multiple branches
   of the same rule is invoked at most once per evaluation, keyed by
   structural term identity (see [CONTEXT.md#term-identity](CONTEXT.md#term-identity)).
@@ -360,6 +397,54 @@ prints the named form.
 Symbols and words mix freely (`a && b OR c`) and follow the same precedence
 and no-mixing rules as the named operators. A lone `&` or `|` is a syntax error; a lone `?` is only valid as the ternary's `?`.
 
+### Grammar
+
+The whole DSL in EBNF (`{ x }` is zero or more, `[ x ]` optional, `|` a choice). Keywords and
+constants are case-insensitive; a term name may not be a reserved word.
+
+```ebnf
+rule        = collapse | expression ;
+collapse    = "Collapse" "(" expression "," policy ")" ;     (* outermost only *)
+policy      = "UnknownAsFalse" | "UnknownAsTrue" | "UnknownIsError" ;
+
+expression  = or_expr [ "?" or_expr ":" or_expr ] ;          (* ternary = If *)
+or_expr     = and_expr { ( "OR" | "||" | "∨" ) and_expr } ;
+and_expr    = infix_expr { ( "AND" | "&&" | "∧" ) infix_expr } ;
+infix_expr  = not_expr [ infix_op not_expr ]                 (* at most one *)
+            | not_expr { "??" not_expr } ;                   (* COALESCE chain *)
+infix_op    = "XOR" | "⊕" | "EQUIVALENT" | "IFF" | "XNOR" | "↔"
+            | "IMPLIES" | "→" | "NAND" | "↑" | "NOR" | "↓" ;
+not_expr    = ( "NOT" | "!" | "¬" ) not_expr | primary ;
+
+primary     = "(" expression ")" | "[" expression "]" | "{" expression "}"
+            | constant | call | term ;
+constant    = "True" | "False" | "Unknown" ;
+call        = list_op "(" expression { "," expression } ")"
+            | threshold "(" integer "," expression { "," expression } ")"
+            | "BETWEEN" "(" integer "," integer "," expression { "," expression } ")"
+            | "If" "(" expression "," expression "," expression ")"
+            | inspection "(" expression ")"
+            | "Project" "(" expression "," ( "True" | "False" ) ")" ;
+list_op     = "NXOR" | "ANY" | "ALL" | "NONE" | "COALESCE" | "ExactlyOne" ;
+threshold   = "AtLeast" | "AtMost" | "GreaterThan" | "LessThan" | "Exactly" ;
+inspection  = "IsTrue" | "IsFalse" | "IsUnknown" | "IsKnown" ;
+
+term        = identifier [ "(" [ argument { "," argument } ] ")" ] ;
+argument    = identifier ":" literal ;
+literal     = string | number | "true" | "false" | "[" [ literal { "," literal } ] "]" ;
+```
+
+Two rules sit outside the grammar because they are context rules, not syntax:
+
+- **No implicit mixing.** An `infix_op` expression (or `??`, or the ternary) may not sit next to
+  `AND`/`OR`, another infix operator or a nested ternary at the same level without parentheses
+  (`AmbiguousOperatorMixing`); see [Order of operations](#order-of-operations).
+- **`Collapse` is outermost only** (`NestedCollapse`), and operand counts, threshold bounds and
+  argument schemas are checked after parsing, as diagnostics.
+
+Precedence, tightest first: grouping, `NOT`, `AND`, `OR`. Everything else is a one-step infix form
+that needs parentheses to combine.
+
 ### Order of operations
 
 Precedence governs *parsing* the DSL only — the canonical printer always
@@ -437,8 +522,7 @@ was written with. To tidy text *as written* (keeping your operators, letter case
 or needing a predicate registry), use `RuleText.NormalizeWhitespace`:
 
 ```csharp
-RuleText.NormalizeWhitespace("  a&&b ||
-  !c  ");          // "a && b || !c"
+RuleText.NormalizeWhitespace("  a&&b ||\n  !c  ");          // "a && b || !c"
 RuleText.NormalizeWhitespace("ANY( a ,b,	c )");            // "ANY(a, b, c)"
 RuleText.NormalizeWhitespace("named( value :\"x  y\" )");   // "named(value: \"x  y\")" (string contents untouched)
 ```
@@ -462,14 +546,14 @@ Characters the DSL does not recognise are kept in place, so the text of a rule t
 
 | Operator | Arity | Description |
 | --- | --- | --- |
-| `AND` | n-ary | True iff every operand is true. Short-circuits at the first `False`. |
-| `OR` | n-ary | True iff at least one operand is true. Short-circuits at the first `True`. |
-| `NOT` | unary | Logical negation. `Unknown` stays `Unknown`. |
-| `XOR(a, b)` | binary | True iff exactly one of the two operands is true. `Unknown` if either operand is `Unknown`. |
-| `EQUIVALENT(a, b)` / `a ↔ b` | binary | Logical biconditional — true iff both operands agree (both true or both false). The negation of `XOR`; `Unknown` if either operand is `Unknown`. `IFF` and the legacy `XNOR` are accepted on input and compile to the same node; the canonical printer writes `EQUIVALENT`. |
-| `IMPLIES(a, b)` / `a → b` | binary | Strong Kleene material implication, `NOT a OR b`. `True` when `a` is `False` or `b` is `True`; `False` only for `True → False`; otherwise `Unknown`. |
-| `NAND(a, b)` / `a ↑ b` | binary | Negated conjunction, `NOT (a AND b)`. `False` only when both operands are `True`; `True` if either is `False`; otherwise `Unknown`. Both operands are always evaluated. |
-| `NOR(a, b)` / `a ↓ b` | binary | Negated disjunction, `NOT (a OR b)`. `True` only when both operands are `False`; `False` if either is `True`; otherwise `Unknown`. Both operands are always evaluated. |
+| `AND` / `&&` / `∧` | n-ary | True iff every operand is true. Short-circuits at the first `False`. |
+| `OR` / `\|\|` / `∨` | n-ary | True iff at least one operand is true. Short-circuits at the first `True`. |
+| `NOT a` / `!a` / `¬a` | unary | Logical negation. `Unknown` stays `Unknown`. |
+| `a XOR b` / `a ⊕ b` | binary | True iff exactly one of the two operands is true. `Unknown` if either operand is `Unknown`. |
+| `a EQUIVALENT b` / `a ↔ b` | binary | Logical biconditional — true iff both operands agree (both true or both false). The negation of `XOR`; `Unknown` if either operand is `Unknown`. `IFF` and the legacy `XNOR` are accepted on input and compile to the same node; the canonical printer writes `EQUIVALENT`. |
+| `a IMPLIES b` / `a → b` | binary | Strong Kleene material implication, `NOT a OR b`. `True` when `a` is `False` or `b` is `True`; `False` only for `True → False`; otherwise `Unknown`. |
+| `a NAND b` / `a ↑ b` | binary | Negated conjunction, `NOT (a AND b)`. `False` only when both operands are `True`; `True` if either is `False`; otherwise `Unknown`. Both operands are always evaluated. |
+| `a NOR b` / `a ↓ b` | binary | Negated disjunction, `NOT (a OR b)`. `True` only when both operands are `False`; `False` if either is `True`; otherwise `Unknown`. Both operands are always evaluated. |
 | `NXOR(a, b, ...)` | n-ary | Parity: `True` iff an odd number of operands are `True`, `False` iff an even number are, and `Unknown` whenever any operand is `Unknown`. At two operands it equals `XOR`; from three operands it differs from `ExactlyOne` (`NXOR(a, b, c)` is `True` when all three are `True`). A function call, so it has no precedence and needs no parentheses next to other operators. |
 | `ANY(a, b, ...)` | n-ary | At least one operand is `True` (`AtLeast(1, ...)`): `True` if any operand is `True`, `False` if every operand is `False`, otherwise `Unknown`. |
 | `ALL(a, b, ...)` | n-ary | Every operand is `True` (`AtLeast(n, ...)`): `True` if all are `True`, `False` if any is `False`, otherwise `Unknown`. |
@@ -490,6 +574,9 @@ Characters the DSL does not recognise are kept in place, so the text of a rule t
 | `LessThan(k, ...)` | n-ary | True iff fewer than `k` operands are true. |
 | `Exactly(k, ...)` | n-ary | True iff exactly `k` operands are true. |
 | `True` / `False` / `Unknown` | constant | Fixed K3 truth value (any letter case; the canonical printer writes `True`, `False`, `Unknown`). `Unknown` models an indeterminate constant, e.g. when stubbing out incomplete logic. In JSON a constant is `{"const": true}` or, for `Unknown`, `{"const": "unknown"}`; in YAML `const: unknown`. Operator names are case-insensitive in every format. |
+
+The binary logical operators are infix only (`a XOR b`); there is no `XOR(a, b)` call form. The n-ary
+operators, the threshold family and the other functions are calls (`NXOR(a, b, c)`).
 
 Every operator above follows the three-valued Kleene truth tables in
 [ADR-0001](docs/adr/0001-kleene-failure-model.md) — see the
@@ -1215,7 +1302,7 @@ next to `AND`/`OR` or another infix operator
 
 ### 5. The full worked example, in all three formats
 
-Rule text (the canonical, persisted form):
+Rule text as authored (`CanonicalText` prints the same rule with the optional `hasCrust` arguments filled in from their defaults):
 
 ```text
 hasTopping(topping: "greenOlives") AND (hasCrust(crust: "thin") OR hasCrust(crust: "stuffed", ignoreCase: false) OR (isDineIn XOR isTakeout))
@@ -1704,7 +1791,7 @@ flowchart TD
     Memo -->|"Yes"| Reuse["Reuse memoized TruthValue"]
     Memo -->|"No"| Invoke["Invoke predicate"]
 
-    Invoke -->|"success"| Record["Memoize TruthValue"]
+    Invoke -->|"returns True, False or Unknown"| Record["Memoize TruthValue"]
     Invoke -->|"throws"| Fault["Record Fault →<br/>treat as Unknown"]
 
     Reuse --> Combine
@@ -1847,11 +1934,11 @@ reports the nearest valid ancestor (the innermost object or array still open) an
 the parser's position:
 
 ```text
-BRE0014 error at $.operands (line 1, column 38): Malformed JSON: ...
+BRE0014 error at $.operands (line 1, column 39): Malformed JSON: Expected start of a property name or value, but instead reached end of data. LineNumber: 0 | BytePositionInLine: 38.
   {"op":"and","operands":[{"const":true},
                                         ^
   Expected: well-formed JSON
-  Found: ...
+  Found: Expected start of a property name or value, but instead reached end of data. LineNumber: 0 | BytePositionInLine: 38.
 ```
 
 The classes of malformed rule text each report as follows.
@@ -1922,7 +2009,7 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `CompilerOptions` | Compile-time resource bounds — max tree depth, max node count, the BDD analyzer's term cap — plus `CompilationMode`. |
 | `Decision` | The result of one evaluation: a `TruthValue`, the `Fault`s absorbed along the way, and optionally a `Trace`. `Decision.IsSatisfied` is true only when the result is `TruthValue.True`. `Decision.Collapse(policy)` turns it into a final `CollapseOutcome`; `Decision.Outcome` is set when the rule declared a `Collapse`. |
 | `Collapse` / `CollapsePolicy` / `CollapseOutcome` | The final evaluation boundary (ADR-0005 decision 14). `CollapsePolicy` (`UnknownAsFalse`, `UnknownAsTrue`, `UnknownIsError`) says how `Unknown` becomes a two-valued answer; `CollapseOutcome` (`True`, `False`, `RejectedUnresolved`) is the answer. `RejectedUnresolved` is a normal outcome, not a `Fault`. In the DSL `Collapse(expr, policy)` is accepted only as the outermost expression. See [Collapse](#collapse-the-final-boundary). |
-| `Diagnostic` | One compile-time problem: a code, a `DiagnosticSeverity` (`Error`/`Warning`/`Info`), a message, and a source span. `Error` severity is what blocks `CompiledRule<TContext>` from being populated. |
+| `Diagnostic` | One compile-time problem: a code, a `DiagnosticSeverity` (`Error`/`Warning`/`Info`), a message, a source span or JSON/YAML `Path`, optional expected/found text and a `DiagnosticSuggestion`. See [Reading diagnostics](#reading-diagnostics). `Error` severity is what blocks `CompiledRule<TContext>` from being populated. |
 | `EvaluationOptions` | Per-call evaluation knobs: `FaultBudget` (abort after N faults), `Mode` (`Default` or `Exhaustive`), and an overall timeout. |
 | `NXOR(...)` | N-ary parity: true iff an odd number of operands are true; `Unknown` whenever any operand is `Unknown`. The unambiguous name for what `XOR` would mean past two operands. |
 | `ANY(...)` / `ALL(...)` / `NONE(...)` | N-ary cardinality operators over the definitely-true / possibly-true interval: `AtLeast(1, ...)`, `AtLeast(n, ...)` and `AtMost(0, ...)`, kept as their own nodes so a rule round-trips as written. They take two or more operands. |
@@ -1932,12 +2019,15 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `Project(x, True\|False)` | Projection: keeps `True`/`False` and replaces `Unknown` with the chosen constant, so the result is always definite. Equal to `COALESCE(x, value)`. |
 | `If(...)` / `c ? t : f` | Ternary conditional. A definite condition picks its branch (the other is not evaluated); an `Unknown` condition yields a value only when both branches are the same definite value. |
 | `ExactlyOne(...)` | N-ary operator: true iff exactly one operand is true. The explicit name for "exactly one," so it's never confused with `XOR`'s binary-only meaning or `NXOR`'s parity. |
-| Expression | The boolean tree itself — operators over terms and sub-expressions. What a `CompiledRule<TContext>` wraps. |
+| Expression | The three-valued tree itself — operators over terms, constants and sub-expressions. What a `CompiledRule<TContext>` wraps. |
 | `Fault` | A record of one predicate failing to produce an answer during one evaluation: the faulting term's identity plus the exception. Faults are absorbed as `Unknown`, never rethrown. |
-| `IMPLIES(a, b)` / `→` | Strong Kleene material implication, `NOT a OR b`; a first-class binary node that prints as written (`(a IMPLIES b)`). Mixing it with `AND`/`OR` or another infix operator without parentheses is a compile error. See [Operators](#operators). |
+| `a IMPLIES b` / `→` | Strong Kleene material implication, `NOT a OR b`; a first-class binary node that prints as written (`(a IMPLIES b)`). Mixing it with `AND`/`OR` or another infix operator without parentheses is a compile error. See [Operators](#operators). |
+| Inspection | `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`: operators that test the K3 state of their operand and always answer a definite `True`/`False`. |
+| Rewrite | An opt-in, value-preserving transform of a compiled rule returning a new rule: `ExpandToPrimitives`, `ExpandToNand`, `ExpandToNor`, `CompressToDerived`, `Canonicalize`, `Simplify`. See [Rewriting rules](#rewriting-rules). |
+| `GroupingStyle` / `RuleText` | `CompiledRule.PrintText(GroupingStyle)` prints with `()` only or depth-cycling `()` `[]` `{}`; `RuleText.NormalizeWhitespace` tidies rule text as written without compiling it. See [Grouping delimiters](#grouping-delimiters). |
 | Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
-| Operator | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `If`, `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`, `Project`, `ExactlyOne`, the threshold family, and the `True/`False`/`Unknown` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
+| Operator | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `If`, `IsTrue`, `IsFalse`, `IsUnknown`, `IsKnown`, `Project`, `ExactlyOne`, the threshold family, and the `True`/`False`/`Unknown` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
 | `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`TruthWeaver.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
 | Predicate | A registered, reusable implementation (e.g. `hasTopping`, `lovesPineapple`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Label` and `Description`; see [Predicate types](#predicate-types). |
 | `PredicateArguments` | The non-generic accessor (`GetString`, `GetInt64`, ...) a predicate uses to read its own term's arguments inside `EvaluateAsync`. |
@@ -1952,8 +2042,8 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | Term identity | What makes two term references "the same variable": predicate name (normalized to registered casing) plus arguments sorted by name and compared by exact, case-sensitive value. Argument order in source text never matters; array-valued arguments are order-sensitive. |
 | `Trace` | An ordered, literal record of every node an evaluation visited or explicitly skipped — the "why was this denied" explanation. |
 | `TruthValue` | The three-valued result type: `True`, `False`, or `Unknown`. Never `bool?`. |
-| `EQUIVALENT(a, b)` / `↔` | The Strong Kleene biconditional (`IFF`; formerly and still readable as `XNOR`) — the negation of `XOR`, deliberately binary. Mixing `EQUIVALENT` with `AND`/`OR`, or with `XOR`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-equivalent-exactlyone-and-the-threshold-family). |
-| `XOR(a, b)` | Binary exclusive-or; `NXOR(...)` is the n-ary parity operator. Mixing `XOR` with `AND`/`OR`, or with `EQUIVALENT`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-equivalent-exactlyone-and-the-threshold-family). |
+| `a EQUIVALENT b` / `↔` | The Strong Kleene biconditional (`IFF`; formerly and still readable as `XNOR`) — the negation of `XOR`, deliberately binary. Mixing `EQUIVALENT` with `AND`/`OR`, or with `XOR`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-equivalent-exactlyone-and-the-threshold-family). |
+| `a XOR b` | Binary exclusive-or (infix only); `NXOR(...)` is the n-ary parity operator. Mixing `XOR` with `AND`/`OR`, or with `EQUIVALENT`, at the same level without parentheses is a compile error — see [Examples #4](#4-xor-equivalent-exactlyone-and-the-threshold-family). |
 
 ## Appendix: Truth tables
 
@@ -2200,10 +2290,14 @@ are covered by the evaluator's behavior described in
   async predicates, per-evaluation memoization, short-circuit, fault
   handling, predicate registration, and the compile-and-swap rule lifecycle.
 - [ADR-0003: Rule syntax and serialization](docs/adr/0003-rule-syntax-and-serialization.md) —
-  the operator set, the DSL grammar, and the JSON/YAML tree form.
+  the DSL grammar, the JSON/YAML tree form and the compile pipeline (its operator set
+  is superseded by ADR-0005).
 - [ADR-0004: Package boundaries and extensibility](docs/adr/0004-package-boundaries-and-extensibility.md) —
-  why the library ships as three packages and how predicates and operators
+  why the library ships as five packages and how predicates and operators
   are extended.
+- [ADR-0005: Strong K3 language surface](docs/adr/0005-strong-k3-language-surface.md) —
+  the full K3 operator set, notations, boundaries (`Project`, `Collapse`), rewrites,
+  structured diagnostics and `TruthValue`-returning predicates.
 
 ## License
 

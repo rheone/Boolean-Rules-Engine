@@ -1,5 +1,31 @@
 # k3-conformance: issues log
 
+## Summary for review
+
+Open questions that need the repo owner's decision, most important first. Row numbers refer to the table below. Nothing here blocks the work; each item has a working default.
+
+1. **Safety semantics (decide first).**
+   - Row 22: a `Collapse` declared in a rule with `UnknownAsFalse`/`UnknownAsTrue` replaces `Decision.Result`, so `IsSatisfied` follows the author's lenient choice. The alternative keeps `Result` raw and makes `IsSatisfied` consult `Outcome`, which weakens fail-closed.
+   - Row 17: `If(Unknown, A, A)` is `A` (multiplexer plus the consensus term), matching the reference specification, not the naive multiplexer's `Unknown`.
+2. **Public API breaks and names.**
+   - Row 9: `XnorExpression` renamed `EquivalentExpression` (no shim). Add a shim only if a consumer pattern-matches the old record.
+   - Row 6: `Structural*` names and codes kept; messages changed to the Strong K3 wording.
+   - Rows 7, 11, 35: `XorArityViolation` (`BRE0006`) is reused for XOR, EQUIVALENT, IMPLIES, NAND and NOR. Rename or alias to a broader code?
+3. **Syntax and spelling to confirm.**
+   - Rows 8, 10: `IMPLIES`, `NAND`, `NOR` keep their word form under `OperatorStyle.CStyle`; pick spellings such as `=>`?
+   - Row 15: `COALESCE` chains and the `??` tree-style spelling; canonical function-call form.
+   - Row 18: ternary mixed with `AND`/`OR` is an error even where C precedence would resolve it; relax to "lowest precedence"?
+   - Row 25: grouping accepts `[]`/`{}`, but call argument lists stay `(` only.
+   - Row 27: whether prefix `!` should be spaced (`! a`) by `RuleText.NormalizeWhitespace`.
+4. **Operand minimums and bounds.** Rows 12, 13, 14: `NXOR`, `ANY`/`ALL`/`NONE`, `BETWEEN` need two or more operands, and `BETWEEN` rejects the whole range `0..n`. Allow one operand or the full range?
+5. **New API shape and field names.** Rows 19, 20, 21, 23, 26, 27, 30, 34, 37, 38: `Decision.Outcome`, `NestedCollapse` (`BRE0016`), `policy`/`unknownAs` JSON fields, `GroupingStyle`/`PrintText`, `RuleText.NormalizeWhitespace`, `CompressToDerived` preferring `Project` over `IsTrue`, free-text `Expected`/`Found`, string `Path`, no JSON spans.
+6. **Environment.** Rows 1-3: `csharpier check .` crash on `.claude\SKILLS\humanizer`, `roslynator analyze` needs per-project runs, `dotnet format` reports pre-existing S1135/SA1512/S6966 findings.
+7. **Limits and tuning (low priority).** Rows 28, 29, 33, 36: expansion size growth, NAND/NOR threshold blow-up, conservative simplifier, suggestion thresholds.
+8. **Predicate catalog.** The eight open questions in [`.scratch/predicate-catalog/k3-gap-list.md`](../predicate-catalog/k3-gap-list.md) (null as `False` vs `Unknown`, `Culture`, collection `In`, `DateTime` literal, clock predicates, bounds) gate any implementation of the 49 missing inventory predicates.
+
+Informational rows (no decision needed): 4, 5, 16, 24, 31, 32, 39, 40, 41.
+
+
 Problems hit while implementing the tickets, recorded for later discussion. Newest last.
 
 | # | Ticket | Issue | Workaround / status |
@@ -43,3 +69,5 @@ Problems hit while implementing the tickets, recorded for later discussion. Newe
 | 37 | 29 | Path shape decided: `Diagnostic.Path` (string) beside `Span`, `$`-rooted `.key` / `[n]` syntax shared by JSON and YAML; a wrong operand count is located at `.operands`, a missing key at the node that should hold it. A missing key is therefore not `$.max` but `$`. | Recorded in ADR-0005 decision 11. Open: a structured path (segments) instead of a string if a UI wants to navigate it. |
 | 38 | 29 | JSON diagnostics have no `Span` (a `JsonElement` keeps no positions), so only the path locates them, except for invalid syntax. Re-parsing with `Utf8JsonReader` to attach spans was not done. | Open: add a position-tracking pass if editors need line and column for JSON. |
 | 39 | 29 | Behaviour changes in the tree parsers: a fractional or oversized `k` used to throw `FormatException` from `GetInt32` (now a diagnostic); the operator name is checked before `operands` (an unknown op with bad operands now reports only the op); a non-string `op` has its own diagnostic instead of the generic missing-key one. The internal `RuleNode.Path` takes part in record equality, which only matters for comparing raw nodes. | Covered by `TreeDiagnosticsTests`. |
+| 40 | 31 | The documentation sweep found stale or wrong statements: README/CONTEXT still described a "boolean expression engine"; the README operator and glossary tables wrote the infix-only `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR` as call forms (`XOR(a, b)`), which do not parse; the whitespace example contained a raw line break inside a string; the JSON-syntax diagnostic sample did not match real output; the CONTEXT class diagram named `Term`/`ThresholdKind` (real: `TermExpression`/`ThresholdComparison`); no ADR-0005 link in README/CONTEXT/ADR-0003; ADR-0004 and the README said "three/four packages". | Fixed in the ticket 31 commit; examples were verified by running them. ADR-0001 to 0004 got "Superseded by ADR-0005" notes without rewriting history. No engine bug was found. |
+| 41 | 30, 31 | CONTEXT.md does not state a "no culture-sensitive comparison" or "null selected value is false" rule; they live only in predicate-catalog issue 01 and the `TruthWeaver.Predicates` XML docs, and `StringPredicates.EqualsConfigurable` is culture-sensitive. | Recorded in the gap list (open question 3). Open: record the chosen rule in CONTEXT.md once decided. |

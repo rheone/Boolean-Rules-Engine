@@ -32,7 +32,7 @@ Target framework `net11.0`; SDK pinned in `global.json` (`11.0.100-rc.1.26425.12
 
 ## In-flight work
 
-[ADR-0005](docs/adr/0005-strong-k3-language-surface.md) and `.scratch/k3-conformance/spec.md` supersede the operator-set, alias and `XOR`/`XNOR` decisions in ADR-0003. Do not implement from `.scratch/k3-conformance/_superseded/`, ADR-0003's old operator list, or `.scratch/engine-v1`. Material in `.tmp/` is reference only and may be subtly wrong; verify it.
+The k3-conformance effort (Strong K3 language surface, `.scratch/k3-conformance/`, tickets 01-31) is complete: [ADR-0005](docs/adr/0005-strong-k3-language-surface.md) is the authority for the operator set, notation, boundaries, rewrites and diagnostics, and supersedes the operator-set, alias and `XOR`/`XNOR` decisions in ADR-0003 (marked in place). Open owner questions are summarised at the top of `.scratch/k3-conformance/issues-log.md`. Predicate catalog gaps are in `.scratch/predicate-catalog/k3-gap-list.md` (not implemented). Do not implement from `.scratch/k3-conformance/_superseded/` or `.scratch/engine-v1`. Material in `.tmp/` is reference only and may be subtly wrong; verify it.
 
 ## Development rules
 

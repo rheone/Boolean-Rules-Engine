@@ -1,6 +1,8 @@
 # Strong K3 conformance and language surface
 
-**Status:** ready-for-agent
+**Status:** done
+
+All 31 slices are delivered (tickets 01-31 in `issues/`, each Status: done). Where the implementation chose between readings of the spec, or deviated from it, the choice is recorded in [issues-log.md](issues-log.md) (rows 4-39; the open ones are summarised at the top of that file) and in ADR-0005 decisions 13-17. Notable deviations: `Structural*` analyzer names and codes kept; `XorArityViolation` (BRE0006) reused for all binary infix operators; `XnorExpression` renamed `EquivalentExpression`; `COALESCE`-based forms cannot be written with NAND/NOR only; `Collapse` lives on `CompiledRule`, not in the tree. Predicate catalog gaps are handed off in [`.scratch/predicate-catalog/k3-gap-list.md`](../predicate-catalog/k3-gap-list.md).
 
 Source requirements: `.scratch/2026-10-02-TODO.md`. Decisions: [ADR-0005](../../docs/adr/0005-strong-k3-language-surface.md) (decisions 1-17, no open decisions). Reference material in `.tmp/` was used as a source, not trusted blindly; every K3 behaviour is verified against the truth-table oracle described under Testing Decisions. Earlier category-level tickets live in `_superseded/` and must not be implemented.
 

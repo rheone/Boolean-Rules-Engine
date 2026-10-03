@@ -26,6 +26,9 @@ observability is deferred, not v1).
 
 ### Four packages
 
+> A fifth package, `TruthWeaver.Testing` (`Decision` assertions and fake predicates, depending on
+> `TruthWeaver.Abstractions` alone), was added later; the boundaries below are unchanged.
+
 - **`TruthWeaver.Abstractions`** — `IPredicate<TContext>`,
   `PredicateSchema`, `PredicateArguments`, `TruthValue`, `Decision`, `Fault`.
   Zero third-party dependencies. This is the "common kernel" a project that
@@ -121,8 +124,9 @@ or registering a stateless lambda directly. There is no attribute-scanning
 or assembly-scanning discovery mechanism. New *operators* are added inside
 `TruthWeaver` itself (parser, compiler, evaluator, analyzer each
 need to know about a new operator) rather than through an operator plugin
-model — the operator set is small and closed by design
-([ADR-0003](0003-rule-syntax-and-serialization.md)), so an extensibility
+model — the operator set is closed by design
+([ADR-0003](0003-rule-syntax-and-serialization.md); its size was expanded to the full Strong K3 set by
+[ADR-0005](0005-strong-k3-language-surface.md), which keeps the no-plug-in stance), so an extensibility
 point for operators would be speculative surface area with no current
 consumer.
 
@@ -170,6 +174,10 @@ pattern-match:
 The structural duplication (six identical `Expression` switches) is gone; what remains is
 irreducible — genuinely different behavior or vocabulary per subsystem, not the same fact
 re-derived six times.
+
+> **Update (ADR-0005):** the K3 operator slices also touch the expand/compress/canonicalize/simplify
+> rewriters (`src/TruthWeaver/Rewriting`), the structured-diagnostic suggestions and the JSON schema, in
+> addition to the six switches above.
 
 ## Consequences
 

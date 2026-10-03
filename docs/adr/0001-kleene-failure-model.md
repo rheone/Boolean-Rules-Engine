@@ -77,6 +77,11 @@ traces.
 | `True` | `False` |
 | `U` | `U` |
 
+> **Superseded in part by [ADR-0005](0005-strong-k3-language-surface.md) (decisions 3, 5, 15):**
+> the operator set is larger (`XNOR` is now `EQUIVALENT`, with `IMPLIES`, `NAND`, `NOR`, `NXOR`,
+> `COALESCE`, `If` and others), and a predicate may return `Unknown` directly. The truth tables and
+> the failure model below stand.
+
 `XOR`, `XNOR`, `ExactlyOne`, and the threshold family (`AtLeast(k)`/
 `AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, added after this ADR
 was first accepted — see [ADR-0003's Amendments](0003-rule-syntax-and-serialization.md#amendments))
@@ -107,6 +112,10 @@ public sealed record Decision(
     public bool IsSatisfied => Result == TruthValue.True;
 }
 ```
+
+> `Decision` has since gained `EvaluatedTree` and `Outcome` members, and an explicit
+> `Decision.Collapse(CollapsePolicy)` boundary; `IsSatisfied` is still fail-closed. See
+> [ADR-0005](0005-strong-k3-language-surface.md) decision 14.
 
 `IsSatisfied` is `true` only for `TruthValue.True`. `Unknown` — whether from
 one absorbed fault or a hundred — reads as "not satisfied," which is the
