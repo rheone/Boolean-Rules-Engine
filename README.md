@@ -334,6 +334,23 @@ A service that only *implements* domain predicates references
 
 ## Operators
 
+### Symbol notation
+
+Every existing operator can also be written with a symbol. Symbols compile to
+exactly the same tree as the named operator, so notation is a style choice and
+never a semantic one; the canonical printer (and persisted DSL text) always
+prints the named form.
+
+| Named | Symbols |
+| --- | --- |
+| `AND` | `&&`, `∧` |
+| `OR` | `\|\|`, `∨` |
+| `NOT` | `!`, `¬` |
+| `XOR` | `⊕` |
+
+Symbols and words mix freely (`a && b OR c`) and follow the same precedence
+and no-mixing rules as the named operators. A lone `&` or `|` is a syntax error.
+
 ### Order of operations
 
 Precedence governs *parsing* the DSL only — the canonical printer always

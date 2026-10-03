@@ -215,7 +215,8 @@ locking, in-flight evaluations finish against the old rule. Full reasoning:
 
 ## Syntax and serialization (summary)
 
-The string DSL (word operators, `NOT > AND > OR` precedence, `XOR`/`XNOR`
+The string DSL (word operators, plus the symbol aliases `&&`, `||`, `!`, `∧`, `∨`,
+`¬`, `⊕` that compile to the same nodes and are never printed; `NOT > AND > OR` precedence, `XOR`/`XNOR`
 never mixed with `AND`/`OR` or with each other without parentheses) is
 canonical and is what gets persisted. JSON and YAML are interchange/tooling
 formats that compile to the same AST and round-trip losslessly with the DSL.

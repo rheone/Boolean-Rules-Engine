@@ -3,7 +3,7 @@ namespace TruthWeaver.Parsing;
 using TruthWeaver.Diagnostics;
 
 /// <summary>
-/// Hand-written tokenizer for the word-operator DSL (ADR-0003 notes this is a hand-written
+/// Hand-written tokenizer for the word-operator DSL, which also accepts symbolic operator aliases (ADR-0005; ADR-0003 notes this is a hand-written
 /// recursive-descent parser, not Roslyn-based — there is no C# involved in rule text).
 /// </summary>
 internal sealed class Lexer(string source)
@@ -71,6 +71,14 @@ internal sealed class Lexer(string source)
                 return new Token(TokenKind.Colon, ":", new SourceSpan(start, 1));
             case '"':
                 return this.ReadString(start);
+            case '!' or '¬' or '∧' or '∨' or '⊕':
+                this.position++;
+                return new Token(TokenKind.Operator, c.ToString(), new SourceSpan(start, 1));
+            case '&' or '|' when this.position + 1 < this.source.Length && this.source[this.position + 1] == c:
+                // Doubled form only: a lone '&' or '|' is not an operator and falls through to the
+                // unexpected-character diagnostic below.
+                this.position += 2;
+                return new Token(TokenKind.Operator, new string(c, 2), new SourceSpan(start, 2));
         }
 
         if (

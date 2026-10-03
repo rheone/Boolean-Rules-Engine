@@ -4,11 +4,15 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Each symbol compiles to a tree equal to its named operator
-- [ ] Canonical printer emits named form only
-- [ ] Precedence is unchanged
-- [ ] Built test-first; the full validation set in CLAUDE.md passes (restore --locked-mode, build, test, csharpier check, format --verify-no-changes, roslynator analyze)
+- [x] Each symbol compiles to a tree equal to its named operator
+- [x] Canonical printer emits named form only
+- [x] Precedence is unchanged
+- [x] Built test-first; the full validation set in CLAUDE.md passes (restore --locked-mode, build, test, csharpier check, format --verify-no-changes, roslynator analyze)
 
 See [spec](../spec.md) and [ADR-0005](../../../docs/adr/0005-strong-k3-language-surface.md).
+
+## Comments
+
+Symbols `&&`, `||`, `!`, `∧`, `∨`, `¬`, `⊕` are lexed as a new `TokenKind.Operator` and mapped by the parser to the named keyword (AND/OR/NOT/XOR), so no node, evaluator, analyzer, printer, JSON/YAML, schema or builder change was needed (those layers never see notation). A lone `&` or `|` is still an "Unexpected character" syntax error. `⊕` follows XOR's no-mixing rule. Out of scope here (later tickets): `→ ↔ ↑ ↓ ??`, and symbols inside JSON/YAML op names.

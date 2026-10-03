@@ -81,10 +81,30 @@ internal sealed class DslParser
         return new(start, Math.Max(0, end - start));
     }
 
+    /// <summary>
+    /// Maps a symbolic operator to the named operator it aliases, so the rest of the parser only ever
+    /// reasons about named operators and notation can never change the resulting tree.
+    /// </summary>
+    private static string? SymbolAlias(string symbol)
+    {
+        return symbol switch
+        {
+            "&&" or "∧" => "AND",
+            "||" or "∨" => "OR",
+            "!" or "¬" => "NOT",
+            "⊕" => "XOR",
+            _ => null,
+        };
+    }
+
     private bool IsKeyword(string keyword)
     {
-        return this.Current.Kind == TokenKind.Identifier
-            && string.Equals(this.Current.Text, keyword, StringComparison.OrdinalIgnoreCase);
+        return this.Current.Kind switch
+        {
+            TokenKind.Identifier => string.Equals(this.Current.Text, keyword, StringComparison.OrdinalIgnoreCase),
+            TokenKind.Operator => SymbolAlias(this.Current.Text) == keyword,
+            _ => false,
+        };
     }
 
     private bool TryConsumeKeyword(string keyword)

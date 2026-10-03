@@ -32,6 +32,12 @@ internal enum TokenKind
     /// <summary>':'.</summary>
     Colon,
 
+    /// <summary>
+    /// A symbolic operator (<c>&amp;&amp; || ! ∧ ∨ ¬ ⊕</c>). <see cref="Token.Text"/> holds the symbol as written;
+    /// the parser maps it to the named operator it is an alias for (ADR-0005 decision 2).
+    /// </summary>
+    Operator,
+
     /// <summary>End of input.</summary>
     Eof,
 }
