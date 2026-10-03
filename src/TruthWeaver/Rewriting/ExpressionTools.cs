@@ -75,6 +75,23 @@ internal static class ExpressionTools
         };
     }
 
+    /// <summary>Lists the direct children of <paramref name="node"/> in operand order.</summary>
+    /// <param name="node">The node.</param>
+    /// <returns>Its operands (empty for a constant or term).</returns>
+    public static List<Expression> Children(Expression node)
+    {
+        List<Expression> children = [];
+        MapChildren(
+            node,
+            child =>
+            {
+                children.Add(child);
+                return child;
+            }
+        );
+        return children;
+    }
+
     /// <summary>
     /// The number of nodes in <paramref name="root"/> counted as a tree: a sub-expression shared in memory but appearing
     /// twice in the printed rule counts twice, because the printed (recompilable) size is what the node limit measures.

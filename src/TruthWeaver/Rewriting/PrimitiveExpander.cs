@@ -21,49 +21,53 @@ internal static class PrimitiveExpander
     /// <returns>An equivalent tree containing only primitive operators, constants and terms.</returns>
     public static Expression Expand(Expression node)
     {
+        // Children first, so the operator-level definitions below only ever see primitive operands. An operand a
+        // definition mentions twice is then one shared, already-expanded node.
+        return ExpandTop(ExpressionTools.MapChildren(node, Expand));
+    }
+
+    /// <summary>
+    /// Expands only the outermost operator of <paramref name="node"/>, treating its operands as already expanded (or as
+    /// opaque sub-expressions the caller does not want expanded). Used by the simplifier to reason about one derived
+    /// operator without expanding the whole tree below it.
+    /// </summary>
+    /// <param name="node">The node whose own operator is expanded.</param>
+    /// <returns>A primitive-operator tree over the node's unchanged operands.</returns>
+    public static Expression ExpandTop(Expression node)
+    {
         return node switch
         {
-            // Leaves are already primitive.
-            ConstantExpression or TermExpression => node,
-
-            // Primitive operators keep their shape; only their operands are expanded.
-            NotExpression n => new NotExpression(Expand(n.Operand)),
-            AndExpression a => new AndExpression(ExpandAll(a.Operands)),
-            OrExpression o => new OrExpression(ExpandAll(o.Operands)),
-            CoalesceExpression c => new CoalesceExpression(ExpandAll(c.Operands)),
+            // Leaves and primitive operators are already primitive.
+            ConstantExpression or TermExpression or NotExpression or AndExpression or OrExpression or CoalesceExpression =>
+                node,
 
             // The threshold family: AtLeast, AtMost and Exactly are the kernel; the strict comparisons shift k by one.
             ThresholdExpression t => ExpandThreshold(t),
 
             // Derived binary operators (ADR-0005 decision 3).
-            ImpliesExpression i => Or(Not(Expand(i.Antecedent)), Expand(i.Consequent)),
-            XorExpression x => Xor(Expand(x.Left), Expand(x.Right)),
-            EquivalentExpression e => Equivalent(Expand(e.Left), Expand(e.Right)),
-            NandExpression nd => Not(And(Expand(nd.Left), Expand(nd.Right))),
-            NorExpression nr => Not(Or(Expand(nr.Left), Expand(nr.Right))),
+            ImpliesExpression i => Or(Not(i.Antecedent), i.Consequent),
+            XorExpression x => Xor(x.Left, x.Right),
+            EquivalentExpression e => Equivalent(e.Left, e.Right),
+            NandExpression nd => Not(And(nd.Left, nd.Right)),
+            NorExpression nr => Not(Or(nr.Left, nr.Right)),
 
             // Parity: True for an odd number of True operands, Unknown if any operand is Unknown (see ExpandParity).
-            NxorExpression nx => ExpandParity(ExpandAll(nx.Operands)),
+            NxorExpression nx => ExpandParity(nx.Operands),
 
             // Cardinality aliases over the definitely-true / possibly-true interval (ADR-0005 decision 6).
-            AnyExpression any => Threshold(ThresholdComparison.AtLeast, 1, ExpandAll(any.Operands)),
-            AllExpression all => Threshold(ThresholdComparison.AtLeast, all.Operands.Count, ExpandAll(all.Operands)),
-            NoneExpression none => Threshold(ThresholdComparison.AtMost, 0, ExpandAll(none.Operands)),
-            ExactlyOneExpression one => Threshold(ThresholdComparison.Exactly, 1, ExpandAll(one.Operands)),
+            AnyExpression any => Threshold(ThresholdComparison.AtLeast, 1, any.Operands),
+            AllExpression all => Threshold(ThresholdComparison.AtLeast, all.Operands.Count, all.Operands),
+            NoneExpression none => Threshold(ThresholdComparison.AtMost, 0, none.Operands),
+            ExactlyOneExpression one => Threshold(ThresholdComparison.Exactly, 1, one.Operands),
             BetweenExpression b => ExpandBetween(b),
 
             // Conditional and boundary operators.
-            IfExpression f => ExpandIf(Expand(f.Condition), Expand(f.WhenTrue), Expand(f.WhenFalse)),
-            ProjectExpression p => Coalesce(Expand(p.Operand), p.UnknownAs ? TruthValue.True : TruthValue.False),
-            InspectionExpression s => ExpandInspection(s.Kind, Expand(s.Operand)),
+            IfExpression f => ExpandIf(f.Condition, f.WhenTrue, f.WhenFalse),
+            ProjectExpression p => Coalesce(p.Operand, p.UnknownAs ? TruthValue.True : TruthValue.False),
+            InspectionExpression s => ExpandInspection(s.Kind, s.Operand),
 
             _ => throw new InvalidOperationException($"Unhandled expression type '{node.GetType().Name}'."),
         };
-    }
-
-    private static EquatableArray<Expression> ExpandAll(EquatableArray<Expression> operands)
-    {
-        return new EquatableArray<Expression>(operands.Select(Expand));
     }
 
     private static NotExpression Not(Expression operand)
@@ -115,7 +119,7 @@ internal static class PrimitiveExpander
     /// </summary>
     private static Expression ExpandThreshold(ThresholdExpression t)
     {
-        EquatableArray<Expression> operands = ExpandAll(t.Operands);
+        EquatableArray<Expression> operands = t.Operands;
         return t.Comparison switch
         {
             ThresholdComparison.GreaterThan => Threshold(ThresholdComparison.AtLeast, t.K + 1, operands),
@@ -131,7 +135,7 @@ internal static class PrimitiveExpander
     /// </summary>
     private static Expression ExpandBetween(BetweenExpression b)
     {
-        EquatableArray<Expression> operands = ExpandAll(b.Operands);
+        EquatableArray<Expression> operands = b.Operands;
         bool hasLower = b.Min > 0;
         bool hasUpper = b.Max < operands.Count;
         if (hasLower && hasUpper)

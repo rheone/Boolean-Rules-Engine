@@ -707,6 +707,57 @@ job of `Simplify()`.
 > applies, and so which faults are reported. Use a canonical rule as a comparison
 > or storage key; keep evaluating the rule as written if invocation order matters.
 
+### Simplify
+
+`Simplify()` replaces a rule with an equivalent, cheaper one. It starts from the
+canonical form (above) and then applies only rewrites that are identities of
+Strong Kleene logic, repeating until nothing changes. The result evaluates like
+the original for every `True`/`False`/`Unknown` assignment, is never larger
+(counted in nodes), and simplifying it again changes nothing.
+
+| Rewrite | Example |
+| --- | --- |
+| Identity and annihilator constants | `a AND True` is `a`; `a AND False` is `False`; `a OR False` is `a`; `a OR True` is `True` |
+| `Unknown` is kept | `a AND Unknown` stays; `True AND Unknown` is `Unknown`; `NOT Unknown` is `Unknown` |
+| Constant folding | `NOT True` is `False`; any operator over constants folds to a constant |
+| Idempotence, double negation, flattening | `a AND a` is `a`; `NOT NOT a` is `a`; `a AND (b AND a)` is `a AND b` |
+| Absorption | `a AND (a OR b)` is `a`; `a OR (a AND b)` is `a` |
+| De Morgan, only where it removes nodes | `NOT (NOT a AND NOT b)` is `a OR b`; `NOT a NAND NOT b` is `a OR b` |
+| Negation through derived operators | `NOT a IMPLIES b` is `a OR b`; `NOT a XOR b` is `a EQUIVALENT b`; `NOT IsKnown(a)` is `IsUnknown(a)` |
+| `COALESCE` / `Project` | `COALESCE(Unknown, a)` is `a`; `COALESCE(a, True, b)` is `COALESCE(a, True)`; `COALESCE(IsKnown(a), b)` is `IsKnown(a)`; `Project(IsTrue(a), False)` is `IsTrue(a)` |
+| Inspections | `IsKnown(True)` is `True`; `IsUnknown(IsTrue(a))` is `False`; `IsTrue(NOT a)` is `IsFalse(a)` |
+| `If` | `If(True, a, b)` is `a`; `If(c, a, a)` is `a` |
+| Derived operator with a constant operand | `a IMPLIES False` is `NOT a`; `a XOR True` is `NOT a`; `a NAND False` is `True` (expanded one level, simplified, kept only if no larger) |
+| Thresholds with `True`/`False` operands | `AtLeast(2, True, a, b)` is `a OR b`; `AtMost(0, True, a, b)` is `False`; `Exactly(2, True, True, a)` is `NOT a` |
+
+"Never `Unknown`" operands (constants, `Project`, the inspections, and operators
+over only those) also let `COALESCE`, `Project` and the inspections be removed.
+
+**Classical rules that deliberately do not apply.** Each of these is valid in
+two-valued logic and false in Strong Kleene logic, because it fails when `a` is
+`Unknown`, so `Simplify()` never uses it and the rule keeps its value:
+
+| Classical law | Why it fails when `a` is `Unknown` |
+| --- | --- |
+| `a OR NOT a` is `True` (excluded middle) | `Unknown OR Unknown` is `Unknown` |
+| `a AND NOT a` is `False` (non-contradiction) | `Unknown AND Unknown` is `Unknown` |
+| `a IMPLIES a` and `a EQUIVALENT a` are `True` | both are `Unknown` |
+| `a XOR a` is `False` | it is `Unknown` |
+| `a AND (NOT a OR b)` is `a AND b`; `a OR (NOT a AND b)` is `a OR b` (complement absorption) | `Unknown AND (Unknown OR False)` is `Unknown`, but `Unknown AND False` is `False` |
+| `If(c, t, f)` with an `Unknown` condition follows a branch | it yields a value only when both branches agree |
+
+Only plain absorption (`a AND (a OR b)`) holds, since `AND` and `OR` form a lattice.
+
+> [!IMPORTANT]
+> Like `Canonicalize()`, simplification keeps the *value* but not the evaluation
+> order or side effects. Operands can be reordered, merged or dropped; an annihilated
+> `AND` never evaluates its other operands, so a predicate the original would have
+> invoked (and any fault it would have reported) may not run.
+
+The rewrite does not use the analyzer's dual-rail findings: those are reported as
+diagnostics (`StructuralTautology`, `StructuralContradiction`) for authors, and
+every simplification here is a local, structural rule that is easy to check.
+
 ## Choosing a rule format
 
 DSL, JSON, and YAML compile to the exact same tree through the exact same

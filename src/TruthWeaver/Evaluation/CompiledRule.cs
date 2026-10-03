@@ -206,6 +206,37 @@ public sealed class CompiledRule<TContext>
         );
     }
 
+    /// <summary>
+    /// Replaces this rule with an equivalent, cheaper one using only Strong Kleene-sound rewrites, and returns it as a new
+    /// rule (ADR-0005 decision 10). Starts from <see cref="Canonicalize"/>, then folds and reduces until nothing changes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Applied rewrites: constant folding through the K3 tables; identity and annihilator laws with constants
+    /// (<c>a AND True = a</c>, <c>a AND False = False</c>, <c>a OR False = a</c>, <c>a OR True = True</c>; an
+    /// <c>Unknown</c> operand is kept); idempotence, double negation and flattening (from canonicalisation); absorption
+    /// (<c>a AND (a OR b) = a</c>); De Morgan and negation-pushing only where they remove nodes; <c>COALESCE</c> and
+    /// <c>Project</c> of a known or never-<c>Unknown</c> operand; inspections of constants or never-<c>Unknown</c> operands;
+    /// <c>If</c> with a constant condition or equal branches; derived operators with a constant operand; and threshold
+    /// operators with <c>True</c>/<c>False</c> operands. Classical-only laws are <b>never</b> applied: <c>a OR NOT a</c> is
+    /// not <c>True</c>, <c>a AND NOT a</c> is not <c>False</c>, <c>a IMPLIES a</c> and <c>a EQUIVALENT a</c> are not
+    /// <c>True</c>, and complement absorption (<c>a AND (NOT a OR b) = a AND b</c>) is rejected, because each fails when
+    /// <c>a</c> is <c>Unknown</c>.
+    /// </para>
+    /// <para>
+    /// The result evaluates to the same value as this rule for every <c>True</c>/<c>False</c>/<c>Unknown</c> assignment, is
+    /// never larger (in nodes), and simplifying it again changes nothing. <b>Evaluation order and side effects are not
+    /// preserved.</b> Operands may be reordered, merged or dropped (an annihilated <c>AND</c> never evaluates its other
+    /// operands), so a predicate the original would have invoked, and any fault it would have reported, may not run;
+    /// the value never changes.
+    /// </para>
+    /// </remarks>
+    /// <returns>A new rule over the same predicates, simplified.</returns>
+    public CompiledRule<TContext> Simplify()
+    {
+        return new CompiledRule<TContext>(Simplifier.Simplify(this.Root), this.registry, this.logger, this.CollapsePolicy);
+    }
+
     /// <summary>Prints this rule to the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
     /// <returns>The JSON text.</returns>
     public string PrintJson()

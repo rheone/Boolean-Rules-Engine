@@ -178,6 +178,26 @@ the aliases are cheap once the canonical form stays single.
     idempotent and deterministic, and, because it reorders and deduplicates
     operands, it does not preserve evaluation order, short-circuiting or which
     faults are reported, only the value; this is stated in the API remarks.
+
+    Implemented in k3-conformance 27 (simplification):
+    `CompiledRule<TContext>.Simplify()` canonicalises, then repeats a bottom-up
+    rewrite sweep plus canonicalisation until nothing changes, and returns the
+    input unchanged if the result were ever larger. Rules: constant folding;
+    identity/annihilator laws for `AND`/`OR` (an `Unknown` operand is kept);
+    absorption `a AND (a OR b) = a` (a lattice law that holds in K3); `NOT` of a
+    constant, `NOT NAND`, `NOT NOR`, `NOT IsKnown`/`IsUnknown`, threshold flipping,
+    and De Morgan only where it removes nodes; `COALESCE`/`Project`/inspections
+    of constants and of operands that can never be `Unknown`; `If` with a constant
+    condition or equal branches; threshold operands that are `True`/`False`
+    eliminated by shifting `k`, out-of-range thresholds folded; and any other
+    derived operator with a constant operand expanded one level
+    (`PrimitiveExpander.ExpandTop`), simplified, and kept only if no larger.
+    Classical-only laws are never used: excluded middle, non-contradiction,
+    `a IMPLIES a`, `a EQUIVALENT a`, `a XOR a`, complement absorption, and an
+    `If` with an `Unknown` condition. The analyzer's dual-rail findings are not
+    used (they are diagnostics for authors; every rewrite here is local and
+    structural). Like canonicalisation it preserves the value, not evaluation
+    order, short-circuiting or which faults are reported.
 11. **Validation messages are structured**: code, message, span (or
     JSON/YAML path), optional "did you mean" suggestion, and an
     expected-vs-found pair, with a plain-text rendering.
