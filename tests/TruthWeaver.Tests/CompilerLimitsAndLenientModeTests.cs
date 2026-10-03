@@ -139,6 +139,21 @@ public sealed class CompilerLimitsAndLenientModeTests
         Assert.Equal(TruthValue.Unknown, decision.Result);
     }
 
+    /// <summary>
+    /// A node that fails validation is replaced by an Unknown constant (never False), so a failure
+    /// can never look like a negative answer even to code that inspects the intermediate tree.
+    /// </summary>
+    [Fact]
+    public void Placeholder_WhenSubstitutingAFailedNode_IsAnUnknownConstant_Test()
+    {
+        // Arrange / Act
+        Ast.Expression placeholder = FailedNode.Placeholder;
+
+        // Assert
+        Ast.ConstantExpression constant = Assert.IsType<Ast.ConstantExpression>(placeholder);
+        Assert.Equal(TruthValue.Unknown, constant.Value);
+    }
+
     [Fact]
     public void Strict_mode_rejects_the_identical_rule_text_lenient_mode_accepts()
     {

@@ -27,7 +27,7 @@ public sealed class RuleNodeCompilerErrorNodeAndDefensiveThrowsTests
         .Build();
 
     [Fact]
-    public void An_error_node_compiles_to_a_false_constant_without_throwing_and_the_surrounding_tree_still_compiles()
+    public void An_error_node_compiles_to_an_unknown_constant_without_throwing_and_the_surrounding_tree_still_compiles()
     {
         SourceSpan span = new(0, 1);
         AndNode tree = new([new ConstantNode(TruthValue.True, span), new ErrorNode(span)], span);
@@ -41,7 +41,7 @@ public sealed class RuleNodeCompilerErrorNodeAndDefensiveThrowsTests
         Assert.NotNull(compiled);
         Assert.Empty(diagnostics);
         AndExpression and = Assert.IsType<AndExpression>(compiled);
-        Assert.Equal([new ConstantExpression(TruthValue.True), new ConstantExpression(TruthValue.False)], and.Operands);
+        Assert.Equal([new ConstantExpression(TruthValue.True), new ConstantExpression(TruthValue.Unknown)], and.Operands);
     }
 
     [Fact]
