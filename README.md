@@ -555,6 +555,62 @@ YAML the outermost collapse is a node of its own:
 `RuleBuilder.Collapse(operand, policy)` builds it. `UnknownRequiresResolution` is not
 supported.
 
+## Rewriting rules
+
+A compiled rule is immutable, so a rewrite never edits it: it returns a **new**
+`CompiledRule` over the same predicates, with the same declared `Collapse` policy,
+that evaluates to the same value for every `True`/`False`/`Unknown` assignment of
+its terms. Rewrites are opt-in; the compiler never applies one for you, so a rule
+always prints and round-trips as it was written.
+
+### Expand to primitives
+
+`ExpandToPrimitives()` replaces every derived operator with its definition in the
+primitive kernel: `NOT`, `AND`, `OR`, `AtLeast`, `AtMost`, `Exactly` and `COALESCE`.
+
+```csharp
+CompiledRule<MyContext> rule = compiler.Compile("a IMPLIES ANY(b, c)").CompiledRule!;
+CompiledRule<MyContext> kernel = rule.ExpandToPrimitives();
+
+Console.WriteLine(kernel.CanonicalText);   // only primitive operators
+Console.WriteLine(rule.CanonicalText);     // unchanged: (a IMPLIES ANY(b, c))
+```
+
+| Derived operator | Expands to |
+| --- | --- |
+| `a IMPLIES b` | `NOT a OR b` |
+| `a XOR b` | `(a AND NOT b) OR (NOT a AND b)` |
+| `a EQUIVALENT b` | `(a AND b) OR (NOT a AND NOT b)` |
+| `a NAND b` / `a NOR b` | `NOT (a AND b)` / `NOT (a OR b)` |
+| `NXOR(a, b, ...)` | `Exactly(1, ...) OR Exactly(3, ...) OR ...` (every odd count) |
+| `ExactlyOne(...)` | `Exactly(1, ...)` |
+| `ANY(...)` / `ALL(...)` / `NONE(...)` | `AtLeast(1, ...)` / `AtLeast(n, ...)` / `AtMost(0, ...)` |
+| `BETWEEN(min, max, ...)` | `AtLeast(min, ...) AND AtMost(max, ...)` (a vacuous bound is dropped) |
+| `GreaterThan(k, ...)` / `LessThan(k, ...)` | `AtLeast(k + 1, ...)` / `AtMost(k - 1, ...)` |
+| `If(c, t, f)` | `(c AND t) OR (NOT c AND f) OR (t AND f)` |
+| `Project(x, True)` / `Project(x, False)` | `COALESCE(x, True)` / `COALESCE(x, False)` |
+| `IsTrue(x)` | `COALESCE(x, False)` |
+| `IsFalse(x)` | `COALESCE(NOT x, False)` |
+| `IsUnknown(x)` | `COALESCE(x, True) AND COALESCE(NOT x, True)` |
+| `IsKnown(x)` | `COALESCE(x, False) OR COALESCE(NOT x, False)` |
+
+Every row was checked against an independent truth-table oracle for all
+`True`/`False`/`Unknown` inputs, because classical shortcuts fail in Strong
+Kleene logic (`a OR NOT a` is not `True`, and `If(Unknown, t, t)` is `t`, which the
+`If` row's third term preserves). Nothing is left unexpanded: even the inspections
+are expressible with `COALESCE`, which is the primitive that can see `Unknown`.
+
+Things to know:
+
+- **Size.** Operators whose definition mentions an operand twice (`XOR`,
+  `EQUIVALENT`, `If`, the inspections) repeat that operand's text, so a deeply
+  nested rule can grow a lot. The expanded rule's printed text compiles back to
+  the same rule, but may exceed the default `CompilerOptions.MaxNodeCount`.
+- **Faults.** A predicate that throws is `Unknown` plus a `Fault` in the expanded
+  rule exactly as in the original; terms are still memoized by identity.
+- **Collapse.** A declared outermost `Collapse(expr, policy)` is the evaluation
+  boundary, not an operator, so it is carried over unchanged.
+
 ## Choosing a rule format
 
 DSL, JSON, and YAML compile to the exact same tree through the exact same

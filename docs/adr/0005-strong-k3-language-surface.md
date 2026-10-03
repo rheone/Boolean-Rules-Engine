@@ -101,6 +101,37 @@ the aliases are cheap once the canonical form stays single.
     this effort. Every rewrite must be K3-sound, verified exhaustively against
     the truth-table oracle; classical laws that fail in K3 (for example
     `A OR NOT A = True`) are not applied.
+
+    Implemented in k3-conformance 23 (primitive expansion):
+    `CompiledRule<TContext>.ExpandToPrimitives()` returns a new rule (the original
+    is immutable and untouched; the declared `CollapsePolicy` is carried over)
+    whose tree holds only the kernel (`NOT`, `AND`, `OR`, `AtLeast`, `AtMost`,
+    `Exactly`, `COALESCE`), constants and terms. Definitions, each verified
+    exhaustively against the oracle (and a random-rule property test over every
+    assignment): `IMPLIES` = `OR(NOT a, b)`; `XOR` = `OR(AND(a, NOT b), AND(NOT a,
+    b))`; `EQUIVALENT` = `OR(AND(a, b), AND(NOT a, NOT b))`; `NAND`/`NOR` = `NOT`
+    of `AND`/`OR`; `ExactlyOne` = `Exactly(1, ...)`; `ANY`/`ALL`/`NONE` =
+    `AtLeast(1)`/`AtLeast(n)`/`AtMost(0)`; `BETWEEN` = `AND(AtLeast(min),
+    AtMost(max))` with a vacuous bound (`min = 0` or `max = n`) dropped, since the
+    compiler rejects those thresholds as constants; `GreaterThan(k)` =
+    `AtLeast(k + 1)` and `LessThan(k)` = `AtMost(k - 1)` (the compiler's valid
+    ranges map exactly onto the targets' valid ranges); `If` = the multiplexer
+    plus consensus term of decision 13; `Project(x, v)` = `COALESCE(x, v)`.
+    **`NXOR` (parity)** is `OR(Exactly(1, ...), Exactly(3, ...), ...)` over every
+    odd count rather than a fold of the `XOR` expansion: with no `Unknown`
+    operand the interval is a single count and the disjunction is `True` iff it is
+    odd; with an `Unknown` operand the interval has two or more consecutive
+    counts, so every matching `Exactly(k)` is `Unknown` and at least one odd count
+    lies inside it, which gives `Unknown`. That is exactly parity's "Unknown if
+    any operand is Unknown", and the size is linear (a fold repeats its
+    accumulator twice per step, growing exponentially). **The inspections need no
+    semantic boundary:** `COALESCE` is the one primitive that can observe
+    `Unknown`, so `IsTrue(x)` = `COALESCE(x, False)`, `IsFalse(x)` =
+    `COALESCE(NOT x, False)`, `IsUnknown(x)` = `AND(COALESCE(x, True), COALESCE(NOT
+    x, True))` and `IsKnown(x)` = `OR(COALESCE(x, False), COALESCE(NOT x, False))`.
+    Operands a definition repeats are one shared, already-expanded node (a DAG in
+    memory; the printed text repeats them), so a deeply nested expansion can
+    exceed the default compile node limit when recompiled.
 11. **Validation messages are structured**: code, message, span (or
     JSON/YAML path), optional "did you mean" suggestion, and an
     expected-vs-found pair, with a plain-text rendering.

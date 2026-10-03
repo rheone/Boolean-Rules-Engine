@@ -225,7 +225,9 @@ with an operator that would just be a synonym for one of these:
 `ANY(...)`, `ALL(...)` and `NONE(...)` take two or more operands, like `AND`/`OR`/`ExactlyOne`. In Strong K3 they happen to coincide with `OR(...)`, `AND(...)` and `NOT(OR(...))` (the cardinality interval collapses to the same truth tables); they exist as named, intent-revealing spellings.
 
 These equivalences are documentation, not a normalization pass: the compiler
-does not rewrite one form into the other, and both sides of each row remain
+does not rewrite one form into the other (the opt-in `CompiledRule.ExpandToPrimitives()`
+does, on request, returning a new rule built only from `NOT`, `AND`, `OR`, `AtLeast`,
+`AtMost`, `Exactly` and `COALESCE`), and both sides of each row remain
 independently valid, distinct things a rule author can write. See the
 [threshold operator family amendment](docs/adr/0003-rule-syntax-and-serialization.md#threshold-operator-family-supersedes-the-single-atleastk-)
 in ADR-0003 for the full `AtLeast`/`AtMost`/`GreaterThan`/`LessThan`/`Exactly`

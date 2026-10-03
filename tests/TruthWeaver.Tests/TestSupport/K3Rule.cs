@@ -12,14 +12,16 @@ using TruthWeaver.Registry;
 /// </summary>
 public sealed class K3Rule
 {
-    private readonly CompiledRule<RuleTestContext> compiled;
     private readonly TruthValue[] current;
 
     private K3Rule(CompiledRule<RuleTestContext> compiled, TruthValue[] current)
     {
-        this.compiled = compiled;
+        this.Compiled = compiled;
         this.current = current;
     }
+
+    /// <summary>Gets the compiled rule under test.</summary>
+    public CompiledRule<RuleTestContext> Compiled { get; }
 
     /// <summary>Compiles <paramref name="ruleText"/> with <paramref name="arity"/> predicates named <c>a</c>, <c>b</c>, and so on.</summary>
     /// <param name="ruleText">The DSL text.</param>
@@ -45,6 +47,17 @@ public sealed class K3Rule
         return result.CompiledRule is { } rule ? new K3Rule(rule, current) : null;
     }
 
+    /// <summary>
+    /// Applies a rewrite (for example <c>ExpandToPrimitives</c>) to the compiled rule and returns a rule that shares this
+    /// rule's inputs, so the original and the rewritten rule can be evaluated under the very same assignment.
+    /// </summary>
+    /// <param name="rewrite">The rewrite to apply.</param>
+    /// <returns>The rewritten rule wired to the same input predicates.</returns>
+    public K3Rule Rewrite(Func<CompiledRule<RuleTestContext>, CompiledRule<RuleTestContext>> rewrite)
+    {
+        return new K3Rule(rewrite(this.Compiled), this.current);
+    }
+
     /// <summary>Evaluates the rule with the inputs set to <paramref name="assignment"/>.</summary>
     /// <param name="assignment">One K3 value per input predicate.</param>
     /// <param name="cancellationToken">The test cancellation token.</param>
@@ -56,7 +69,7 @@ public sealed class K3Rule
             this.current[i] = assignment[i];
         }
 
-        return this.compiled.EvaluateAsync(
+        return this.Compiled.EvaluateAsync(
             new RuleTestContext(),
             EmptyServiceProvider.Instance,
             cancellationToken: cancellationToken

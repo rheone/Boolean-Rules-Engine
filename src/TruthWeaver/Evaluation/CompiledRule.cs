@@ -5,9 +5,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
+using TruthWeaver.Compilation;
 using TruthWeaver.Json;
 using TruthWeaver.Printing;
 using TruthWeaver.Registry;
+using TruthWeaver.Rewriting;
 
 /// <summary>
 /// The immutable, thread-safe result of compiling a rule's text (CONTEXT.md). Safe to cache and
@@ -68,6 +70,29 @@ public sealed class CompiledRule<TContext>
         return grouping == GroupingStyle.Parentheses
             ? this.CanonicalText
             : CanonicalPrinter.Print(this.Root, this.CollapsePolicy, grouping);
+    }
+
+    /// <summary>
+    /// Rewrites every derived operator into the primitive kernel — <c>NOT</c>, <c>AND</c>, <c>OR</c>, <c>AtLeast</c>,
+    /// <c>AtMost</c>, <c>Exactly</c> and <c>COALESCE</c> — and returns the result as a new rule (ADR-0005 decision 10). The
+    /// derived operators are <c>IMPLIES</c>, <c>EQUIVALENT</c>, <c>XOR</c>, <c>NAND</c>, <c>NOR</c>, <c>NXOR</c>,
+    /// <c>ExactlyOne</c>, <c>ANY</c>, <c>ALL</c>, <c>NONE</c>, <c>BETWEEN</c>, <c>GreaterThan</c>, <c>LessThan</c>,
+    /// <c>If</c>, the four inspections and <c>Project</c>; every one of them has a kernel definition, so nothing is left
+    /// unexpanded.
+    /// </summary>
+    /// <remarks>
+    /// The result evaluates to the same <see cref="TruthValue"/> as this rule for every assignment of its terms, and
+    /// records the same faults for predicates that throw. This rule is immutable and is not changed. The declared
+    /// <see cref="CollapsePolicy"/> is an evaluation boundary rather than a derived operator and is carried over
+    /// unchanged. The expanded rule prints canonical text that compiles back to the same tree, but it is usually larger:
+    /// an operator whose definition mentions an operand twice (<c>XOR</c>, <c>EQUIVALENT</c>, <c>If</c>, the inspections)
+    /// repeats that operand's text, so deeply nested rules grow quickly and may exceed
+    /// <see cref="CompilerOptions.MaxNodeCount"/> when recompiled with the default limits.
+    /// </remarks>
+    /// <returns>A new rule over the same predicates whose tree contains only primitive operators, constants and terms.</returns>
+    public CompiledRule<TContext> ExpandToPrimitives()
+    {
+        return new CompiledRule<TContext>(PrimitiveExpander.Expand(this.Root), this.registry, this.logger, this.CollapsePolicy);
     }
 
     /// <summary>Prints this rule to the flat, key-discriminated JSON tree shape (ADR-0003).</summary>
