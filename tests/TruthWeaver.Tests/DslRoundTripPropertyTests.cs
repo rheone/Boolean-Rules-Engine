@@ -183,6 +183,93 @@ public sealed class DslRoundTripPropertyTests
         );
     }
 
+    /// <summary>
+    /// Ticket 22: padding the printed text of a generated tree with random whitespace (including tabs and newlines) around
+    /// its punctuation never changes the compiled tree, and normalising the padded text gives the same text as normalising
+    /// the tidy print.
+    /// </summary>
+    [Fact]
+    public void Normalising_a_whitespace_padded_print_of_a_generated_tree_matches_the_tidy_print_and_reparses_equal()
+    {
+        RuleCompiler<RuleTestContext> compiler = new(BuildRegistry());
+
+        GenExpressionTree
+            .Select(Gen.Int, (tree, seed) => (Tree: tree, Seed: seed))
+            .Sample(
+                sample =>
+                {
+                    string tidy = CanonicalPrinter.Print(sample.Tree);
+                    string padded = PadWhitespace(tidy, new Random(sample.Seed));
+                    string normalized = RuleText.NormalizeWhitespace(padded);
+
+                    Assert.Equal(RuleText.NormalizeWhitespace(tidy), normalized);
+                    CompilationResult<RuleTestContext> result = compiler.Compile(padded);
+                    Assert.True(result.Succeeded, $"Expected padded '{padded}' to compile cleanly.");
+                    Assert.Equal(sample.Tree, result.CompiledRule!.Root);
+                    Assert.Equal(sample.Tree, compiler.Compile(normalized).CompiledRule!.Root);
+                },
+                iter: SampleIterations
+            );
+    }
+
+    /// <summary>
+    /// Surrounds every punctuation character outside a string literal, and replaces every space outside one, with a random
+    /// run of whitespace. String literal contents are copied untouched because whitespace inside them is data.
+    /// </summary>
+    private static string PadWhitespace(string text, Random random)
+    {
+        const string Whitespace = " \t\r\n";
+        string RandomRun()
+        {
+            return new string(
+                Enumerable.Range(0, random.Next(0, 4)).Select(_ => Whitespace[random.Next(Whitespace.Length)]).ToArray()
+            );
+        }
+
+        System.Text.StringBuilder builder = new();
+        bool inString = false;
+        bool escaped = false;
+        foreach (char c in text)
+        {
+            if (inString)
+            {
+                builder.Append(c);
+
+                // A backslash escapes the next character, so an escaped quote does not end the literal.
+                if (escaped)
+                {
+                    escaped = false;
+                }
+                else if (c == '\\')
+                {
+                    escaped = true;
+                }
+                else if (c == '"')
+                {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            if (c == ' ')
+            {
+                builder.Append(' ').Append(RandomRun());
+            }
+            else if ("(),:[]".Contains(c))
+            {
+                builder.Append(RandomRun()).Append(c).Append(RandomRun());
+            }
+            else
+            {
+                builder.Append(c);
+                inString = c == '"';
+            }
+        }
+
+        return builder.ToString();
+    }
+
     private static Gen<LiteralValue> GenLiteralValue(LiteralKind kind)
     {
         return kind switch

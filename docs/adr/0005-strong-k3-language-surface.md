@@ -91,6 +91,11 @@ the aliases are cheap once the canonical form stays single.
    groups the printer wraps count as depth; function-call argument lists stay
    `(` and do not deepen it. The reference material's "option to convert all
    delimiter pairs to parens" is the default, so it needs no flag.
+   Whitespace normalization is implemented (k3-conformance 22) as the
+   text-level `RuleText.NormalizeWhitespace`, which works on text as written
+   (no compile, no registry, keeps operators, case and delimiters) and is
+   idempotent; the canonical printer already prints single spaces around
+   infix operators and after commas, so printed text needs nothing more.
 10. **Expression mutation** (primitive/NAND/NOR expansion, compression,
     simplification, canonicalization, whitespace normalization) all ship in
     this effort. Every rewrite must be K3-sound, verified exhaustively against

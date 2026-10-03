@@ -428,6 +428,24 @@ rule.PrintText(GroupingStyle.DepthCycling);          // a AND (b OR [c AND {d OR
 `[`, `{` and repeating. It is a readability aid for people; the output always re-parses to a tree equal to the
 original, so `CanonicalText` stays the form to persist. Function-call argument lists keep `(`.
 
+### Whitespace
+
+Whitespace between tokens never matters, so rule text can be laid out freely. `CanonicalText` always prints a
+single space around each infix operator and after each comma, with no leading or trailing whitespace, whatever spacing the rule
+was written with. To tidy text *as written* (keeping your operators, letter case and delimiters, and without compiling it
+or needing a predicate registry), use `RuleText.NormalizeWhitespace`:
+
+```csharp
+RuleText.NormalizeWhitespace("  a&&b ||
+  !c  ");          // "a && b || !c"
+RuleText.NormalizeWhitespace("ANY( a ,b,	c )");            // "ANY(a, b, c)"
+RuleText.NormalizeWhitespace("named( value :\"x  y\" )");   // "named(value: \"x  y\")" (string contents untouched)
+```
+
+The result is deterministic for any input spacing, idempotent, and compiles to a tree equal to the input's. Prefix `!`/`¬`
+hugs its operand, a call or term's argument list hugs its name, and nothing pads the inside of `()`, `[]` or `{}`.
+Characters the DSL does not recognise are kept in place, so the text of a rule that does not compile yet is never lost.
+
 ### Binary vs. unary operators
 
 | Arity | Operators | Notes |
