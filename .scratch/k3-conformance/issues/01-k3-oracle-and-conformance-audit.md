@@ -4,11 +4,17 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Oracle helper is reusable by later slices through the public pipeline (text/JSON/YAML -> Compile -> EvaluateAsync -> Decision)
-- [ ] Existing NOT/AND/OR/XOR/ExactlyOne/threshold operators are verified against the oracle
-- [ ] Any divergence found is recorded in this ticket's Comments section
-- [ ] Built test-first; the full validation set in CLAUDE.md passes (restore --locked-mode, build, test, csharpier check, format --verify-no-changes, roslynator analyze)
+- [x] Oracle helper is reusable by later slices through the public pipeline (text/JSON/YAML -> Compile -> EvaluateAsync -> Decision)
+- [x] Existing NOT/AND/OR/XOR/ExactlyOne/threshold operators are verified against the oracle
+- [x] Any divergence found is recorded in this ticket's Comments section
+- [x] Built test-first; the full validation set in CLAUDE.md passes (restore --locked-mode, build, test, csharpier check, format --verify-no-changes, roslynator analyze)
 
 See [spec](../spec.md) and [ADR-0005](../../../docs/adr/0005-strong-k3-language-surface.md).
+
+## Comments
+
+- Oracle: `tests/TruthWeaver.Tests/TestSupport/K3Oracle.cs`; harness: `K3Rule.cs`; audit: `K3ConformanceTests.cs`.
+- Audit result: NOT, AND, OR (2-4 operands), XOR, XNOR, ExactlyOne and the AtLeast/AtMost/GreaterThan/LessThan/Exactly family all match the oracle for every {T,F,U} assignment. No divergences found.
+- Unknown inputs are delivered as thrown faults until ticket 02 lets predicates return `TruthValue`; `K3Rule.TryCreate` is the one place to change then.
