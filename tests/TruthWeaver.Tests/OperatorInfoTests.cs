@@ -26,6 +26,8 @@ public sealed class OperatorInfoTests
     [InlineData("ANY(a, b)", "ANY")]
     [InlineData("ALL(a, b)", "ALL")]
     [InlineData("NONE(a, b)", "NONE")]
+    [InlineData("BETWEEN(0, 1, a, b)", "BETWEEN(0, 1)")]
+    [InlineData("COALESCE(a, b)", "COALESCE")]
     [InlineData("ExactlyOne(a, b)", "ExactlyOne")]
     [InlineData("AtLeast(1, a, b)", "AtLeast(1)")]
     [InlineData("AtMost(1, a, b)", "AtMost(1)")]

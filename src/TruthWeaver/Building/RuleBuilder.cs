@@ -178,6 +178,30 @@ public abstract class RuleBuilder
         return new OperatorBuilder("exactlyOne", operands);
     }
 
+    /// <summary>
+    /// Creates a builder for <c>COALESCE(...)</c>: the first operand that is not <c>Unknown</c> (<c>True</c> and
+    /// <c>False</c> pass through).
+    /// </summary>
+    /// <param name="operands">The operands in priority order (at least two).</param>
+    /// <returns>A builder for the <c>COALESCE</c> expression.</returns>
+    public static RuleBuilder Coalesce(params RuleBuilder[] operands)
+    {
+        return new OperatorBuilder("coalesce", operands);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>BETWEEN(min, max, ...)</c>: the number of true operands lies in the inclusive range
+    /// <c>[min, max]</c> (<c>AtLeast(min, ...) AND AtMost(max, ...)</c>).
+    /// </summary>
+    /// <param name="min">The inclusive lower bound (at least 0).</param>
+    /// <param name="max">The inclusive upper bound (at least <paramref name="min"/>, at most the operand count).</param>
+    /// <param name="operands">The operands (at least two).</param>
+    /// <returns>A builder for the <c>BETWEEN</c> expression.</returns>
+    public static RuleBuilder Between(int min, int max, params RuleBuilder[] operands)
+    {
+        return new BetweenBuilder(min, max, operands);
+    }
+
     /// <summary>Creates a builder for "at least <paramref name="k"/> of these operands are true".</summary>
     /// <param name="k">The threshold.</param>
     /// <param name="operands">The operands.</param>
@@ -329,6 +353,24 @@ public abstract class RuleBuilder
         private protected override JsonNode ToNode()
         {
             return new JsonObject { ["op"] = this.op, ["operands"] = OperandsNode(this.operands) };
+        }
+    }
+
+    private sealed class BetweenBuilder(int min, int max, IReadOnlyList<RuleBuilder> operands) : RuleBuilder
+    {
+        private readonly int min = min;
+        private readonly int max = max;
+        private readonly IReadOnlyList<RuleBuilder> operands = operands;
+
+        private protected override JsonNode ToNode()
+        {
+            return new JsonObject
+            {
+                ["op"] = "between",
+                ["min"] = this.min,
+                ["max"] = this.max,
+                ["operands"] = OperandsNode(this.operands),
+            };
         }
     }
 

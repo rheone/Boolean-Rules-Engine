@@ -40,6 +40,15 @@ internal static class YamlTreePrinter
 
         NodeShape shape = ExpressionShape.Of(node);
         string op = TreeFormatOpNames.ToTreeFormat(shape.OpName);
+        if (shape is { K: { } min, Max: { } max })
+        {
+            // BETWEEN carries its two bounds as min/max instead of a single threshold k.
+            YamlMappingNode between = OperatorNode(op, shape.Operands.Select(ToNode));
+            between.Add(new YamlScalarNode("min"), Scalar(min.ToString(CultureInfo.InvariantCulture), ScalarStyle.Plain));
+            between.Add(new YamlScalarNode("max"), Scalar(max.ToString(CultureInfo.InvariantCulture), ScalarStyle.Plain));
+            return between;
+        }
+
         return shape.K is { } k
             ? OperatorNodeWithThreshold(op, k, shape.Operands.Select(ToNode))
             : OperatorNode(op, shape.Operands.Select(ToNode));

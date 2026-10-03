@@ -235,6 +235,8 @@ internal static class YamlTreeParser
                 return new AllNode(operands, SourceSpan.None);
             case "None":
                 return new NoneNode(operands, SourceSpan.None);
+            case "Coalesce":
+                return new CoalesceNode(operands, SourceSpan.None);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":
@@ -247,6 +249,8 @@ internal static class YamlTreeParser
                 return ParseThreshold(mapping, op, ThresholdComparison.LessThan, operands, diagnostics);
             case "Exactly":
                 return ParseThreshold(mapping, op, ThresholdComparison.Exactly, operands, diagnostics);
+            case "Between":
+                return ParseBetween(mapping, op, operands, diagnostics);
             default:
                 throw new InvalidOperationException($"Unhandled canonical op-name '{canonicalOpName}'.");
         }
@@ -273,6 +277,32 @@ internal static class YamlTreeParser
         }
 
         return new ThresholdNode(comparison, k, operands, SourceSpan.None);
+    }
+
+    private static RuleNode? ParseBetween(
+        YamlMappingNode mapping,
+        string op,
+        List<RuleNode> operands,
+        List<Diagnostic> diagnostics
+    )
+    {
+        if (!TryGetInteger(mapping, "min", out int min) || !TryGetInteger(mapping, "max", out int max))
+        {
+            diagnostics.Add(
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"'{op}' requires integer 'min' and 'max'.", SourceSpan.None)
+            );
+            return null;
+        }
+
+        return new BetweenNode(min, max, operands, SourceSpan.None);
+    }
+
+    private static bool TryGetInteger(YamlMappingNode mapping, string key, out int value)
+    {
+        value = 0;
+        return TryGetChild(mapping, key, out YamlNode? node)
+            && node is YamlScalarNode { Value: { } text }
+            && int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
     }
 
     private static RawLiteral? ParseLiteral(YamlNode node, List<Diagnostic> diagnostics)

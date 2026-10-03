@@ -137,6 +137,20 @@ internal static class Analyzer
                 }
 
                 break;
+            case BetweenExpression bt:
+                foreach (Expression o in bt.Operands)
+                {
+                    CollectTerms(o, terms);
+                }
+
+                break;
+            case CoalesceExpression co:
+                foreach (Expression o in co.Operands)
+                {
+                    CollectTerms(o, terms);
+                }
+
+                break;
         }
     }
 
@@ -198,6 +212,28 @@ internal static class Analyzer
         for (int i = 1; i < operands.Count; i++)
         {
             result = Xor(bdd, result, operands[i]);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// <c>COALESCE</c> as a right fold of the binary form. For <c>x</c> with rail <c>(D, P)</c>, <c>x</c> is
+    /// <c>True</c> iff <c>D</c>, <c>False</c> iff <c>NOT P</c> and <c>Unknown</c> iff <c>P AND NOT D</c>; the result is
+    /// <c>x</c> when known and <c>y</c> when <c>x</c> is Unknown. So it is definitely true when
+    /// <c>D_x OR (Unknown_x AND D_y)</c>, which simplifies to <c>D_x OR (P_x AND D_y)</c>, and possibly true when it is
+    /// not definitely false: <c>NOT (NOT P_x OR (Unknown_x AND NOT P_y))</c>, i.e. <c>P_x AND (D_x OR P_y)</c>.
+    /// </summary>
+    private static DualRail Coalesce(BddManager bdd, IReadOnlyList<DualRail> operands)
+    {
+        DualRail result = operands[^1];
+        for (int i = operands.Count - 2; i >= 0; i--)
+        {
+            DualRail x = operands[i];
+            result = new DualRail(
+                bdd.Or(x.Definite, bdd.And(x.Possible, result.Definite)),
+                bdd.And(x.Possible, bdd.Or(x.Definite, result.Possible))
+            );
         }
 
         return result;
@@ -361,6 +397,14 @@ internal static class Analyzer
                 break;
             case ExactlyOneExpression e:
                 rail = Exactly(bdd, BuildOperands(e.Operands, bdd, variableIndex, diagnostics), 1);
+                break;
+            case BetweenExpression bt:
+                // AND(AtLeast(min, ...), AtMost(max, ...)): AtMost(max) is the negation of AtLeast(max + 1).
+                List<DualRail> betweenOperands = BuildOperands(bt.Operands, bdd, variableIndex, diagnostics);
+                rail = And(bdd, AtLeast(bdd, betweenOperands, bt.Min), Not(bdd, AtLeast(bdd, betweenOperands, bt.Max + 1)));
+                break;
+            case CoalesceExpression co:
+                rail = Coalesce(bdd, BuildOperands(co.Operands, bdd, variableIndex, diagnostics));
                 break;
             case ThresholdExpression th:
                 List<DualRail> operands = BuildOperands(th.Operands, bdd, variableIndex, diagnostics);

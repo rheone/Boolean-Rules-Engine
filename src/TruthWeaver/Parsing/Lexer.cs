@@ -74,8 +74,8 @@ internal sealed class Lexer(string source)
             case '!' or '¬' or '∧' or '∨' or '⊕' or '→' or '↔' or '↑' or '↓':
                 this.position++;
                 return new Token(TokenKind.Operator, c.ToString(), new SourceSpan(start, 1));
-            case '&' or '|' when this.position + 1 < this.source.Length && this.source[this.position + 1] == c:
-                // Doubled form only: a lone '&' or '|' is not an operator and falls through to the
+            case '&' or '|' or '?' when this.position + 1 < this.source.Length && this.source[this.position + 1] == c:
+                // Doubled form only (&&, ||, ??): a lone '&', '|' or '?' is not an operator and falls through to the
                 // unexpected-character diagnostic below.
                 this.position += 2;
                 return new Token(TokenKind.Operator, new string(c, 2), new SourceSpan(start, 2));

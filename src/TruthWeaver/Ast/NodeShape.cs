@@ -2,7 +2,8 @@ namespace TruthWeaver.Ast;
 
 /// <summary>
 /// The structural shape of an operator <see cref="Expression"/> node: its canonical op-name, its
-/// threshold <c>K</c> (only for <see cref="ThresholdExpression"/>, <see langword="null"/> otherwise),
+/// threshold <c>K</c> (only for <see cref="ThresholdExpression"/> and, as its lower bound, <see cref="BetweenExpression"/>;
+/// <see langword="null"/> otherwise), the upper bound <c>Max</c> (only for <see cref="BetweenExpression"/>),
 /// and its operand list, in source order.
 /// </summary>
 /// <param name="OpName">
@@ -11,9 +12,10 @@ namespace TruthWeaver.Ast;
 /// <c>"AtLeast"</c>). Each consumer maps this to its own format-specific keyword or label; the seam
 /// only settles what the name structurally is, not how any one format spells it.
 /// </param>
-/// <param name="K">The threshold value, for a <see cref="ThresholdExpression"/>; otherwise <see langword="null"/>.</param>
+/// <param name="K">The threshold value for a <see cref="ThresholdExpression"/>, or the lower bound (<c>min</c>) for a <see cref="BetweenExpression"/>; otherwise <see langword="null"/>.</param>
 /// <param name="Operands">The node's operands, in source order.</param>
-internal readonly record struct NodeShape(string OpName, int? K, IReadOnlyList<Expression> Operands);
+/// <param name="Max">The upper bound (<c>max</c>) for a <see cref="BetweenExpression"/>; otherwise <see langword="null"/>.</param>
+internal readonly record struct NodeShape(string OpName, int? K, IReadOnlyList<Expression> Operands, int? Max = null);
 
 /// <summary>
 /// The single seam every consumer that needs an operator node's op-name/K/operands goes through,
@@ -53,6 +55,8 @@ internal static class ExpressionShape
             NoneExpression no => new NodeShape("None", null, no.Operands),
             ExactlyOneExpression e => new NodeShape("ExactlyOne", null, e.Operands),
             ThresholdExpression th => new NodeShape(th.Comparison.ToString(), th.K, th.Operands),
+            BetweenExpression bt => new NodeShape("Between", bt.Min, bt.Operands, bt.Max),
+            CoalesceExpression co => new NodeShape("Coalesce", null, co.Operands),
             ConstantExpression or TermExpression => throw new ArgumentException(
                 $"'{node.GetType().Name}' is a leaf with no operand shape — handle it directly instead "
                     + $"of calling {nameof(ExpressionShape)}.{nameof(Of)}.",

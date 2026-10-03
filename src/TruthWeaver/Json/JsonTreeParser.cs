@@ -230,6 +230,8 @@ internal static class JsonTreeParser
                 return new AllNode(operands, SourceSpan.None);
             case "None":
                 return new NoneNode(operands, SourceSpan.None);
+            case "Coalesce":
+                return new CoalesceNode(operands, SourceSpan.None);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":
@@ -242,6 +244,8 @@ internal static class JsonTreeParser
                 return ParseThreshold(element, op, ThresholdComparison.LessThan, operands, diagnostics);
             case "Exactly":
                 return ParseThreshold(element, op, ThresholdComparison.Exactly, operands, diagnostics);
+            case "Between":
+                return ParseBetween(element, op, operands, diagnostics);
             default:
                 throw new InvalidOperationException($"Unhandled canonical op-name '{canonicalOpName}'.");
         }
@@ -264,6 +268,27 @@ internal static class JsonTreeParser
         }
 
         return new ThresholdNode(comparison, kElement.GetInt32(), operands, SourceSpan.None);
+    }
+
+    private static RuleNode? ParseBetween(JsonElement element, string op, List<RuleNode> operands, List<Diagnostic> diagnostics)
+    {
+        if (!TryGetInteger(element, "min", out int min) || !TryGetInteger(element, "max", out int max))
+        {
+            diagnostics.Add(
+                Diagnostic.Error(DiagnosticCodes.MalformedTree, $"'{op}' requires integer 'min' and 'max'.", SourceSpan.None)
+            );
+            return null;
+        }
+
+        return new BetweenNode(min, max, operands, SourceSpan.None);
+    }
+
+    private static bool TryGetInteger(JsonElement element, string property, out int value)
+    {
+        value = 0;
+        return element.TryGetProperty(property, out JsonElement child)
+            && child.ValueKind == JsonValueKind.Number
+            && child.TryGetInt32(out value);
     }
 
     private static RawLiteral? ParseLiteral(JsonElement element, List<Diagnostic> diagnostics)

@@ -100,6 +100,18 @@ internal sealed record ThresholdNode(ThresholdComparison Comparison, int K, IRea
     : RuleNode(Span);
 
 /// <summary>
+/// <c>BETWEEN(min, max, ...)</c> reference: the true-operand count lies in <c>[min, max]</c>. The bounds' valid range and
+/// the operand count (at least two) are validated by the compiler, not the parser.
+/// </summary>
+internal sealed record BetweenNode(int Min, int Max, IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
+/// N-ary <c>COALESCE(...)</c> / infix <c>??</c> reference (first operand that is not <c>Unknown</c>). Operand count
+/// (at least two) is validated by <c>RuleNodeCompiler</c> like the other n-ary operators.
+/// </summary>
+internal sealed record CoalesceNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
 /// A placeholder produced only after a syntax/structure error has already been reported, so parsing
 /// can continue (and thus report further diagnostics in the same pass) without ever throwing.
 /// </summary>

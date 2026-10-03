@@ -43,7 +43,13 @@ internal static class JsonTreePrinter
             ["op"] = TreeFormatOpNames.ToTreeFormat(shape.OpName),
             ["operands"] = OperandsArray(shape.Operands),
         };
-        if (shape.K is { } k)
+        if (shape.Max is { } max)
+        {
+            // BETWEEN carries its two bounds as min/max instead of a single threshold k.
+            obj["min"] = shape.K;
+            obj["max"] = max;
+        }
+        else if (shape.K is { } k)
         {
             obj["k"] = k;
         }

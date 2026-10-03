@@ -171,6 +171,14 @@ internal sealed class RuleNodeCompiler<TContext>
                 operands => new ExactlyOneExpression(new EquatableArray<Expression>(operands))
             ),
             ThresholdNode th => this.BuildThreshold(th, depth),
+            BetweenNode bt => this.BuildBetween(bt, depth),
+            CoalesceNode co => this.BuildVariadic(
+                co.Operands,
+                depth,
+                co.Span,
+                2,
+                operands => new CoalesceExpression(new EquatableArray<Expression>(operands))
+            ),
             _ => throw new InvalidOperationException($"Unhandled rule node type '{node.GetType()}'."),
         };
     }
@@ -308,6 +316,51 @@ internal sealed class RuleNodeCompiler<TContext>
         }
 
         return new ThresholdExpression(node.Comparison, node.K, new EquatableArray<Expression>(built));
+    }
+
+    /// <summary>
+    /// Builds <c>BETWEEN(min, max, ...)</c>. Like the threshold family it rejects bounds that would make the result
+    /// a structural constant (<c>0 &lt;= min &lt;= max &lt;= n</c>; the full range <c>0..n</c> is always True), and
+    /// like <c>ANY</c>/<c>ALL</c>/<c>ExactlyOne</c> it needs at least two operands (ADR-0005 decision 13).
+    /// </summary>
+    private Expression BuildBetween(BetweenNode node, int depth)
+    {
+        int operandCount = node.Operands.Count;
+        if (operandCount < 2)
+        {
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"BETWEEN requires at least 2 operands but found {operandCount}.",
+                    node.Span
+                )
+            );
+            return FailedNode.Placeholder;
+        }
+
+        bool inRange = node.Min >= 0 && node.Min <= node.Max && node.Max <= operandCount;
+        if (!inRange || (node.Min == 0 && node.Max == operandCount))
+        {
+            string reason = inRange
+                ? $"the full range 0..{operandCount} is always True (a structural constant)"
+                : $"it must satisfy 0 <= min <= max <= {operandCount} for {operandCount} operand(s)";
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.InvalidThresholdValue,
+                    $"BETWEEN's bounds min={node.Min}, max={node.Max} are invalid: {reason}.",
+                    node.Span
+                )
+            );
+            return FailedNode.Placeholder;
+        }
+
+        List<Expression> built = new(operandCount);
+        foreach (RuleNode operand in node.Operands)
+        {
+            built.Add(this.Build(operand, depth + 1));
+        }
+
+        return new BetweenExpression(node.Min, node.Max, new EquatableArray<Expression>(built));
     }
 
     private Expression BuildTerm(TermNode node)

@@ -161,7 +161,47 @@ the aliases are cheap once the canonical form stays single.
     tree-printer style keeps the word (no symbol or C-family spelling) and the
     evaluated/description label is `ANY`/`ALL`/`NONE`. `rule-tree.schema.json`
     lists `any`, `all` and `none`. `RuleBuilder.Any`, `All` and `None` are new.
-    `BETWEEN` is a separate ticket.
+
+    Implemented in k3-conformance 14: `BETWEEN(min, max, op1, op2, ...)` is a
+    first-class `BetweenExpression(Min, Max, Operands)` function-call node (no
+    precedence): the first two arguments are integer bounds, parsed like the
+    threshold family's `k` (a missing or non-integer bound is a `SyntaxError`
+    naming the minimum or maximum), then the operands. It is
+    `AND(AtLeast(min, ...), AtMost(max, ...))` over the definitely-true /
+    possibly-true interval (the evaluator ANDs the two threshold results; the
+    analyzer rail is `AtLeast(min)` AND NOT `AtLeast(max + 1)`). Operand
+    minimum: **two or more**, as `ANY`/`ALL` (`MalformedTree`). Bound range:
+    `0 <= min <= max <= n` for `n` operands, and the whole range `0..n` is
+    rejected because the node would be the constant `True`, the same
+    structural-constant rationale as the threshold family (all of these are
+    `InvalidThresholdValue`, with a message naming `min=`, `max=` and the
+    allowed range). JSON/YAML: `{"op": "between", "min": 1, "max": 2,
+    "operands": [...]}` (case-insensitive op, integer `min`/`max` required
+    else `MalformedTree`); `rule-tree.schema.json` has a `betweenOperatorNode`.
+    `NodeShape` gained an optional `Max` (its `K` carries `min`). The
+    canonical printer writes `BETWEEN(1, 2, a, b, c)`; the evaluated and
+    description label is `BETWEEN(min, max)`, kept as a word in every
+    `OperatorStyle`. `RuleBuilder.Between(min, max, operands)` is new.
+
+    Implemented in k3-conformance 15: `COALESCE(a, b, ...)` and the infix `??`
+    build one `CoalesceExpression(Operands)`: the first operand that is not
+    `Unknown` (`True`/`False` pass through; `Unknown` only if all are).
+    `??` is an infix operator under decision 8: it cannot share a level with
+    `AND`/`OR` or another infix operator without parentheses. **Chains are
+    accepted**: `a ?? b ?? c` is one three-operand node, because coalescing is
+    associative (unlike the binary-only `IMPLIES`/`NAND`/`NOR`, whose chains
+    stay errors); its operands are `NOT`-level expressions. Only the `??`
+    token is infix; the word `COALESCE` is a function call only (a lone `?` is
+    a lexical error). Two or more operands are required (`MalformedTree`).
+    Evaluation is left to right and stops at the first non-`Unknown` operand
+    (skipped operands appear as `NotEvaluated` in the evaluated tree and trace,
+    like `AND`/`OR`; `EvaluationMode.Exhaustive` evaluates all). The analyzer
+    rail folds from the right: with `(D, P)` the definite/possible rails of
+    `x`, `COALESCE(x, y)` is `(D_x OR (P_x AND D_y), P_x AND (D_x OR P_y))`.
+    The canonical printer writes the function-call form `COALESCE(a, b)`; the
+    tree printers spell the label `COALESCE` / `??` / `??` for the word /
+    symbolic / C-style styles. JSON/YAML op `coalesce`; `RuleBuilder.Coalesce`
+    is new.
 
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,

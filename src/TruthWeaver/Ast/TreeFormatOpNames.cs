@@ -32,6 +32,8 @@ internal static class TreeFormatOpNames
         ["GreaterThan"] = "greaterThan",
         ["LessThan"] = "lessThan",
         ["Exactly"] = "exactly",
+        ["Between"] = "between",
+        ["Coalesce"] = "coalesce",
     };
 
     private static readonly IReadOnlyDictionary<string, string> TreeFormatToCanonical = BuildReadTable();

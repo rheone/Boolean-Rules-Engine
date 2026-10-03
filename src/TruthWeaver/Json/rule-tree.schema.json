@@ -60,7 +60,8 @@
       "oneOf": [
         { "$ref": "#/$defs/unaryOperatorNode" },
         { "$ref": "#/$defs/naryOperatorNode" },
-        { "$ref": "#/$defs/thresholdOperatorNode" }
+        { "$ref": "#/$defs/thresholdOperatorNode" },
+        { "$ref": "#/$defs/betweenOperatorNode" }
       ]
     },
     "unaryOperatorNode": {
@@ -79,10 +80,10 @@
       "additionalProperties": false
     },
     "naryOperatorNode": {
-      "description": "AND, OR, XOR, EQUIVALENT, IMPLIES, NAND, NOR, NXOR, ANY, ALL, NONE, ExactlyOne: an operand list ('iff' and the legacy 'xnor' are accepted aliases of 'equivalent'; XOR/EQUIVALENT/IMPLIES/NAND/NOR are compile-time restricted to exactly two operands, IMPLIES as [antecedent, consequent]; that restriction is not expressible as JSON structure).",
+      "description": "AND, OR, XOR, EQUIVALENT, IMPLIES, NAND, NOR, NXOR, ANY, ALL, NONE, COALESCE, ExactlyOne: an operand list ('iff' and the legacy 'xnor' are accepted aliases of 'equivalent'; XOR/EQUIVALENT/IMPLIES/NAND/NOR are compile-time restricted to exactly two operands, IMPLIES as [antecedent, consequent]; that restriction is not expressible as JSON structure; COALESCE takes its operands in priority order).",
       "type": "object",
       "properties": {
-        "op": { "enum": ["and", "or", "xor", "equivalent", "iff", "xnor", "implies", "nand", "nor", "nxor", "any", "all", "none", "exactlyOne"] },
+        "op": { "enum": ["and", "or", "xor", "equivalent", "iff", "xnor", "implies", "nand", "nor", "nxor", "any", "all", "none", "coalesce", "exactlyOne"] },
         "operands": {
           "type": "array",
           "items": { "$ref": "#/$defs/node" }
@@ -103,6 +104,21 @@
         "k": { "type": "integer" }
       },
       "required": ["op", "operands", "k"],
+      "additionalProperties": false
+    },
+    "betweenOperatorNode": {
+      "description": "BETWEEN: the number of true operands lies in the inclusive range [min, max]. The bounds' range (0 <= min <= max <= operand count, not the full range) is a compile-time check, not expressible as JSON structure.",
+      "type": "object",
+      "properties": {
+        "op": { "const": "between" },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" }
+        },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" }
+      },
+      "required": ["op", "operands", "min", "max"],
       "additionalProperties": false
     }
   }

@@ -141,6 +141,10 @@ public sealed class AnalyzerTests
     [InlineData("ALL((a OR TRUE), (b OR TRUE))", true)]
     [InlineData("NONE((a OR TRUE), (b AND FALSE))", false)]
     [InlineData("NONE((a AND FALSE), (b AND FALSE))", true)]
+    [InlineData("BETWEEN(1, 1, (a AND FALSE), (b AND FALSE))", false)]
+    [InlineData("BETWEEN(0, 1, (a AND FALSE), (b AND FALSE))", true)]
+    [InlineData("COALESCE((a AND FALSE), b)", false)]
+    [InlineData("COALESCE((a OR TRUE), b)", true)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -178,6 +182,9 @@ public sealed class AnalyzerTests
     [InlineData("ANY(a, NOT a)")]
     [InlineData("ALL(a, NOT a)")]
     [InlineData("NONE(a, NOT a)")]
+    [InlineData("BETWEEN(1, 1, a, NOT a)")]
+    [InlineData("COALESCE(a, NOT a)")]
+    [InlineData("a ?? NOT a")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
     [InlineData("AtMost(1, a, NOT a)")]
@@ -350,7 +357,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(15))
+        switch (random.Next(17))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -424,6 +431,27 @@ public sealed class AnalyzerTests
                     $"NONE({string.Join(", ", nones.Select(o => o.Text))})",
                     v => K3Oracle.None([.. nones.Select(o => o.Eval(v))]),
                     nones
+                );
+            case 15:
+                GeneratedRule[] betweenOperands = [.. Enumerable.Range(0, random.Next(2, 5)).Select(_ => Child())];
+                int min = random.Next(0, betweenOperands.Length + 1);
+                int max = random.Next(min, betweenOperands.Length + 1);
+                if (min == 0 && max == betweenOperands.Length)
+                {
+                    min = 1; // The full range is rejected as an always-true structural constant.
+                }
+
+                return new GeneratedRule(
+                    $"BETWEEN({min}, {max}, {string.Join(", ", betweenOperands.Select(o => o.Text))})",
+                    v => K3Oracle.Between(min, max, [.. betweenOperands.Select(o => o.Eval(v))]),
+                    betweenOperands
+                );
+            case 16:
+                GeneratedRule[] coalesced = [.. Enumerable.Range(0, random.Next(2, 5)).Select(_ => Child())];
+                return new GeneratedRule(
+                    $"COALESCE({string.Join(", ", coalesced.Select(o => o.Text))})",
+                    v => K3Oracle.Coalesce([.. coalesced.Select(o => o.Eval(v))]),
+                    coalesced
                 );
             case 6:
                 GeneratedRule[] exactlyOne = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];

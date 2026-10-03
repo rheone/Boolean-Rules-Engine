@@ -44,7 +44,7 @@ anything else.
 
 `TruthWeaver` answers one question: *is this expression true right
 now, for this context?* It knows about `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`,
-`NXOR`, `ANY`, `ALL`, `NONE`, `ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
+`NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `ExactlyOne`, the threshold family (`AtLeast`/`AtMost`/`GreaterThan`/
 `LessThan`/`Exactly`), terms, and evaluation. It does not know about
 permissions, workflows, or policies — those are things you build *on top* of
 it. A permission check ("can the current user do X") is one consumer of this
@@ -56,7 +56,7 @@ engine, not what the engine itself is.
 | **Expression** | The boolean tree — operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation, e.g. `hasTopping`, `lovesPineapple`. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")` — the tree's leaf node. |
-| **Operator** | `AND` `OR` `NOT` `XOR` `EQUIVALENT` `IMPLIES` `NAND` `NOR` `NXOR` `ANY` `ALL` `NONE` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
+| **Operator** | `AND` `OR` `NOT` `XOR` `EQUIVALENT` `IMPLIES` `NAND` `NOR` `NXOR` `ANY` `ALL` `NONE` `BETWEEN(min, max)` `COALESCE` `ExactlyOne` and the threshold family (`AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`), plus `true`/`false`. See [Operators](#operators) below. |
 | **Decision** | The evaluation result: a `TruthValue` plus any faults, and optionally a trace. |
 
 Full vocabulary and the predicate-author contract: [CONTEXT.md](CONTEXT.md).
@@ -352,6 +352,7 @@ prints the named form.
 | `IMPLIES` | `→` |
 | `NAND` | `↑` |
 | `NOR` | `↓` |
+| `COALESCE` | `??` (infix; the word `COALESCE` is the function-call form only) |
 | `EQUIVALENT` | `↔` (words `IFF` and the legacy `XNOR` are accepted too) |
 
 Symbols and words mix freely (`a && b OR c`) and follow the same precedence
@@ -373,7 +374,7 @@ their head.
 `lovesPineapple AND NOT isBanned OR isVip` therefore parses as
 `(lovesPineapple AND (NOT isBanned)) OR isVip`.
 
-Every infix operator other than `NOT`/`AND`/`OR` (today `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND` and `NOR`)
+Every infix operator other than `NOT`/`AND`/`OR` (today `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR` and `??`)
 is **not** part of this precedence chain: mixing one with `AND`/`OR`, or with
 a *different* infix operator, at the same syntactic level without explicit
 parentheses is a **compile error** (`AmbiguousOperatorMixing`) rather than
@@ -382,7 +383,10 @@ offending operator (or at the bare infix expression sitting next to
 `AND`/`OR`) and tells you to add parentheses — see
 [ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 8 (which
 extends [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)'s rule) for
-why. Function-call-style operators (`NXOR(...)`, `ANY(...)`, `ALL(...)`, `NONE(...)`, `ExactlyOne(...)` and the threshold
+why. The coalescing operator `??` follows the same rule (`a ?? b AND c` is an error, `(a ?? b) AND c` is fine) but, unlike
+the binary-only infix operators, a chain of it is accepted: `a ?? b ?? c` is one n-ary `COALESCE(a, b, c)` node, because
+coalescing is associative. Its operands are `NOT`-level expressions, so `NOT a ?? b` is `COALESCE(NOT a, b)`.
+Function-call-style operators (`NXOR(...)`, `ANY(...)`, `ALL(...)`, `NONE(...)`, `BETWEEN(...)`, `COALESCE(...)`, `ExactlyOne(...)` and the threshold
 family) are self-delimiting — their parentheses are part of the call syntax,
 not grouping, so they never participate in precedence at all.
 
@@ -392,7 +396,7 @@ not grouping, so they never participate in precedence at all.
 | --- | --- | --- |
 | **Unary** | `NOT` | Takes exactly one operand. |
 | **Binary only** | `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR` | Always exactly two operands — a compile error otherwise (`XorArityViolation`). `XOR` with three or more operands is an error whose message points at `NXOR` (n-ary parity) and `ExactlyOne` (see [ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 7); a chain such as `a IMPLIES b IMPLIES c` or `a NAND b NAND c` is rejected too — parenthesize it. |
-| **N-ary (≥ 2)** | `AND`, `OR`, `NXOR`, `ANY`, `ALL`, `NONE`, `ExactlyOne`, `AtLeast`, `AtMost`, `GreaterThan`, `LessThan`, `Exactly` | Take two or more operands. `AND`/`OR` are commonly thought of as "binary" from C-family languages, but this engine treats them as flat n-ary chains (`AND(a, b, c)`, not `AND(AND(a, b), c)`). |
+| **N-ary (≥ 2)** | `AND`, `OR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `ExactlyOne`, `AtLeast`, `AtMost`, `GreaterThan`, `LessThan`, `Exactly` | Take two or more operands. `AND`/`OR` are commonly thought of as "binary" from C-family languages, but this engine treats them as flat n-ary chains (`AND(a, b, c)`, not `AND(AND(a, b), c)`). |
 | **0-ary** | `True`, `False`, `Unknown` | Constants, not operators over operands. Written in any letter case; printed upper camel. |
 
 ### All operators
@@ -411,6 +415,8 @@ not grouping, so they never participate in precedence at all.
 | `ANY(a, b, ...)` | n-ary | At least one operand is `True` (`AtLeast(1, ...)`): `True` if any operand is `True`, `False` if every operand is `False`, otherwise `Unknown`. |
 | `ALL(a, b, ...)` | n-ary | Every operand is `True` (`AtLeast(n, ...)`): `True` if all are `True`, `False` if any is `False`, otherwise `Unknown`. |
 | `NONE(a, b, ...)` | n-ary | No operand is `True` (`AtMost(0, ...)`): `True` if all are `False`, `False` if any is `True`, otherwise `Unknown`. |
+| `BETWEEN(min, max, a, b, ...)` | n-ary | The number of `True` operands lies in `[min, max]`, defined as `AtLeast(min, ...) AND AtMost(max, ...)` over the definitely-true / possibly-true interval. The two integer bounds come first; they must satisfy `0 <= min <= max <= n` and may not be the whole range `0..n` (always `True`), otherwise `InvalidThresholdValue`. Needs two or more operands. |
+| `COALESCE(a, b, ...)` / `a ?? b` | n-ary | Replaces only `Unknown`: the first operand that is not `Unknown`, with `True` and `False` passing through unchanged (`Unknown` only if every operand is). Operands are evaluated left to right and the rest are skipped (recorded as `NotEvaluated`) once a known value is found; `EvaluationMode.Exhaustive` evaluates them all. `a ?? b ?? c` is one three-operand node. |
 | `ExactlyOne(...)` | n-ary | True iff exactly one operand is true — the unambiguous name for what `XOR` only means at exactly two operands. |
 | `AtLeast(k, ...)` | n-ary | True iff at least `k` operands are true. |
 | `AtMost(k, ...)` | n-ary | True iff at most `k` operands are true. |
@@ -439,7 +445,7 @@ write and read each one:
 | **Compile with** | `compiler.Compile(text)` | `compiler.CompileJson(json)` | `compiler.CompileYaml(yaml)` |
 | **Print with** | `rule.CanonicalText` | `rule.PrintJson()` | `rule.PrintYaml()` |
 | **Round-trips losslessly?** | Yes, by definition. | Yes — `parse(print(x))` is structurally equal to `x` (ticket 07). | Yes — same guarantee (ticket 08). |
-| **Nesting for `AND`/`OR`/`XOR`/`EQUIVALENT`/`IMPLIES`/`NAND`/`NOR`** | Infix with precedence (see [Operators](#operators)); `XOR`/`EQUIVALENT`/`IMPLIES`/`NAND`/`NOR` mixed with `AND`/`OR`, or with each other, needs explicit parens. | Explicit `{"op": "...", "operands": [...]}` nodes — no precedence to get wrong. | Same explicit `op`/`operands` shape as JSON. |
+| **Nesting for `AND`/`OR`/`XOR`/`EQUIVALENT`/`IMPLIES`/`NAND`/`NOR`/`??`** | Infix with precedence (see [Operators](#operators)); `XOR`/`EQUIVALENT`/`IMPLIES`/`NAND`/`NOR`/`??` mixed with `AND`/`OR`, or with each other, needs explicit parens. | Explicit `{"op": "...", "operands": [...]}` nodes — no precedence to get wrong. | Same explicit `op`/`operands` shape as JSON. |
 | **Comments** | No | No (JSON has none) | Yes (`#`) — a practical reason to prefer YAML for hand-maintained rule files. |
 
 See [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md) for the full
@@ -1266,6 +1272,8 @@ on `TruthWeaver.Building.RuleBuilder`:
 | `NOR` | `RuleBuilder.Nor(RuleBuilder left, RuleBuilder right)` |
 | `NXOR` | `RuleBuilder.Nxor(params RuleBuilder[] operands)` |
 | `ANY` / `ALL` / `NONE` | `RuleBuilder.Any(params RuleBuilder[] operands)` / `RuleBuilder.All(...)` / `RuleBuilder.None(...)` |
+| `BETWEEN(min, max)` | `RuleBuilder.Between(int min, int max, params RuleBuilder[] operands)` (JSON/YAML: `{"op": "between", "min": 1, "max": 2, "operands": [...]}`) |
+| `COALESCE` | `RuleBuilder.Coalesce(params RuleBuilder[] operands)` |
 | `ExactlyOne` | `RuleBuilder.ExactlyOne(params RuleBuilder[] operands)` |
 | `AtLeast(k)` / `AtMost(k)` / `GreaterThan(k)` / `LessThan(k)` / `Exactly(k)` | `RuleBuilder.AtLeast(int k, params RuleBuilder[] operands)` (and the four siblings, same shape) |
 
@@ -1474,13 +1482,15 @@ with the reasoning behind each term, is [CONTEXT.md](CONTEXT.md).
 | `EvaluationOptions` | Per-call evaluation knobs: `FaultBudget` (abort after N faults), `Mode` (`Default` or `Exhaustive`), and an overall timeout. |
 | `NXOR(...)` | N-ary parity: true iff an odd number of operands are true; `Unknown` whenever any operand is `Unknown`. The unambiguous name for what `XOR` would mean past two operands. |
 | `ANY(...)` / `ALL(...)` / `NONE(...)` | N-ary cardinality operators over the definitely-true / possibly-true interval: `AtLeast(1, ...)`, `AtLeast(n, ...)` and `AtMost(0, ...)`, kept as their own nodes so a rule round-trips as written. They take two or more operands. |
+| `BETWEEN(min, max, ...)` | N-ary operator: the number of true operands lies in `[min, max]` (`AtLeast(min, ...) AND AtMost(max, ...)`); the bounds are validated at compile time and a rule prints them first. |
+| `COALESCE(...)` / `??` | N-ary operator that replaces only `Unknown` with the next operand (`True`/`False` pass through); short-circuits at the first known value. `??` is the infix spelling and chains into one node. |
 | `ExactlyOne(...)` | N-ary operator: true iff exactly one operand is true. The explicit name for "exactly one," so it's never confused with `XOR`'s binary-only meaning or `NXOR`'s parity. |
 | Expression | The boolean tree itself — operators over terms and sub-expressions. What a `CompiledRule<TContext>` wraps. |
 | `Fault` | A record of one predicate failing to produce an answer during one evaluation: the faulting term's identity plus the exception. Faults are absorbed as `Unknown`, never rethrown. |
 | `IMPLIES(a, b)` / `→` | Strong Kleene material implication, `NOT a OR b`; a first-class binary node that prints as written (`(a IMPLIES b)`). Mixing it with `AND`/`OR` or another infix operator without parentheses is a compile error. See [Operators](#operators). |
 | Kleene logic | Three-valued logic (`True`/`False`/`Unknown`) instead of two-valued boolean logic — the reason a predicate fault becomes `Unknown` rather than a thrown exception or a silently coerced `false`. See [ADR-0001](docs/adr/0001-kleene-failure-model.md). |
 | Memoization | Within one evaluation, a given term identity is invoked at most once, however many places in the tree reference it. Never carries across separate `EvaluateAsync` calls. |
-| Operator | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ExactlyOne`, the threshold family, and the `True/`False`/`Unknown` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
+| Operator | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT`, `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN`, `COALESCE`, `ExactlyOne`, the threshold family, and the `True/`False`/`Unknown` constants — the closed set of ways to combine terms and sub-expressions. Every operator has a `Label`/`Description` via `OperatorInfo.Describe`. See [Operators](#operators). |
 | `OperatorInfo` / `OperatorDescriptor` | `OperatorInfo.Describe(node)` (`TruthWeaver.Ast`) returns an operator node's `OperatorDescriptor` (`Label`, `Description`) — the operator-side counterpart to a predicate's `PredicateSchema.Label`/`Description`. See [Describing a compiled rule](#describing-a-compiled-rule). |
 | Predicate | A registered, reusable implementation (e.g. `hasTopping`, `lovesPineapple`) — the *function*, not any one call to it. Implements `IPredicate<TContext>` or is registered as a stateless lambda. Required to carry a `Label` and `Description`; see [Predicate types](#predicate-types). |
 | `PredicateArguments` | The non-generic accessor (`GetString`, `GetInt64`, ...) a predicate uses to read its own term's arguments inside `EvaluateAsync`. |
@@ -1643,6 +1653,32 @@ every reachable count agrees.
 | F | ? | F | ? | F | ? |
 | T | ? | T | T | ? | F |
 | ? | ? | ? | ? | ? | ? |
+
+### Binary: `COALESCE` (`a ?? b`)
+
+Only `Unknown` is replaced; a known first operand always wins. The n-ary form
+folds this from the right (`COALESCE(a, b, c)` is `COALESCE(a, COALESCE(b, c))`).
+
+| a \ b | T | F | ? |
+| :-: | :-: | :-: | :-: |
+| **T** | T | T | T |
+| **F** | F | F | F |
+| **?** | T | F | ? |
+
+### N-ary: `BETWEEN(1, 2, a, b, c)`
+
+The count of `True` operands must lie in `[1, 2]` for every reachable count
+(`[definitely true, definitely true + Unknown]`) for the result to be certain.
+
+| a | b | c | `BETWEEN(1, 2, a, b, c)` |
+| :-: | :-: | :-: | :-: |
+| T | F | F | T |
+| F | F | F | F |
+| T | T | T | F |
+| T | ? | F | T |
+| F | ? | F | ? |
+| T | T | ? | ? |
+| ? | ? | ? | ? |
 
 `ExactlyOne(...)` and the threshold family don't get their own table here —
 they're n-ary counting operators over the *number* of `True` operands, not

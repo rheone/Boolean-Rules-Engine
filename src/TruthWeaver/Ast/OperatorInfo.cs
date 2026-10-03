@@ -76,6 +76,14 @@ public static class OperatorInfo
                 "NONE",
                 "True iff no operand is true (AtMost(0, ...)). False iff any operand is true; Unknown when no operand is true yet some are Unknown."
             ),
+            "Between" => new OperatorDescriptor(
+                $"BETWEEN({shape.K}, {shape.Max})",
+                $"True iff the number of true operands is between {shape.K} and {shape.Max} inclusive (AtLeast({shape.K}, ...) AND AtMost({shape.Max}, ...)). False iff no possible count of true operands lies in that range; Unknown otherwise."
+            ),
+            "Coalesce" => new OperatorDescriptor(
+                "COALESCE",
+                "The first operand that is not Unknown; True and False pass through unchanged and the result is Unknown only if every operand is Unknown. Operands after the first known value are skipped."
+            ),
             "ExactlyOne" => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
             _ => new OperatorDescriptor($"{shape.OpName}({shape.K})", ThresholdDescription(shape)),
         };

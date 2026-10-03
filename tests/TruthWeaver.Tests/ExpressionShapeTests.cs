@@ -154,6 +154,32 @@ public sealed class ExpressionShapeTests
     }
 
     [Fact]
+    public void Between_shape_carries_its_bounds_and_operands_in_order()
+    {
+        BetweenExpression node = new(1, 2, new([TermA, TermB, TermA]));
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Between", shape.OpName);
+        Assert.Equal(1, shape.K);
+        Assert.Equal(2, shape.Max);
+        Assert.Equal([TermA, TermB, TermA], shape.Operands);
+    }
+
+    [Fact]
+    public void Coalesce_shape_carries_its_operands_in_order()
+    {
+        CoalesceExpression node = new(new([TermA, TermB]));
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("Coalesce", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Null(shape.Max);
+        Assert.Equal([TermA, TermB], shape.Operands);
+    }
+
+    [Fact]
     public void ExactlyOne_shape_carries_its_operands_in_order()
     {
         ExactlyOneExpression node = new(new([TermA, TermB]));

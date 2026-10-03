@@ -102,6 +102,9 @@ public sealed class DslRoundTripPropertyTests
             Gen<Expression> genExactlyOne = self.Array[2, 4]
                 .Select(operands => (Expression)new ExactlyOneExpression(new EquatableArray<Expression>(operands)));
             Gen<Expression> genThreshold = BuildThresholdGen(self);
+            Gen<Expression> genBetween = BuildBetweenGen(self);
+            Gen<Expression> genCoalesce = self.Array[2, 4]
+                .Select(operands => (Expression)new CoalesceExpression(new EquatableArray<Expression>(operands)));
 
             return Gen.Frequency(
                 (3, GenLeaf),
@@ -118,7 +121,9 @@ public sealed class DslRoundTripPropertyTests
                 (1, genAll),
                 (1, genNone),
                 (1, genExactlyOne),
-                (1, genThreshold)
+                (1, genThreshold),
+                (1, genBetween),
+                (1, genCoalesce)
             );
         }
     );
@@ -220,6 +225,24 @@ public sealed class DslRoundTripPropertyTests
                                     (Expression)new ThresholdExpression(comparison, k, new EquatableArray<Expression>(operands))
                             );
                     })
+            );
+    }
+
+    /// <summary>Generates BETWEEN nodes whose bounds satisfy <c>0 &lt;= min &lt;= max &lt;= n</c>, excluding the rejected full range.</summary>
+    private static Gen<Expression> BuildBetweenGen(Gen<Expression> operandGen)
+    {
+        return Gen.Int[2, 4]
+            .SelectMany(operandCount =>
+                Gen.Int[0, operandCount]
+                    .SelectMany(min =>
+                        Gen.Int[min, operandCount]
+                            .Where(max => !(min == 0 && max == operandCount))
+                            .Select(
+                                operandGen.Array[operandCount],
+                                (max, operands) =>
+                                    (Expression)new BetweenExpression(min, max, new EquatableArray<Expression>(operands))
+                            )
+                    )
             );
     }
 

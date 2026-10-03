@@ -30,7 +30,7 @@ an authorization layer is intentionally out of scope.
 | **Expression** | The boolean tree: operators over terms and sub-expressions. |
 | **Predicate** | A registered, reusable implementation — `IPredicate<TContext>` — such as `hasTopping` or `lovesPineapple`. The *function*, not any particular call to it. |
 | **Term** | A predicate bound to concrete arguments, e.g. `hasTopping(topping: "greenOlives")`. The tree's leaf node, and the unit of [term identity](#term-identity) and memoization. |
-| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT` (aliases `IFF`, legacy `XNOR`), `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`, `ALL`, `NONE`, `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `True`/`False`/`Unknown` (case-insensitive; printed upper camel). Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
+| **Operator** | `AND`, `OR`, `NOT`, `XOR`, `EQUIVALENT` (aliases `IFF`, legacy `XNOR`), `IMPLIES`, `NAND`, `NOR`, `NXOR`, `ANY`, `ALL`, `NONE`, `BETWEEN(min, max)`, `COALESCE` (infix `??`), `ExactlyOne`, and the threshold family `AtLeast(k)`/`AtMost(k)`/`GreaterThan(k)`/`LessThan(k)`/`Exactly(k)`, plus the constants `True`/`False`/`Unknown` (case-insensitive; printed upper camel). Never called a "gate." Every operator has a `Label`/`Description` exposed via `OperatorInfo.Describe`. |
 | **Decision** | The result of evaluating an expression: a `TruthValue` plus any faults recorded along the way, and optionally a trace. |
 | **TruthValue** | `True` / `False` / `Unknown` — a dedicated three-valued (Kleene) type, never `bool?`. |
 | **Fault** | A predicate failed to produce an answer during one evaluation (exception, timeout, cancellation). Faults become `Unknown`, not thrown exceptions, at the expression level. A predicate that simply returns `Unknown` is a normal answer and records no fault. |
@@ -68,6 +68,11 @@ classDiagram
     class AnyExpression
     class AllExpression
     class NoneExpression
+    class BetweenExpression {
+        +int Min
+        +int Max
+    }
+    class CoalesceExpression
     class ExactlyOneExpression
     class ThresholdExpression {
         +int K
@@ -95,6 +100,8 @@ classDiagram
     Expression <|-- AnyExpression
     Expression <|-- AllExpression
     Expression <|-- NoneExpression
+    Expression <|-- BetweenExpression
+    Expression <|-- CoalesceExpression
     Expression <|-- ExactlyOneExpression
     Expression <|-- ThresholdExpression
     Expression <|-- ConstantExpression
@@ -110,6 +117,8 @@ classDiagram
     AnyExpression "1" o-- "2..*" Expression : operands
     AllExpression "1" o-- "2..*" Expression : operands
     NoneExpression "1" o-- "2..*" Expression : operands
+    BetweenExpression "1" o-- "2..*" Expression : operands
+    CoalesceExpression "1" o-- "2..*" Expression : operands
     ExactlyOneExpression "1" o-- "2..*" Expression : operands
     ThresholdExpression "1" o-- "2..*" Expression : operands
     Term "1" --> "1" Predicate : bound to
@@ -134,6 +143,8 @@ Expression =
     | ANY(Expression, Expression, ...)     // AtLeast(1, ...)
     | ALL(Expression, Expression, ...)     // AtLeast(n, ...)
     | NONE(Expression, Expression, ...)    // AtMost(0, ...)
+    | BETWEEN(min, max, Expression, Expression, ...)  // AND(AtLeast(min, ...), AtMost(max, ...))
+    | COALESCE(Expression, Expression, ...)           // first non-Unknown operand; infix: a ?? b ?? c
     | ExactlyOne(Expression, Expression, ...)
     | AtLeast(k, Expression, Expression, ...)
     | AtMost(k, Expression, Expression, ...)
@@ -175,6 +186,7 @@ with an operator that would just be a synonym for one of these:
 | `AtMost(0, ...)` | `NOT(OR(...))` (also `NONE(...)`) |
 | `AtLeast(1, ...)` | `ANY(...)` (and, in K3, `OR(...)`) |
 | `AtLeast(n, ...)`, where `n` is the operand count | `ALL(...)` (and, in K3, `AND(...)`) |
+| `AND(AtLeast(min, ...), AtMost(max, ...))` | `BETWEEN(min, max, ...)` |
 | `Exactly(n, ...)`, where `n` is the operand count | `AND(...)` |
 | `Exactly(1, ...)` | `ExactlyOne(...)` |
 | `EQUIVALENT(a, b)` (`IFF`, legacy `XNOR`) | `NOT(XOR(a, b))` |
@@ -184,7 +196,7 @@ with an operator that would just be a synonym for one of these:
 | `GreaterThan(0, ...)` | `OR(...)` |
 | `LessThan(n, ...)`, where `n` is the operand count | `NOT(AND(...))` |
 
-> **Superseded by [ADR-0005](docs/adr/0005-strong-k3-language-surface.md):** `ANY`, `ALL` and `NONE` now exist as first-class derived cardinality operators (`AtLeast(1, ...)`, `AtLeast(n, ...)`, `AtMost(0, ...)`), kept as their own nodes so a rule round-trips as written. ADR-0003's earlier "no `All`/`None`" reasoning no longer applies. `BETWEEN` is not yet implemented.
+> **Superseded by [ADR-0005](docs/adr/0005-strong-k3-language-surface.md):** `ANY`, `ALL` and `NONE` now exist as first-class derived cardinality operators (`AtLeast(1, ...)`, `AtLeast(n, ...)`, `AtMost(0, ...)`), kept as their own nodes so a rule round-trips as written. ADR-0003's earlier "no `All`/`None`" reasoning no longer applies. `BETWEEN` is likewise a first-class node: `BETWEEN(min, max, ...)` is `AND(AtLeast(min, ...), AtMost(max, ...))` over the interval, with the two integer bounds written first. It needs two or more operands, `0 <= min <= max <= n`, and rejects the whole range `0..n` as an always-true constant (`InvalidThresholdValue`). `COALESCE(a, b, ...)` and the infix `a ?? b ?? c` are one node that replaces only `Unknown` with the next operand (`True`/`False` pass through, short-circuiting at the first known value); a chain of `??` is accepted as one n-ary node because the operator is associative, but `??` still follows the no-mixing rule against `AND`/`OR` and other infix operators.
 
 `ANY(...)`, `ALL(...)` and `NONE(...)` take two or more operands, like `AND`/`OR`/`ExactlyOne`. In Strong K3 they happen to coincide with `OR(...)`, `AND(...)` and `NOT(OR(...))` (the cardinality interval collapses to the same truth tables); they exist as named, intent-revealing spellings.
 

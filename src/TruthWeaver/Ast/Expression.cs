@@ -152,3 +152,21 @@ public sealed record ExactlyOneExpression(EquatableArray<Expression> Operands) :
 /// <param name="Operands">The operands.</param>
 public sealed record ThresholdExpression(ThresholdComparison Comparison, int K, EquatableArray<Expression> Operands)
     : Expression;
+
+/// <summary>
+/// <c>BETWEEN(min, max, ...)</c>: the number of <c>True</c> operands lies in the inclusive range
+/// <c>[min, max]</c>. Defined as <c>AND(AtLeast(min, ...), AtMost(max, ...))</c> over the definitely-true /
+/// possibly-true interval (ADR-0005 decision 6) but kept as its own node so it round-trips as written.
+/// </summary>
+/// <param name="Min">The inclusive lower bound on the true-operand count (at least 0).</param>
+/// <param name="Max">The inclusive upper bound on the true-operand count (at least <paramref name="Min"/>, at most the operand count); <c>Min = 0</c> with <c>Max = n</c> is rejected as an always-true range.</param>
+/// <param name="Operands">The operands (at least two).</param>
+public sealed record BetweenExpression(int Min, int Max, EquatableArray<Expression> Operands) : Expression;
+
+/// <summary>
+/// <c>COALESCE(a, b, ...)</c> (infix <c>a ?? b</c>): the first operand that is not <c>Unknown</c>; <c>True</c> and
+/// <c>False</c> pass through unchanged and the result is <c>Unknown</c> only when every operand is. Operands are
+/// evaluated left to right and the rest are skipped once a known value is found.
+/// </summary>
+/// <param name="Operands">The operands in priority order (at least two).</param>
+public sealed record CoalesceExpression(EquatableArray<Expression> Operands) : Expression;

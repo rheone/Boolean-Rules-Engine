@@ -71,6 +71,8 @@ internal sealed class Evaluator<TContext>(
             "All" => "ALL",
             "None" => "NONE",
             "ExactlyOne" => "ExactlyOne",
+            "Between" => $"BETWEEN({shape.K}, {shape.Max})",
+            "Coalesce" => "COALESCE",
             _ => $"{shape.OpName}({shape.K})",
         };
     }
@@ -247,14 +249,41 @@ internal sealed class Evaluator<TContext>(
             case AndExpression:
             {
                 NodeShape shape = ExpressionShape.Of(node);
-                return await this.EvalChainAsync("AND", shape.Operands, TruthValue.True, KleeneAnd, stopValue: TruthValue.False)
+                return await this.EvalChainAsync(
+                        "AND",
+                        shape.Operands,
+                        TruthValue.True,
+                        KleeneAnd,
+                        stops: value => value == TruthValue.False
+                    )
                     .ConfigureAwait(false);
             }
 
             case OrExpression:
             {
                 NodeShape shape = ExpressionShape.Of(node);
-                return await this.EvalChainAsync("OR", shape.Operands, TruthValue.False, KleeneOr, stopValue: TruthValue.True)
+                return await this.EvalChainAsync(
+                        "OR",
+                        shape.Operands,
+                        TruthValue.False,
+                        KleeneOr,
+                        stops: value => value == TruthValue.True
+                    )
+                    .ConfigureAwait(false);
+            }
+
+            case CoalesceExpression:
+            {
+                // The first non-Unknown operand wins and later operands cannot change it, so (outside
+                // exhaustive mode) they are skipped and marked as such, exactly like AND/OR short-circuit.
+                NodeShape shape = ExpressionShape.Of(node);
+                return await this.EvalChainAsync(
+                        "COALESCE",
+                        shape.Operands,
+                        TruthValue.Unknown,
+                        (accumulated, next) => accumulated == TruthValue.Unknown ? next : accumulated,
+                        stops: value => value != TruthValue.Unknown
+                    )
                     .ConfigureAwait(false);
             }
 
@@ -345,6 +374,20 @@ internal sealed class Evaluator<TContext>(
                 return new EvalResult(value, new EvaluatedNode("ExactlyOne", value, false, [.. results.Select(r => r.Node)]));
             }
 
+            case BetweenExpression bt:
+            {
+                // AND(AtLeast(min, ...), AtMost(max, ...)) over the same operand values (ADR-0005 decision 6).
+                NodeShape shape = ExpressionShape.Of(node);
+                IReadOnlyList<EvalResult> results = await this.EvalAllAsync(shape.Operands).ConfigureAwait(false);
+                TruthValue[] operandValues = [.. results.Select(r => r.Value)];
+                TruthValue value = KleeneAnd(
+                    EvaluateThreshold(ThresholdComparison.AtLeast, bt.Min, operandValues),
+                    EvaluateThreshold(ThresholdComparison.AtMost, bt.Max, operandValues)
+                );
+                string description = Describe(node);
+                return new EvalResult(value, new EvaluatedNode(description, value, false, [.. results.Select(r => r.Node)]));
+            }
+
             case ThresholdExpression th:
             {
                 NodeShape shape = ExpressionShape.Of(node);
@@ -364,7 +407,7 @@ internal sealed class Evaluator<TContext>(
         IReadOnlyList<Expression> operands,
         TruthValue identity,
         Func<TruthValue, TruthValue, TruthValue> combine,
-        TruthValue stopValue
+        Func<TruthValue, bool> stops
     )
     {
         TruthValue accumulator = identity;
@@ -384,7 +427,7 @@ internal sealed class Evaluator<TContext>(
             EvalResult result = await this.EvalAsync(operand).ConfigureAwait(false);
             children.Add(result.Node);
             accumulator = combine(accumulator, result.Value);
-            if (!exhaustive && result.Value == stopValue)
+            if (!exhaustive && stops(result.Value))
             {
                 stop = true;
             }

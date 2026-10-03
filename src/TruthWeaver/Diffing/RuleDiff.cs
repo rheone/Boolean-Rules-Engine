@@ -94,6 +94,11 @@ public static class RuleDiff
             return beforeThreshold.Comparison == afterThreshold.Comparison && beforeThreshold.K == afterThreshold.K;
         }
 
+        if (before is BetweenExpression beforeBetween && after is BetweenExpression afterBetween)
+        {
+            return beforeBetween.Min == afterBetween.Min && beforeBetween.Max == afterBetween.Max;
+        }
+
         return true;
     }
 }

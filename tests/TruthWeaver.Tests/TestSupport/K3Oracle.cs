@@ -187,6 +187,37 @@ public static class K3Oracle
         return Cardinality(c => c <= 0, operands);
     }
 
+    /// <summary>
+    /// <c>BETWEEN(min, max, ...)</c>: <c>AND(AtLeast(min, ...), AtMost(max, ...))</c>, each side over the interval
+    /// semantics, combined with the primitive <see cref="And"/>.
+    /// </summary>
+    /// <param name="min">The inclusive lower bound on the true-count.</param>
+    /// <param name="max">The inclusive upper bound on the true-count.</param>
+    /// <param name="operands">The operand values.</param>
+    public static TruthValue Between(int min, int max, IReadOnlyList<TruthValue> operands)
+    {
+        return And([Cardinality(c => c >= min, operands), Cardinality(c => c <= max, operands)]);
+    }
+
+    /// <summary>
+    /// <c>COALESCE</c>: the first operand that is not <c>Unknown</c> (<c>True</c> and <c>False</c> pass through);
+    /// <c>Unknown</c> when every operand is <c>Unknown</c>. Defined directly because no K3 connective can detect
+    /// "is Unknown".
+    /// </summary>
+    /// <param name="operands">The operand values, in priority order.</param>
+    public static TruthValue Coalesce(IReadOnlyList<TruthValue> operands)
+    {
+        foreach (TruthValue operand in operands)
+        {
+            if (operand != TruthValue.Unknown)
+            {
+                return operand;
+            }
+        }
+
+        return TruthValue.Unknown;
+    }
+
     /// <summary>Exactly-one-true over the interval semantics (not parity).</summary>
     public static TruthValue ExactlyOne(IReadOnlyList<TruthValue> operands)
     {

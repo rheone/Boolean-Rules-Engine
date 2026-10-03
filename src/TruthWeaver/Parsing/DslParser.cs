@@ -33,6 +33,8 @@ internal sealed class DslParser
         "ANY",
         "ALL",
         "NONE",
+        "BETWEEN",
+        "COALESCE",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -43,7 +45,9 @@ internal sealed class DslParser
 
     // Infix operators that sit outside the NOT > AND > OR precedence chain: they may not be mixed with
     // each other or with AND/OR at one nesting level without parentheses (ADR-0005 decision 8).
-    private static readonly string[] InfixOperators = ["XOR", "EQUIVALENT", "IMPLIES", "NAND", "NOR"];
+    // COALESCE is infix only as the symbol ?? (the word is a function call), and, being associative, a chain of it
+    // folds into one n-ary node instead of being rejected like the binary-only operators.
+    private static readonly string[] InfixOperators = ["XOR", "EQUIVALENT", "IMPLIES", "NAND", "NOR", "COALESCE"];
 
     private readonly IReadOnlyList<Token> tokens;
     private readonly List<Diagnostic> diagnostics;
@@ -94,6 +98,12 @@ internal sealed class DslParser
         return new(start, Math.Max(0, end - start));
     }
 
+    /// <summary>Gets the spelling used in diagnostics for an infix operator: its symbol for COALESCE, else its name.</summary>
+    private static string DisplayName(string infixOperator)
+    {
+        return infixOperator == "COALESCE" ? "??" : infixOperator;
+    }
+
     /// <summary>
     /// Maps a symbolic operator to the named operator it aliases, so the rest of the parser only ever
     /// reasons about named operators and notation can never change the resulting tree.
@@ -110,6 +120,7 @@ internal sealed class DslParser
             "↔" => "EQUIVALENT",
             "↑" => "NAND",
             "↓" => "NOR",
+            "??" => "COALESCE",
             _ => null,
         };
     }
@@ -196,9 +207,10 @@ internal sealed class DslParser
 
         foreach ((RuleNode operand, string infixOperator) in bareOperands)
         {
+            string shown = DisplayName(infixOperator);
             string message =
-                $"Mixing {infixOperator} with AND/OR at the same level requires explicit parentheses. "
-                + $"Add parentheses around the {infixOperator} expression to say which operator applies first.";
+                $"Mixing {shown} with AND/OR at the same level requires explicit parentheses. "
+                + $"Add parentheses around the {shown} expression to say which operator applies first.";
             this.ReportAmbiguousMixing(operand.Span, message);
         }
 
@@ -226,7 +238,7 @@ internal sealed class DslParser
             if (current != chainOperator)
             {
                 string message =
-                    $"Mixing {chainOperator} with {current} at the same level requires explicit parentheses. "
+                    $"Mixing {DisplayName(chainOperator)} with {DisplayName(current)} at the same level requires explicit parentheses. "
                     + "Add parentheses around the operands that should be grouped first.";
                 this.ReportAmbiguousMixing(this.Current.Span, message);
             }
@@ -243,6 +255,7 @@ internal sealed class DslParser
             "IMPLIES" => new ImpliesNode(operands, span),
             "NAND" => new NandNode(operands, span),
             "NOR" => new NorNode(operands, span),
+            "COALESCE" => new CoalesceNode(operands, span),
             _ => throw new InvalidOperationException($"Unhandled infix operator '{chainOperator}'."),
         };
         return (result, chainOperator);
@@ -251,7 +264,10 @@ internal sealed class DslParser
     /// <summary>Gets the canonical name of the infix operator (other than AND/OR) at the cursor, or <see langword="null"/>.</summary>
     private string? CurrentInfixOperator()
     {
-        return InfixOperators.FirstOrDefault(this.IsKeyword);
+        // The word COALESCE is a function call, so only its ?? symbol token counts as an infix operator.
+        return InfixOperators.FirstOrDefault(op =>
+            this.IsKeyword(op) && (op != "COALESCE" || this.Current.Kind == TokenKind.Operator)
+        );
     }
 
     private RuleNode ParseNotExpression()
@@ -322,6 +338,16 @@ internal sealed class DslParser
         if (this.IsKeyword("NONE"))
         {
             return this.ParseOperandCall((operands, span) => new NoneNode(operands, span));
+        }
+
+        if (this.Current.Kind == TokenKind.Identifier && this.IsKeyword("COALESCE"))
+        {
+            return this.ParseOperandCall((operands, span) => new CoalesceNode(operands, span));
+        }
+
+        if (this.IsKeyword("BETWEEN"))
+        {
+            return this.ParseBetween();
         }
 
         if (this.IsKeyword("ATLEAST"))
@@ -513,6 +539,61 @@ internal sealed class DslParser
         int end = this.Current.Span.End;
         this.Expect(TokenKind.RParen, "')'");
         return new ThresholdNode(comparison, k, operands, SpanCovering(start, end));
+    }
+
+    /// <summary>
+    /// Parses <c>BETWEEN(min, max, operand, ...)</c>: two integer bounds followed by the operands. The bounds' range and
+    /// the operand count are validated by the compiler, like the threshold family's <c>k</c>.
+    /// </summary>
+    private RuleNode ParseBetween()
+    {
+        int start = this.Current.Span.Start;
+        this.position++;
+        this.Expect(TokenKind.LParen, "'('");
+        int min = this.ParseIntegerBound("minimum");
+        this.Expect(TokenKind.Comma, "','");
+        int max = this.ParseIntegerBound("maximum");
+
+        List<RuleNode> operands = [];
+        while (this.Current.Kind == TokenKind.Comma)
+        {
+            this.position++;
+            operands.Add(this.ParseOrExpression().Node);
+        }
+
+        int end = this.Current.Span.End;
+        this.Expect(TokenKind.RParen, "')'");
+        return new BetweenNode(min, max, operands, SpanCovering(start, end));
+    }
+
+    /// <summary>
+    /// Reads one integer literal for a BETWEEN bound. A missing or non-integer (for example <c>1.5</c>) bound is a
+    /// syntax error; a non-integer number token is still consumed so parsing can continue.
+    /// </summary>
+    private int ParseIntegerBound(string which)
+    {
+        if (
+            this.Current.Kind == TokenKind.NumberLiteral
+            && int.TryParse(this.Current.Text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int value)
+        )
+        {
+            this.position++;
+            return value;
+        }
+
+        this.diagnostics.Add(
+            Diagnostic.Error(
+                DiagnosticCodes.SyntaxError,
+                $"Expected an integer {which} as BETWEEN's {(which == "minimum" ? "first" : "second")} argument.",
+                this.Current.Span
+            )
+        );
+        if (this.Current.Kind == TokenKind.NumberLiteral)
+        {
+            this.position++;
+        }
+
+        return 0;
     }
 
     private List<RuleNode> ParseParenthesizedOperandList()
