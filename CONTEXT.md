@@ -223,8 +223,8 @@ when a sub-expression is `True` (resp. `False`) for every
 ## Syntax and serialization (summary)
 
 The string DSL (word operators, plus the symbol aliases `&&`, `||`, `!`, `∧`, `∨`,
-`¬`, `⊕` that compile to the same nodes and are never printed; `NOT > AND > OR` precedence, `XOR`/`XNOR`
-never mixed with `AND`/`OR` or with each other without parentheses) is
+`¬`, `⊕` that compile to the same nodes and are never printed; `NOT > AND > OR` precedence, every infix operator other than `NOT`/`AND`/`OR`
+never mixed with `AND`/`OR` or with a different infix operator without parentheses) is
 canonical and is what gets persisted. JSON and YAML are interchange/tooling
 formats that compile to the same AST and round-trip losslessly with the DSL.
 A rule can also be assembled programmatically via `RuleBuilder`

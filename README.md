@@ -369,11 +369,15 @@ their head.
 `lovesPineapple AND NOT isBanned OR isVip` therefore parses as
 `(lovesPineapple AND (NOT isBanned)) OR isVip`.
 
-`XOR` and `XNOR` are **not** part of this precedence chain: mixing either of
-them with `AND`/`OR`, or mixing `XOR` with `XNOR`, at the same syntactic
-level without explicit parentheses is a **compile error**
-(`AmbiguousOperatorMixing`) rather than resolved by an implicit precedence
-guess — see [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md) for
+Every infix operator other than `NOT`/`AND`/`OR` (today `XOR` and `XNOR`)
+is **not** part of this precedence chain: mixing one with `AND`/`OR`, or with
+a *different* infix operator, at the same syntactic level without explicit
+parentheses is a **compile error** (`AmbiguousOperatorMixing`) rather than
+resolved by an implicit precedence guess. The diagnostic points at the
+offending operator (or at the bare infix expression sitting next to
+`AND`/`OR`) and tells you to add parentheses — see
+[ADR-0005](docs/adr/0005-strong-k3-language-surface.md) decision 8 (which
+extends [ADR-0003](docs/adr/0003-rule-syntax-and-serialization.md)'s rule) for
 why. Function-call-style operators (`ExactlyOne(...)` and the threshold
 family) are self-delimiting — their parentheses are part of the call syntax,
 not grouping, so they never participate in precedence at all.

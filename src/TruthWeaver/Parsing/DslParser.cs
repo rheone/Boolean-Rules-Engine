@@ -32,6 +32,10 @@ internal sealed class DslParser
         "EXACTLY",
     };
 
+    // Infix operators that sit outside the NOT > AND > OR precedence chain: they may not be mixed with
+    // each other or with AND/OR at one nesting level without parentheses (ADR-0005 decision 8).
+    private static readonly string[] InfixOperators = ["XOR", "XNOR"];
+
     private readonly IReadOnlyList<Token> tokens;
     private readonly List<Diagnostic> diagnostics;
     private int position;
@@ -118,90 +122,106 @@ internal sealed class DslParser
         return true;
     }
 
-    private (RuleNode Node, bool IsBareXor) ParseOrExpression()
+    private (RuleNode Node, string? BareInfix) ParseOrExpression()
     {
-        (RuleNode node, bool isBareXor) = this.ParseAndExpression();
+        return this.ParseAndOrChain("OR", this.ParseAndExpression, (operands, span) => new OrNode(operands, span));
+    }
+
+    private (RuleNode Node, string? BareInfix) ParseAndExpression()
+    {
+        return this.ParseAndOrChain("AND", this.ParseInfixChain, (operands, span) => new AndNode(operands, span));
+    }
+
+    /// <summary>
+    /// Parses one <c>AND</c> or <c>OR</c> level. Any operand that is a bare (unparenthesized) infix
+    /// expression such as <c>a XOR b</c> is ambiguous next to <c>AND</c>/<c>OR</c> (ADR-0005 decision 8), so
+    /// it is reported at its own span. A level with a single operand is passed through so an enclosing
+    /// level can still see that the expression is a bare infix one.
+    /// </summary>
+    private (RuleNode Node, string? BareInfix) ParseAndOrChain(
+        string keyword,
+        Func<(RuleNode Node, string? BareInfix)> parseOperand,
+        Func<List<RuleNode>, SourceSpan, RuleNode> construct
+    )
+    {
+        (RuleNode node, string? bareInfix) = parseOperand();
         List<RuleNode> operands = [node];
-        bool anyBare = isBareXor;
-        int start = node.Span.Start;
-        while (this.TryConsumeKeyword("OR"))
+        List<(RuleNode Operand, string Operator)> bareOperands = [];
+        if (bareInfix is not null)
         {
-            (RuleNode next, bool nextBare) = this.ParseAndExpression();
+            bareOperands.Add((node, bareInfix));
+        }
+
+        while (this.TryConsumeKeyword(keyword))
+        {
+            (RuleNode next, string? nextBare) = parseOperand();
             operands.Add(next);
-            anyBare |= nextBare;
+            if (nextBare is not null)
+            {
+                bareOperands.Add((next, nextBare));
+            }
         }
 
         if (operands.Count == 1)
         {
-            return (operands[0], anyBare);
+            return (operands[0], bareInfix);
         }
 
-        SourceSpan span = SpanCovering(start, operands[^1].Span.End);
-        if (anyBare)
+        foreach ((RuleNode operand, string infixOperator) in bareOperands)
         {
-            this.ReportAmbiguousMixing(span);
+            string message =
+                $"Mixing {infixOperator} with AND/OR at the same level requires explicit parentheses. "
+                + $"Add parentheses around the {infixOperator} expression to say which operator applies first.";
+            this.ReportAmbiguousMixing(operand.Span, message);
         }
 
-        return (new OrNode(operands, span), anyBare);
+        return (construct(operands, SpanCovering(node.Span.Start, operands[^1].Span.End)), null);
     }
 
-    private (RuleNode Node, bool IsBareXor) ParseAndExpression()
-    {
-        (RuleNode node, bool isBareXor) = this.ParseXorChain();
-        List<RuleNode> operands = [node];
-        bool anyBare = isBareXor;
-        int start = node.Span.Start;
-        while (this.TryConsumeKeyword("AND"))
-        {
-            (RuleNode next, bool nextBare) = this.ParseXorChain();
-            operands.Add(next);
-            anyBare |= nextBare;
-        }
-
-        if (operands.Count == 1)
-        {
-            return (operands[0], anyBare);
-        }
-
-        SourceSpan span = SpanCovering(start, operands[^1].Span.End);
-        if (anyBare)
-        {
-            this.ReportAmbiguousMixing(span);
-        }
-
-        return (new AndNode(operands, span), anyBare);
-    }
-
-    private (RuleNode Node, bool IsBareXor) ParseXorChain()
+    /// <summary>
+    /// Parses a chain of one infix operator other than <c>AND</c>/<c>OR</c> (<c>a XOR b</c>). Operands
+    /// are <c>NOT</c>-level expressions. A second, different infix operator in the same chain is ambiguous
+    /// and is reported at that operator's own token (ADR-0005 decision 8).
+    /// </summary>
+    /// <returns>The chain's node and, when it is a real chain, the operator that built it.</returns>
+    private (RuleNode Node, string? BareInfix) ParseInfixChain()
     {
         RuleNode node = this.ParseNotExpression();
+        if (this.CurrentInfixOperator() is not { } chainOperator)
+        {
+            return (node, null);
+        }
+
         List<RuleNode> operands = [node];
         int start = node.Span.Start;
-        bool? isXnor = null;
-        while (this.IsKeyword("XOR") || this.IsKeyword("XNOR"))
+        while (this.CurrentInfixOperator() is { } current)
         {
-            bool currentIsXnor = this.IsKeyword("XNOR");
-            if (isXnor is bool previous && previous != currentIsXnor)
+            if (current != chainOperator)
             {
-                this.ReportAmbiguousMixing(
-                    SpanCovering(start, this.Current.Span.End),
-                    "Mixing XOR with XNOR at the same level requires explicit parentheses."
-                );
+                string message =
+                    $"Mixing {chainOperator} with {current} at the same level requires explicit parentheses. "
+                    + "Add parentheses around the operands that should be grouped first.";
+                this.ReportAmbiguousMixing(this.Current.Span, message);
             }
 
-            isXnor = currentIsXnor;
             this.position++;
             operands.Add(this.ParseNotExpression());
         }
 
-        if (operands.Count == 1)
-        {
-            return (operands[0], false);
-        }
-
         SourceSpan span = SpanCovering(start, operands[^1].Span.End);
-        RuleNode result = isXnor == true ? new XnorNode(operands, span) : new XorNode(operands, span);
-        return (result, true);
+        RuleNode result = chainOperator switch
+        {
+            "XOR" => new XorNode(operands, span),
+            "XNOR" => new XnorNode(operands, span),
+            _ => throw new InvalidOperationException($"Unhandled infix operator '{chainOperator}'."),
+        };
+        return (result, chainOperator);
+    }
+
+    /// <summary>Gets the canonical name of the infix operator (other than AND/OR) at the cursor, or <see langword="null"/>.</summary>
+    private string? CurrentInfixOperator()
+    {
+        return InfixOperators.FirstOrDefault(this.IsKeyword);
     }
 
     private RuleNode ParseNotExpression()
@@ -468,10 +488,7 @@ internal sealed class DslParser
         );
     }
 
-    private void ReportAmbiguousMixing(
-        SourceSpan span,
-        string message = "Mixing XOR with AND/OR at the same level requires explicit parentheses."
-    )
+    private void ReportAmbiguousMixing(SourceSpan span, string message)
     {
         this.diagnostics.Add(Diagnostic.Error(DiagnosticCodes.AmbiguousOperatorMixing, message, span));
     }

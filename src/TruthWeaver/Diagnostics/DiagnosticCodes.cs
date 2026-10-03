@@ -22,8 +22,9 @@ public static class DiagnosticCodes
     public const string XorArityViolation = "BRE0006";
 
     /// <summary>
-    /// <c>XOR</c>/<c>XNOR</c> was combined with <c>AND</c>/<c>OR</c>, or <c>XOR</c> was combined with
-    /// <c>XNOR</c>, at the same syntactic level without parentheses.
+    /// An infix operator other than <c>NOT</c>/<c>AND</c>/<c>OR</c> (<c>XOR</c>, <c>XNOR</c>, ...) was combined
+    /// with <c>AND</c>/<c>OR</c> or with a different such operator at the same syntactic level without
+    /// parentheses (ADR-0005 decision 8). The span is the offending operator, or the bare infix expression.
     /// </summary>
     public const string AmbiguousOperatorMixing = "BRE0007";
 
