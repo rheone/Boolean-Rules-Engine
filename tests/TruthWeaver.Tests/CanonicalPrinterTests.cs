@@ -85,6 +85,7 @@ public sealed class CanonicalPrinterTests
     [InlineData("NONE(isManager, isDepartmentHead, isManager)")]
     [InlineData("BETWEEN(1, 2, isManager, isDepartmentHead, isManager)")]
     [InlineData("COALESCE(isManager, isDepartmentHead, isManager)")]
+    [InlineData("If(isManager, isDepartmentHead, isManager)")]
     [InlineData("ExactlyOne(isManager, isDepartmentHead, isManager)")]
     [InlineData("AtLeast(2, isManager, isDepartmentHead, isManager)")]
     [InlineData("AtMost(1, isManager, isDepartmentHead, isManager)")]

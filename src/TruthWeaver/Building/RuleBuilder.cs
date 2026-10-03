@@ -190,6 +190,20 @@ public abstract class RuleBuilder
     }
 
     /// <summary>
+    /// Creates a builder for <c>If(condition, whenTrue, whenFalse)</c>: <paramref name="whenTrue"/> when the condition is
+    /// <c>True</c>, <paramref name="whenFalse"/> when it is <c>False</c>, and for an <c>Unknown</c> condition the branch value
+    /// only if both branches are the same definite value, otherwise <c>Unknown</c>.
+    /// </summary>
+    /// <param name="condition">The condition.</param>
+    /// <param name="whenTrue">The result when the condition is <c>True</c>.</param>
+    /// <param name="whenFalse">The result when the condition is <c>False</c>.</param>
+    /// <returns>A builder for the <c>If</c> expression.</returns>
+    public static RuleBuilder If(RuleBuilder condition, RuleBuilder whenTrue, RuleBuilder whenFalse)
+    {
+        return new OperatorBuilder("if", [condition, whenTrue, whenFalse]);
+    }
+
+    /// <summary>
     /// Creates a builder for <c>BETWEEN(min, max, ...)</c>: the number of true operands lies in the inclusive range
     /// <c>[min, max]</c> (<c>AtLeast(min, ...) AND AtMost(max, ...)</c>).
     /// </summary>

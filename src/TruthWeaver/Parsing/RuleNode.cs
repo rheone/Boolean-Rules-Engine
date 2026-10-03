@@ -106,6 +106,12 @@ internal sealed record ThresholdNode(ThresholdComparison Comparison, int K, IRea
 internal sealed record BetweenNode(int Min, int Max, IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>
+/// <c>If(condition, whenTrue, whenFalse)</c> / ternary <c>c ? t : f</c> reference. The operand count (exactly three) is
+/// validated by <c>RuleNodeCompiler</c>, so a malformed JSON/YAML node or <c>If(a, b)</c> is rejected the same way.
+/// </summary>
+internal sealed record IfNode(IReadOnlyList<RuleNode> Operands, SourceSpan Span) : RuleNode(Span);
+
+/// <summary>
 /// N-ary <c>COALESCE(...)</c> / infix <c>??</c> reference (first operand that is not <c>Unknown</c>). Operand count
 /// (at least two) is validated by <c>RuleNodeCompiler</c> like the other n-ary operators.
 /// </summary>

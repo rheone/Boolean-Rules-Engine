@@ -34,6 +34,7 @@ internal static class TreeFormatOpNames
         ["Exactly"] = "exactly",
         ["Between"] = "between",
         ["Coalesce"] = "coalesce",
+        ["If"] = "if",
     };
 
     private static readonly IReadOnlyDictionary<string, string> TreeFormatToCanonical = BuildReadTable();

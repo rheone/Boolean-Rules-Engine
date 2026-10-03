@@ -164,6 +164,18 @@ public sealed record ThresholdExpression(ThresholdComparison Comparison, int K, 
 public sealed record BetweenExpression(int Min, int Max, EquatableArray<Expression> Operands) : Expression;
 
 /// <summary>
+/// <c>If(condition, whenTrue, whenFalse)</c> (ternary <c>condition ? whenTrue : whenFalse</c>): a K3-aware conditional.
+/// A <c>True</c> condition yields <paramref name="WhenTrue"/>, a <c>False</c> one yields <paramref name="WhenFalse"/>, and an
+/// <c>Unknown</c> condition does not guess a branch: the result is the branch value when both branches are the same
+/// definite value, otherwise <c>Unknown</c>. Its primitive definition is
+/// <c>(c AND t) OR (NOT c AND f) OR (t AND f)</c>.
+/// </summary>
+/// <param name="Condition">The condition, evaluated first.</param>
+/// <param name="WhenTrue">The branch taken when the condition is <c>True</c>.</param>
+/// <param name="WhenFalse">The branch taken when the condition is <c>False</c>.</param>
+public sealed record IfExpression(Expression Condition, Expression WhenTrue, Expression WhenFalse) : Expression;
+
+/// <summary>
 /// <c>COALESCE(a, b, ...)</c> (infix <c>a ?? b</c>): the first operand that is not <c>Unknown</c>; <c>True</c> and
 /// <c>False</c> pass through unchanged and the result is <c>Unknown</c> only when every operand is. Operands are
 /// evaluated left to right and the rest are skipped once a known value is found.

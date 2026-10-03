@@ -86,6 +86,7 @@ internal static class CanonicalPrinter
             AllExpression => $"ALL({JoinOperands(node, ", ", PrintContext.Top)})",
             NoneExpression => $"NONE({JoinOperands(node, ", ", PrintContext.Top)})",
             ExactlyOneExpression => $"ExactlyOne({JoinOperands(node, ", ", PrintContext.Top)})",
+            IfExpression => $"If({JoinOperands(node, ", ", PrintContext.Top)})",
             CoalesceExpression => $"COALESCE({JoinOperands(node, ", ", PrintContext.Top)})",
             BetweenExpression bt => $"BETWEEN({bt.Min}, {bt.Max}, {JoinOperands(node, ", ", PrintContext.Top)})",
             ThresholdExpression th => $"{th.Comparison}({th.K}, {JoinOperands(node, ", ", PrintContext.Top)})",

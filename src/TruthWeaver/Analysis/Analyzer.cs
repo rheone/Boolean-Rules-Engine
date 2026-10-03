@@ -151,6 +151,11 @@ internal static class Analyzer
                 }
 
                 break;
+            case IfExpression iff:
+                CollectTerms(iff.Condition, terms);
+                CollectTerms(iff.WhenTrue, terms);
+                CollectTerms(iff.WhenFalse, terms);
+                break;
         }
     }
 
@@ -237,6 +242,20 @@ internal static class Analyzer
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// <c>If(c, t, f)</c> as its primitive definition <c>(c AND t) OR (NOT c AND f) OR (t AND f)</c>. The last, consensus
+    /// term is what stops an Unknown condition from guessing: with it <c>If(Unknown, True, True)</c> is <c>True</c>, and
+    /// for a definite condition it never changes the multiplexer's value.
+    /// </summary>
+    private static DualRail If(BddManager bdd, DualRail condition, DualRail whenTrue, DualRail whenFalse)
+    {
+        return Or(
+            bdd,
+            Or(bdd, And(bdd, condition, whenTrue), And(bdd, Not(bdd, condition), whenFalse)),
+            And(bdd, whenTrue, whenFalse)
+        );
     }
 
     /// <summary>
@@ -405,6 +424,14 @@ internal static class Analyzer
                 break;
             case CoalesceExpression co:
                 rail = Coalesce(bdd, BuildOperands(co.Operands, bdd, variableIndex, diagnostics));
+                break;
+            case IfExpression iff:
+                rail = If(
+                    bdd,
+                    Build(iff.Condition, bdd, variableIndex, diagnostics),
+                    Build(iff.WhenTrue, bdd, variableIndex, diagnostics),
+                    Build(iff.WhenFalse, bdd, variableIndex, diagnostics)
+                );
                 break;
             case ThresholdExpression th:
                 List<DualRail> operands = BuildOperands(th.Operands, bdd, variableIndex, diagnostics);

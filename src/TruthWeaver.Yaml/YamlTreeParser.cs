@@ -237,6 +237,8 @@ internal static class YamlTreeParser
                 return new NoneNode(operands, SourceSpan.None);
             case "Coalesce":
                 return new CoalesceNode(operands, SourceSpan.None);
+            case "If":
+                return new IfNode(operands, SourceSpan.None);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":

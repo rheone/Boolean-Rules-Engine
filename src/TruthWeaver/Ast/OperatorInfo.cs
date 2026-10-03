@@ -84,6 +84,10 @@ public static class OperatorInfo
                 "COALESCE",
                 "The first operand that is not Unknown; True and False pass through unchanged and the result is Unknown only if every operand is Unknown. Operands after the first known value are skipped."
             ),
+            "If" => new OperatorDescriptor(
+                "If",
+                "Conditional: the second operand when the condition is True, the third when it is False. An Unknown condition does not pick a branch: the result is the branch value when both branches are the same definite value, otherwise Unknown. Only the needed branch is evaluated for a definite condition."
+            ),
             "ExactlyOne" => new OperatorDescriptor("ExactlyOne", "True iff exactly one operand is true."),
             _ => new OperatorDescriptor($"{shape.OpName}({shape.K})", ThresholdDescription(shape)),
         };

@@ -32,6 +32,8 @@ public sealed class EvaluatedNodeRuleDescriptionAlignmentTests
     [InlineData("BETWEEN(1, 2, d, a, c)")]
     [InlineData("COALESCE(d, a, c)")]
     [InlineData("d ?? a ?? c")]
+    [InlineData("If(d, a, c)")]
+    [InlineData("d ? a : c")]
     [InlineData("ExactlyOne(d, a, c)")]
     [InlineData("AtLeast(2, d, a, c)")]
     [InlineData("(d AND a) OR (ExactlyOne(c, d, a) XOR (NOT c))")]

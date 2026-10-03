@@ -203,6 +203,38 @@ the aliases are cheap once the canonical form stays single.
     symbolic / C-style styles. JSON/YAML op `coalesce`; `RuleBuilder.Coalesce`
     is new.
 
+    Implemented in k3-conformance 16: `If(condition, whenTrue, whenFalse)` and
+    the ternary `condition ? whenTrue : whenFalse` build one
+    `IfExpression(Condition, WhenTrue, WhenFalse)`. **Semantics:** a `True`
+    condition yields `whenTrue`, a `False` one `whenFalse`; an `Unknown`
+    condition does not guess a branch, so the result is the branch value only
+    when both branches are the same definite value, else `Unknown`
+    (`.tmp/Strong Kleene K3 Logic.md` section 25). The primitive definition,
+    used by the analyzer rail and the test oracle, is therefore the
+    multiplexer plus its consensus term: `(c AND t) OR (NOT c AND f) OR
+    (t AND f)`. The bare multiplexer `(c AND t) OR (NOT c AND f)` was
+    rejected because it yields `Unknown` for `If(Unknown, True, True)`, which
+    contradicts the "does not guess a branch" intent and the reference
+    specification; the consensus term never changes the result of a definite
+    condition. **Evaluation** skips the branch a definite condition does not
+    need (recorded as `NotEvaluated`, like `AND`/`OR`/`COALESCE`); an `Unknown`
+    condition evaluates both; `EvaluationMode.Exhaustive` evaluates both. The
+    analyzer rail is the primitive definition over the dual rails, so
+    `If(a, b OR True, c OR True)` is a tautology even for an `Unknown` `a`.
+    **Syntax:** `If` is a reserved function-call word (any case) taking
+    exactly three operands (`MalformedTree` otherwise). The lone `?` and `:`
+    form the ternary, the lowest-precedence construct, accepted wherever a full
+    expression is (the root, parentheses, call arguments). Under decision 8 the
+    condition and each branch must each be a single operand or a parenthesized
+    group: a bare `AND`/`OR` chain, a bare infix expression (`XOR`, `??`, ...)
+    or an unparenthesized nested ternary in any of the three positions is
+    `AmbiguousOperatorMixing`. The canonical printer writes the function-call
+    form `If(a, b, c)`; tree printers and the evaluated/description label are
+    `If` in every `OperatorStyle` (no symbolic or C-style spelling). JSON/YAML:
+    `{"op": "if", "operands": [condition, whenTrue, whenFalse]}` (op name
+    case-insensitive on read; `rule-tree.schema.json` lists `if`).
+    `RuleBuilder.If` is new.
+
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,
     `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a

@@ -35,6 +35,7 @@ internal sealed class DslParser
         "NONE",
         "BETWEEN",
         "COALESCE",
+        "IF",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -78,7 +79,7 @@ internal sealed class DslParser
         IReadOnlyList<Token> tokens = lexer.Tokenize();
         List<Diagnostic> diagnostics = [.. lexer.Diagnostics];
         DslParser parser = new(tokens, diagnostics);
-        RuleNode root = parser.ParseOrExpression().Node;
+        RuleNode root = parser.ParseExpression();
         if (parser.Current.Kind != TokenKind.Eof)
         {
             diagnostics.Add(
@@ -158,6 +159,118 @@ internal sealed class DslParser
 
         this.position++;
         return true;
+    }
+
+    /// <summary>
+    /// Parses one complete expression: an <c>OR</c>-level expression, optionally the condition of the ternary
+    /// <c>condition ? whenTrue : whenFalse</c>. The ternary has the lowest precedence and, like every infix operator
+    /// outside <c>NOT</c> &gt; <c>AND</c> &gt; <c>OR</c>, may not be mixed with another at one level without parentheses
+    /// (ADR-0005 decision 8): its condition and both branches must each be a single operand or a parenthesized group.
+    /// Every place that accepts a full expression (the root, parentheses, call arguments) goes through here.
+    /// </summary>
+    private RuleNode ParseExpression()
+    {
+        int start = this.position;
+        (RuleNode condition, string? bareInfix) = this.ParseOrExpression();
+        return this.Current.Kind == TokenKind.Question ? this.ParseTernaryTail(condition, bareInfix, start) : condition;
+    }
+
+    /// <summary>
+    /// Parses <c>? whenTrue : whenFalse</c> after an already parsed condition. A condition or branch that is a bare
+    /// <c>AND</c>/<c>OR</c> chain or infix expression, or that is itself an unparenthesized ternary, is reported as
+    /// ambiguous at its own span; a nested ternary is still parsed so later problems surface in the same pass.
+    /// </summary>
+    private RuleNode ParseTernaryTail(RuleNode condition, string? conditionBare, int conditionStart, bool checkCondition = true)
+    {
+        if (checkCondition)
+        {
+            this.ReportBareTernaryPart(condition, conditionBare, conditionStart, "condition");
+        }
+
+        this.position++; // The '?'.
+        int trueStart = this.position;
+        (RuleNode whenTrue, string? trueBare) = this.ParseOrExpression();
+        this.ReportBareTernaryPart(whenTrue, trueBare, trueStart, "true branch");
+        if (this.Current.Kind == TokenKind.Question)
+        {
+            whenTrue = this.ParseNestedTernary(whenTrue, trueStart);
+        }
+
+        this.Expect(TokenKind.Colon, "':'");
+        int falseStart = this.position;
+        (RuleNode whenFalse, string? falseBare) = this.ParseOrExpression();
+        this.ReportBareTernaryPart(whenFalse, falseBare, falseStart, "false branch");
+        if (this.Current.Kind == TokenKind.Question)
+        {
+            whenFalse = this.ParseNestedTernary(whenFalse, falseStart);
+        }
+
+        return new IfNode([condition, whenTrue, whenFalse], SpanCovering(condition.Span.Start, whenFalse.Span.End));
+    }
+
+    /// <summary>Reports an unparenthesized ternary nested in a branch (<c>a ? b : c ? d : e</c>) and parses it for recovery.</summary>
+    private RuleNode ParseNestedTernary(RuleNode nestedCondition, int nestedStart)
+    {
+        string message =
+            "Mixing ?: with another ?: at the same level requires explicit parentheses. "
+            + "Add parentheses around the nested conditional to say how the branches group.";
+        this.ReportAmbiguousMixing(this.Current.Span, message);
+
+        // The nested condition was already checked as the enclosing branch.
+        return this.ParseTernaryTail(nestedCondition, null, nestedStart, checkCondition: false);
+    }
+
+    /// <summary>
+    /// Reports a ternary operand that sits at the same level as the ternary without parentheses when it is an infix
+    /// expression or a bare <c>AND</c>/<c>OR</c> chain. <paramref name="startToken"/> is the index of the operand's first
+    /// token, used to tell <c>a AND b</c> from <c>(a AND b)</c> (the node does not retain its parentheses).
+    /// </summary>
+    private void ReportBareTernaryPart(RuleNode part, string? bareInfix, int startToken, string role)
+    {
+        string? bare = bareInfix is not null
+            ? DisplayName(bareInfix)
+            : part switch
+            {
+                AndNode when !this.IsWrappedInParentheses(startToken) => "AND",
+                OrNode when !this.IsWrappedInParentheses(startToken) => "OR",
+                _ => null,
+            };
+        if (bare is not null)
+        {
+            string message =
+                $"Mixing ?: with {bare} at the same level requires explicit parentheses. "
+                + $"Add parentheses around the {bare} expression used as the {role} to say which operator applies first.";
+            this.ReportAmbiguousMixing(part.Span, message);
+        }
+    }
+
+    /// <summary>
+    /// Whether the tokens from <paramref name="startToken"/> up to the cursor are one parenthesized group: they open with
+    /// '(' whose matching ')' is the last token consumed (so <c>(a) AND (b)</c> is not wrapped).
+    /// </summary>
+    private bool IsWrappedInParentheses(int startToken)
+    {
+        if (this.tokens[startToken].Kind != TokenKind.LParen)
+        {
+            return false;
+        }
+
+        int depth = 0;
+        for (int i = startToken; i < this.position; i++)
+        {
+            depth += this.tokens[i].Kind switch
+            {
+                TokenKind.LParen => 1,
+                TokenKind.RParen => -1,
+                _ => 0,
+            };
+            if (depth == 0)
+            {
+                return i == this.position - 1;
+            }
+        }
+
+        return false;
     }
 
     private (RuleNode Node, string? BareInfix) ParseOrExpression()
@@ -294,7 +407,7 @@ internal sealed class DslParser
         if (this.Current.Kind == TokenKind.LParen)
         {
             this.position++;
-            (RuleNode inner, _) = this.ParseOrExpression();
+            RuleNode inner = this.ParseExpression();
             this.Expect(TokenKind.RParen, "')'");
             return inner;
         }
@@ -343,6 +456,11 @@ internal sealed class DslParser
         if (this.Current.Kind == TokenKind.Identifier && this.IsKeyword("COALESCE"))
         {
             return this.ParseOperandCall((operands, span) => new CoalesceNode(operands, span));
+        }
+
+        if (this.IsKeyword("IF"))
+        {
+            return this.ParseOperandCall((operands, span) => new IfNode(operands, span));
         }
 
         if (this.IsKeyword("BETWEEN"))
@@ -533,7 +651,7 @@ internal sealed class DslParser
         while (this.Current.Kind == TokenKind.Comma)
         {
             this.position++;
-            operands.Add(this.ParseOrExpression().Node);
+            operands.Add(this.ParseExpression());
         }
 
         int end = this.Current.Span.End;
@@ -558,7 +676,7 @@ internal sealed class DslParser
         while (this.Current.Kind == TokenKind.Comma)
         {
             this.position++;
-            operands.Add(this.ParseOrExpression().Node);
+            operands.Add(this.ParseExpression());
         }
 
         int end = this.Current.Span.End;
@@ -602,11 +720,11 @@ internal sealed class DslParser
         List<RuleNode> operands = [];
         if (this.Current.Kind != TokenKind.RParen)
         {
-            operands.Add(this.ParseOrExpression().Node);
+            operands.Add(this.ParseExpression());
             while (this.Current.Kind == TokenKind.Comma)
             {
                 this.position++;
-                operands.Add(this.ParseOrExpression().Node);
+                operands.Add(this.ParseExpression());
             }
         }
 

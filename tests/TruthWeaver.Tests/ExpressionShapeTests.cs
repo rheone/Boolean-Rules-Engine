@@ -167,6 +167,19 @@ public sealed class ExpressionShapeTests
     }
 
     [Fact]
+    public void If_shape_carries_condition_then_both_branches_in_order()
+    {
+        IfExpression node = new(TermA, TermB, TermA);
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal("If", shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Null(shape.Max);
+        Assert.Equal([TermA, TermB, TermA], shape.Operands);
+    }
+
+    [Fact]
     public void Coalesce_shape_carries_its_operands_in_order()
     {
         CoalesceExpression node = new(new([TermA, TermB]));

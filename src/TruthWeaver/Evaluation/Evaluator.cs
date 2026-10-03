@@ -73,6 +73,7 @@ internal sealed class Evaluator<TContext>(
             "ExactlyOne" => "ExactlyOne",
             "Between" => $"BETWEEN({shape.K}, {shape.Max})",
             "Coalesce" => "COALESCE",
+            "If" => "If",
             _ => $"{shape.OpName}({shape.K})",
         };
     }
@@ -287,6 +288,9 @@ internal sealed class Evaluator<TContext>(
                     .ConfigureAwait(false);
             }
 
+            case IfExpression ifNode:
+                return await this.EvalIfAsync(ifNode).ConfigureAwait(false);
+
             case XorExpression:
             {
                 NodeShape shape = ExpressionShape.Of(node);
@@ -400,6 +404,45 @@ internal sealed class Evaluator<TContext>(
             default:
                 throw new InvalidOperationException($"Unhandled expression type '{node.GetType()}'.");
         }
+    }
+
+    /// <summary>
+    /// Evaluates <c>If(condition, whenTrue, whenFalse)</c>. A definite condition needs only its own branch, so the other
+    /// is skipped (marked <c>NotEvaluated</c>, like the operands AND/OR short-circuit past). An <c>Unknown</c> condition
+    /// cannot choose, so both branches are evaluated and the result is their shared definite value or <c>Unknown</c>.
+    /// <see cref="EvaluationMode.Exhaustive"/> evaluates both branches regardless.
+    /// </summary>
+    private async ValueTask<EvalResult> EvalIfAsync(IfExpression node)
+    {
+        EvalResult condition = await this.EvalAsync(node.Condition).ConfigureAwait(false);
+        bool exhaustive = this.options.Mode == EvaluationMode.Exhaustive;
+        bool needWhenTrue = exhaustive || condition.Value != TruthValue.False;
+        bool needWhenFalse = exhaustive || condition.Value != TruthValue.True;
+
+        EvalResult whenTrue = needWhenTrue
+            ? await this.EvalAsync(node.WhenTrue).ConfigureAwait(false)
+            : this.Skip(node.WhenTrue);
+        EvalResult whenFalse = needWhenFalse
+            ? await this.EvalAsync(node.WhenFalse).ConfigureAwait(false)
+            : this.Skip(node.WhenFalse);
+
+        TruthValue value = condition.Value switch
+        {
+            TruthValue.True => whenTrue.Value,
+            TruthValue.False => whenFalse.Value,
+
+            // No branch can be chosen: the answer is only certain when both branches agree on a definite value.
+            _ => whenTrue.Value == whenFalse.Value ? whenTrue.Value : TruthValue.Unknown,
+        };
+        return new EvalResult(value, new EvaluatedNode("If", value, false, [condition.Node, whenTrue.Node, whenFalse.Node]));
+    }
+
+    /// <summary>Records <paramref name="node"/> as not evaluated in the trace and evaluated tree.</summary>
+    private EvalResult Skip(Expression node)
+    {
+        string skippedDescription = Describe(node);
+        this.trace.Add(new TraceEntry(skippedDescription, null, true));
+        return new EvalResult(TruthValue.Unknown, new EvaluatedNode(skippedDescription, null, true, []));
     }
 
     private async ValueTask<EvalResult> EvalChainAsync(

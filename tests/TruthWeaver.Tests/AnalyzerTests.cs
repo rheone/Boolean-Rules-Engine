@@ -145,6 +145,11 @@ public sealed class AnalyzerTests
     [InlineData("BETWEEN(0, 1, (a AND FALSE), (b AND FALSE))", true)]
     [InlineData("COALESCE((a AND FALSE), b)", false)]
     [InlineData("COALESCE((a OR TRUE), b)", true)]
+    [InlineData("If((a OR TRUE), (b OR TRUE), c)", true)]
+    [InlineData("If((a OR TRUE), (b AND FALSE), c)", false)]
+    [InlineData("If((a AND FALSE), b, (c AND FALSE))", false)]
+    [InlineData("If(a, (b OR TRUE), (c OR TRUE))", true)]
+    [InlineData("If(a, (b AND FALSE), (c AND FALSE))", false)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -185,6 +190,9 @@ public sealed class AnalyzerTests
     [InlineData("BETWEEN(1, 1, a, NOT a)")]
     [InlineData("COALESCE(a, NOT a)")]
     [InlineData("a ?? NOT a")]
+    [InlineData("If(a, a, NOT a)")]
+    [InlineData("If(a, NOT a, a)")]
+    [InlineData("a ? b : NOT b")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
     [InlineData("AtMost(1, a, NOT a)")]
@@ -357,7 +365,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(17))
+        switch (random.Next(18))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -452,6 +460,15 @@ public sealed class AnalyzerTests
                     $"COALESCE({string.Join(", ", coalesced.Select(o => o.Text))})",
                     v => K3Oracle.Coalesce([.. coalesced.Select(o => o.Eval(v))]),
                     coalesced
+                );
+            case 17:
+                GeneratedRule condition = Child();
+                GeneratedRule whenTrue = Child();
+                GeneratedRule whenFalse = Child();
+                return new GeneratedRule(
+                    $"If({condition.Text}, {whenTrue.Text}, {whenFalse.Text})",
+                    v => K3Oracle.If(condition.Eval(v), whenTrue.Eval(v), whenFalse.Eval(v)),
+                    [condition, whenTrue, whenFalse]
                 );
             case 6:
                 GeneratedRule[] exactlyOne = [.. Enumerable.Range(0, random.Next(2, 4)).Select(_ => Child())];

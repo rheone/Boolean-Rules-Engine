@@ -66,6 +66,7 @@ public sealed class RuleTreeSchemaTests
             """{"op": "all", "operands": [{"const": true}, {"const": false}]}""",
             """{"op": "none", "operands": [{"const": true}, {"const": false}]}""",
             """{"op": "coalesce", "operands": [{"const": "unknown"}, {"const": false}]}""",
+            """{"op": "if", "operands": [{"const": "unknown"}, {"const": true}, {"const": false}]}""",
             """{"op": "between", "min": 1, "max": 2, "operands": [{"const": true}, {"const": false}, {"const": true}]}""",
             """{"op": "exactlyOne", "operands": [{"const": true}, {"const": false}, {"const": true}]}""",
             """{"op": "atLeast", "k": 2, "operands": [{"const": true}, {"const": true}, {"const": false}]}""",

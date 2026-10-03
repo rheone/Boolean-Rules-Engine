@@ -106,6 +106,9 @@ public sealed class DslRoundTripPropertyTests
             Gen<Expression> genCoalesce = self.Array[2, 4]
                 .Select(operands => (Expression)new CoalesceExpression(new EquatableArray<Expression>(operands)));
 
+            Gen<Expression> genIf = self.Array[3]
+                .Select(operands => (Expression)new IfExpression(operands[0], operands[1], operands[2]));
+
             return Gen.Frequency(
                 (3, GenLeaf),
                 (2, genAnd),
@@ -123,7 +126,8 @@ public sealed class DslRoundTripPropertyTests
                 (1, genExactlyOne),
                 (1, genThreshold),
                 (1, genBetween),
-                (1, genCoalesce)
+                (1, genCoalesce),
+                (1, genIf)
             );
         }
     );

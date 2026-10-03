@@ -80,10 +80,10 @@
       "additionalProperties": false
     },
     "naryOperatorNode": {
-      "description": "AND, OR, XOR, EQUIVALENT, IMPLIES, NAND, NOR, NXOR, ANY, ALL, NONE, COALESCE, ExactlyOne: an operand list ('iff' and the legacy 'xnor' are accepted aliases of 'equivalent'; XOR/EQUIVALENT/IMPLIES/NAND/NOR are compile-time restricted to exactly two operands, IMPLIES as [antecedent, consequent]; that restriction is not expressible as JSON structure; COALESCE takes its operands in priority order).",
+      "description": "AND, OR, XOR, EQUIVALENT, IMPLIES, NAND, NOR, NXOR, ANY, ALL, NONE, COALESCE, If, ExactlyOne: an operand list ('iff' and the legacy 'xnor' are accepted aliases of 'equivalent'; XOR/EQUIVALENT/IMPLIES/NAND/NOR are compile-time restricted to exactly two operands, IMPLIES as [antecedent, consequent]; that restriction is not expressible as JSON structure; COALESCE takes its operands in priority order; If is compile-time restricted to exactly three operands, [condition, whenTrue, whenFalse]).",
       "type": "object",
       "properties": {
-        "op": { "enum": ["and", "or", "xor", "equivalent", "iff", "xnor", "implies", "nand", "nor", "nxor", "any", "all", "none", "coalesce", "exactlyOne"] },
+        "op": { "enum": ["and", "or", "xor", "equivalent", "iff", "xnor", "implies", "nand", "nor", "nxor", "any", "all", "none", "coalesce", "if", "exactlyOne"] },
         "operands": {
           "type": "array",
           "items": { "$ref": "#/$defs/node" }

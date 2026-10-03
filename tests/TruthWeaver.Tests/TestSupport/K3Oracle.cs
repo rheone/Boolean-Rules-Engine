@@ -218,6 +218,45 @@ public static class K3Oracle
         return TruthValue.Unknown;
     }
 
+    /// <summary>
+    /// <c>If(condition, whenTrue, whenFalse)</c>, defined from the primitives as the multiplexer
+    /// <c>(c AND t) OR (NOT c AND f)</c> plus its consensus term <c>(t AND f)</c>. Without the consensus term an
+    /// <c>Unknown</c> condition would turn <c>If(U, T, T)</c> into <c>Unknown</c>; with it the result is the branch value
+    /// whenever both branches agree (the reference specification's "an Unknown condition does not guess a branch").
+    /// For a definite condition the consensus term never changes the multiplexer's value.
+    /// </summary>
+    /// <param name="condition">The condition's value.</param>
+    /// <param name="whenTrue">The value of the branch taken when the condition is <c>True</c>.</param>
+    /// <param name="whenFalse">The value of the branch taken when the condition is <c>False</c>.</param>
+    public static TruthValue If(TruthValue condition, TruthValue whenTrue, TruthValue whenFalse)
+    {
+        return Or([And([condition, whenTrue]), And([Not(condition), whenFalse]), And([whenTrue, whenFalse])]);
+    }
+
+    /// <summary><c>IsTrue</c>: <c>True</c> when the operand is <c>True</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsTrue(TruthValue value)
+    {
+        return value == TruthValue.True ? TruthValue.True : TruthValue.False;
+    }
+
+    /// <summary><c>IsFalse</c>: <c>True</c> when the operand is <c>False</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsFalse(TruthValue value)
+    {
+        return value == TruthValue.False ? TruthValue.True : TruthValue.False;
+    }
+
+    /// <summary><c>IsUnknown</c>: <c>True</c> when the operand is <c>Unknown</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsUnknown(TruthValue value)
+    {
+        return value == TruthValue.Unknown ? TruthValue.True : TruthValue.False;
+    }
+
+    /// <summary><c>IsKnown</c>: <c>True</c> when the operand is <c>True</c> or <c>False</c>, otherwise <c>False</c> (never <c>Unknown</c>).</summary>
+    public static TruthValue IsKnown(TruthValue value)
+    {
+        return value == TruthValue.Unknown ? TruthValue.False : TruthValue.True;
+    }
+
     /// <summary>Exactly-one-true over the interval semantics (not parity).</summary>
     public static TruthValue ExactlyOne(IReadOnlyList<TruthValue> operands)
     {

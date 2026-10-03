@@ -179,8 +179,31 @@ internal sealed class RuleNodeCompiler<TContext>
                 2,
                 operands => new CoalesceExpression(new EquatableArray<Expression>(operands))
             ),
+            IfNode ifNode => this.BuildIf(ifNode, depth),
             _ => throw new InvalidOperationException($"Unhandled rule node type '{node.GetType()}'."),
         };
+    }
+
+    /// <summary>Builds <c>If(condition, whenTrue, whenFalse)</c>; anything but exactly three operands is a <see cref="DiagnosticCodes.MalformedTree"/>.</summary>
+    private Expression BuildIf(IfNode node, int depth)
+    {
+        if (node.Operands.Count != 3)
+        {
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"If requires exactly 3 operands (condition, whenTrue, whenFalse) but found {node.Operands.Count}.",
+                    node.Span
+                )
+            );
+            return FailedNode.Placeholder;
+        }
+
+        return new IfExpression(
+            this.Build(node.Operands[0], depth + 1),
+            this.Build(node.Operands[1], depth + 1),
+            this.Build(node.Operands[2], depth + 1)
+        );
     }
 
     private Expression BuildVariadic(

@@ -32,6 +32,9 @@ internal enum TokenKind
     /// <summary>':'.</summary>
     Colon,
 
+    /// <summary>'?', the ternary conditional's separator (the doubled <c>??</c> is an <see cref="Operator"/>).</summary>
+    Question,
+
     /// <summary>
     /// A symbolic operator (<c>&amp;&amp; || ! ∧ ∨ ¬ ⊕ → ↔ ↑ ↓</c>). <see cref="Token.Text"/> holds the symbol as written;
     /// the parser maps it to the named operator it is an alias for (ADR-0005 decision 2).
