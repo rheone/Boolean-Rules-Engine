@@ -26,6 +26,22 @@ public enum ThresholdComparison
     Exactly,
 }
 
+/// <summary>Which K3 state an <see cref="InspectionExpression"/> tests its operand for.</summary>
+public enum InspectionKind
+{
+    /// <summary><c>IsTrue(x)</c>: <c>True</c> iff the operand is <c>True</c>.</summary>
+    IsTrue,
+
+    /// <summary><c>IsFalse(x)</c>: <c>True</c> iff the operand is <c>False</c>.</summary>
+    IsFalse,
+
+    /// <summary><c>IsUnknown(x)</c>: <c>True</c> iff the operand is <c>Unknown</c>.</summary>
+    IsUnknown,
+
+    /// <summary><c>IsKnown(x)</c>: <c>True</c> iff the operand is <c>True</c> or <c>False</c> (not <c>Unknown</c>).</summary>
+    IsKnown,
+}
+
 /// <summary>
 /// The base of the immutable expression tree a <c>CompiledRule</c> wraps (CONTEXT.md's conceptual
 /// model). Every node type below is a closed set by design (ADR-0004) — adding an operator is a
@@ -162,6 +178,16 @@ public sealed record ThresholdExpression(ThresholdComparison Comparison, int K, 
 /// <param name="Max">The inclusive upper bound on the true-operand count (at least <paramref name="Min"/>, at most the operand count); <c>Min = 0</c> with <c>Max = n</c> is rejected as an always-true range.</param>
 /// <param name="Operands">The operands (at least two).</param>
 public sealed record BetweenExpression(int Min, int Max, EquatableArray<Expression> Operands) : Expression;
+
+/// <summary>
+/// <c>IsTrue(x)</c>, <c>IsFalse(x)</c>, <c>IsUnknown(x)</c> or <c>IsKnown(x)</c>: tests the K3 state of the operand
+/// instead of combining values. The result is always a definite <c>True</c> or <c>False</c> (never <c>Unknown</c>), so an
+/// inspection can sit anywhere in a rule without collapsing or poisoning the rest of it. One node with a
+/// <see cref="Kind"/> (like <see cref="ThresholdExpression"/>) because the four differ only in the state they test.
+/// </summary>
+/// <param name="Kind">Which state is tested.</param>
+/// <param name="Operand">The expression whose result is inspected.</param>
+public sealed record InspectionExpression(InspectionKind Kind, Expression Operand) : Expression;
 
 /// <summary>
 /// <c>If(condition, whenTrue, whenFalse)</c> (ternary <c>condition ? whenTrue : whenFalse</c>): a K3-aware conditional.

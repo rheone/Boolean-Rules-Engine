@@ -151,6 +151,9 @@ internal static class Analyzer
                 }
 
                 break;
+            case InspectionExpression ins:
+                CollectTerms(ins.Operand, terms);
+                break;
             case IfExpression iff:
                 CollectTerms(iff.Condition, terms);
                 CollectTerms(iff.WhenTrue, terms);
@@ -242,6 +245,24 @@ internal static class Analyzer
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// An inspection on the rails. The tested state is a definite fact about <c>x</c>, so both result rails are the same
+    /// BDD: <c>IsTrue</c> is <c>D</c>, <c>IsFalse</c> is <c>NOT P</c>, <c>IsUnknown</c> is <c>P AND NOT D</c> and
+    /// <c>IsKnown</c> is <c>D OR NOT P</c> (for <c>x</c> with rail <c>(D, P)</c>); the result is never <c>Unknown</c>.
+    /// </summary>
+    private static DualRail Inspect(BddManager bdd, InspectionKind kind, DualRail x)
+    {
+        int isTrue = kind switch
+        {
+            InspectionKind.IsTrue => x.Definite,
+            InspectionKind.IsFalse => bdd.Not(x.Possible),
+            InspectionKind.IsUnknown => bdd.And(x.Possible, bdd.Not(x.Definite)),
+            InspectionKind.IsKnown => bdd.Or(x.Definite, bdd.Not(x.Possible)),
+            _ => throw new InvalidOperationException($"Unhandled inspection kind '{kind}'."),
+        };
+        return new DualRail(isTrue, isTrue);
     }
 
     /// <summary>
@@ -424,6 +445,9 @@ internal static class Analyzer
                 break;
             case CoalesceExpression co:
                 rail = Coalesce(bdd, BuildOperands(co.Operands, bdd, variableIndex, diagnostics));
+                break;
+            case InspectionExpression ins:
+                rail = Inspect(bdd, ins.Kind, Build(ins.Operand, bdd, variableIndex, diagnostics));
                 break;
             case IfExpression iff:
                 rail = If(

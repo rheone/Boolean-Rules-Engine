@@ -84,6 +84,22 @@ public static class OperatorInfo
                 "COALESCE",
                 "The first operand that is not Unknown; True and False pass through unchanged and the result is Unknown only if every operand is Unknown. Operands after the first known value are skipped."
             ),
+            "IsTrue" => new OperatorDescriptor(
+                "IsTrue",
+                "Inspection: True iff the operand is True; False if it is False or Unknown. The result is never Unknown, so it never collapses the enclosing rule."
+            ),
+            "IsFalse" => new OperatorDescriptor(
+                "IsFalse",
+                "Inspection: True iff the operand is False; False if it is True or Unknown. The result is never Unknown, so it never collapses the enclosing rule."
+            ),
+            "IsUnknown" => new OperatorDescriptor(
+                "IsUnknown",
+                "Inspection: True iff the operand is Unknown; False if it is True or False. The result is never Unknown, so it never collapses the enclosing rule."
+            ),
+            "IsKnown" => new OperatorDescriptor(
+                "IsKnown",
+                "Inspection: True iff the operand is True or False; False if it is Unknown. The result is never Unknown, so it never collapses the enclosing rule."
+            ),
             "If" => new OperatorDescriptor(
                 "If",
                 "Conditional: the second operand when the condition is True, the third when it is False. An Unknown condition does not pick a branch: the result is the branch value when both branches are the same definite value, otherwise Unknown. Only the needed branch is evaluated for a definite condition."

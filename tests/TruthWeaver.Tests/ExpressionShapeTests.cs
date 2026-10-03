@@ -179,6 +179,23 @@ public sealed class ExpressionShapeTests
         Assert.Equal([TermA, TermB, TermA], shape.Operands);
     }
 
+    [Theory]
+    [InlineData(InspectionKind.IsTrue, "IsTrue")]
+    [InlineData(InspectionKind.IsFalse, "IsFalse")]
+    [InlineData(InspectionKind.IsUnknown, "IsUnknown")]
+    [InlineData(InspectionKind.IsKnown, "IsKnown")]
+    public void Inspection_shape_is_named_after_its_kind_and_carries_its_one_operand(InspectionKind kind, string opName)
+    {
+        InspectionExpression node = new(kind, TermA);
+
+        NodeShape shape = ExpressionShape.Of(node);
+
+        Assert.Equal(opName, shape.OpName);
+        Assert.Null(shape.K);
+        Assert.Null(shape.Max);
+        Assert.Equal([TermA], shape.Operands);
+    }
+
     [Fact]
     public void Coalesce_shape_carries_its_operands_in_order()
     {

@@ -36,6 +36,10 @@ internal sealed class DslParser
         "BETWEEN",
         "COALESCE",
         "IF",
+        "ISTRUE",
+        "ISFALSE",
+        "ISUNKNOWN",
+        "ISKNOWN",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -49,6 +53,15 @@ internal sealed class DslParser
     // COALESCE is infix only as the symbol ?? (the word is a function call), and, being associative, a chain of it
     // folds into one n-ary node instead of being rejected like the binary-only operators.
     private static readonly string[] InfixOperators = ["XOR", "EQUIVALENT", "IMPLIES", "NAND", "NOR", "COALESCE"];
+
+    // The inspection function calls, each taking exactly one operand (checked by the compiler).
+    private static readonly (string Keyword, InspectionKind Kind)[] InspectionKeywords =
+    [
+        ("ISTRUE", InspectionKind.IsTrue),
+        ("ISFALSE", InspectionKind.IsFalse),
+        ("ISUNKNOWN", InspectionKind.IsUnknown),
+        ("ISKNOWN", InspectionKind.IsKnown),
+    ];
 
     private readonly IReadOnlyList<Token> tokens;
     private readonly List<Diagnostic> diagnostics;
@@ -456,6 +469,14 @@ internal sealed class DslParser
         if (this.Current.Kind == TokenKind.Identifier && this.IsKeyword("COALESCE"))
         {
             return this.ParseOperandCall((operands, span) => new CoalesceNode(operands, span));
+        }
+
+        foreach ((string keyword, InspectionKind kind) in InspectionKeywords)
+        {
+            if (this.IsKeyword(keyword))
+            {
+                return this.ParseOperandCall((operands, span) => new InspectionNode(kind, operands, span));
+            }
         }
 
         if (this.IsKeyword("IF"))

@@ -35,6 +35,10 @@ internal static class TreeFormatOpNames
         ["Between"] = "between",
         ["Coalesce"] = "coalesce",
         ["If"] = "if",
+        ["IsTrue"] = "isTrue",
+        ["IsFalse"] = "isFalse",
+        ["IsUnknown"] = "isUnknown",
+        ["IsKnown"] = "isKnown",
     };
 
     private static readonly IReadOnlyDictionary<string, string> TreeFormatToCanonical = BuildReadTable();

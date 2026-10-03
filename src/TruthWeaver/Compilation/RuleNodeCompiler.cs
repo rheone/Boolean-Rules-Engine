@@ -180,6 +180,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 operands => new CoalesceExpression(new EquatableArray<Expression>(operands))
             ),
             IfNode ifNode => this.BuildIf(ifNode, depth),
+            InspectionNode ins => this.BuildInspection(ins, depth),
             _ => throw new InvalidOperationException($"Unhandled rule node type '{node.GetType()}'."),
         };
     }
@@ -204,6 +205,24 @@ internal sealed class RuleNodeCompiler<TContext>
             this.Build(node.Operands[1], depth + 1),
             this.Build(node.Operands[2], depth + 1)
         );
+    }
+
+    /// <summary>Builds an inspection (<c>IsTrue</c>/<c>IsFalse</c>/<c>IsUnknown</c>/<c>IsKnown</c>); anything but one operand is a <see cref="DiagnosticCodes.MalformedTree"/>.</summary>
+    private Expression BuildInspection(InspectionNode node, int depth)
+    {
+        if (node.Operands.Count != 1)
+        {
+            this.diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    $"{node.Kind} requires exactly 1 operand but found {node.Operands.Count}.",
+                    node.Span
+                )
+            );
+            return FailedNode.Placeholder;
+        }
+
+        return new InspectionExpression(node.Kind, this.Build(node.Operands[0], depth + 1));
     }
 
     private Expression BuildVariadic(

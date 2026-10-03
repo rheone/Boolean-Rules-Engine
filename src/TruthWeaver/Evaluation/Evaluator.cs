@@ -74,8 +74,23 @@ internal sealed class Evaluator<TContext>(
             "Between" => $"BETWEEN({shape.K}, {shape.Max})",
             "Coalesce" => "COALESCE",
             "If" => "If",
+            "IsTrue" or "IsFalse" or "IsUnknown" or "IsKnown" => shape.OpName,
             _ => $"{shape.OpName}({shape.K})",
         };
+    }
+
+    /// <summary>Tests the K3 state of <paramref name="value"/>; the answer is always a definite <c>True</c> or <c>False</c>.</summary>
+    private static TruthValue Inspect(InspectionKind kind, TruthValue value)
+    {
+        bool matches = kind switch
+        {
+            InspectionKind.IsTrue => value == TruthValue.True,
+            InspectionKind.IsFalse => value == TruthValue.False,
+            InspectionKind.IsUnknown => value == TruthValue.Unknown,
+            InspectionKind.IsKnown => value != TruthValue.Unknown,
+            _ => throw new InvalidOperationException($"Unhandled inspection kind '{kind}'."),
+        };
+        return matches ? TruthValue.True : TruthValue.False;
     }
 
     private static TruthValue KleeneAnd(TruthValue a, TruthValue b)
@@ -286,6 +301,13 @@ internal sealed class Evaluator<TContext>(
                         stops: value => value != TruthValue.Unknown
                     )
                     .ConfigureAwait(false);
+            }
+
+            case InspectionExpression inspection:
+            {
+                EvalResult operand = await this.EvalAsync(inspection.Operand).ConfigureAwait(false);
+                TruthValue value = Inspect(inspection.Kind, operand.Value);
+                return new EvalResult(value, new EvaluatedNode(inspection.Kind.ToString(), value, false, [operand.Node]));
             }
 
             case IfExpression ifNode:

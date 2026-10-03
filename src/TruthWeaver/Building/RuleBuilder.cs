@@ -190,6 +190,50 @@ public abstract class RuleBuilder
     }
 
     /// <summary>
+    /// Creates a builder for <c>IsTrue(operand)</c>: <c>True</c> iff the operand is <c>True</c>, otherwise <c>False</c>
+    /// (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsTrue</c> expression.</returns>
+    public static RuleBuilder IsTrue(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isTrue", [operand]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>IsFalse(operand)</c>: <c>True</c> iff the operand is <c>False</c>, otherwise <c>False</c>
+    /// (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsFalse</c> expression.</returns>
+    public static RuleBuilder IsFalse(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isFalse", [operand]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>IsUnknown(operand)</c>: <c>True</c> iff the operand is <c>Unknown</c>, otherwise <c>False</c>
+    /// (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsUnknown</c> expression.</returns>
+    public static RuleBuilder IsUnknown(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isUnknown", [operand]);
+    }
+
+    /// <summary>
+    /// Creates a builder for <c>IsKnown(operand)</c>: <c>True</c> iff the operand is <c>True</c> or <c>False</c>, otherwise
+    /// <c>False</c> (never <c>Unknown</c>).
+    /// </summary>
+    /// <param name="operand">The expression to inspect.</param>
+    /// <returns>A builder for the <c>IsKnown</c> expression.</returns>
+    public static RuleBuilder IsKnown(RuleBuilder operand)
+    {
+        return new OperatorBuilder("isKnown", [operand]);
+    }
+
+    /// <summary>
     /// Creates a builder for <c>If(condition, whenTrue, whenFalse)</c>: <paramref name="whenTrue"/> when the condition is
     /// <c>True</c>, <paramref name="whenFalse"/> when it is <c>False</c>, and for an <c>Unknown</c> condition the branch value
     /// only if both branches are the same definite value, otherwise <c>Unknown</c>.

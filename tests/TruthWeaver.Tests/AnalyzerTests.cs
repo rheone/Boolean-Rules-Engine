@@ -20,6 +20,14 @@ public sealed class AnalyzerTests
         ("Exactly", (count, k) => count == k),
     ];
 
+    private static readonly (string Name, Func<TruthValue, TruthValue> Inspect)[] Inspections =
+    [
+        ("IsTrue", K3Oracle.IsTrue),
+        ("IsFalse", K3Oracle.IsFalse),
+        ("IsUnknown", K3Oracle.IsUnknown),
+        ("IsKnown", K3Oracle.IsKnown),
+    ];
+
     /// <summary>
     /// <c>A AND NOT A</c> is <c>Unknown</c> when <c>A</c> is <c>Unknown</c>, so it is not a Strong K3
     /// contradiction and must not be reported as one.
@@ -150,6 +158,14 @@ public sealed class AnalyzerTests
     [InlineData("If((a AND FALSE), b, (c AND FALSE))", false)]
     [InlineData("If(a, (b OR TRUE), (c OR TRUE))", true)]
     [InlineData("If(a, (b AND FALSE), (c AND FALSE))", false)]
+    [InlineData("IsTrue((a OR TRUE))", true)]
+    [InlineData("IsTrue((a AND FALSE))", false)]
+    [InlineData("IsFalse((a AND FALSE))", true)]
+    [InlineData("IsFalse((a OR TRUE))", false)]
+    [InlineData("IsUnknown((a OR TRUE))", false)]
+    [InlineData("IsUnknown((a AND FALSE))", false)]
+    [InlineData("IsKnown((a AND FALSE))", true)]
+    [InlineData("IsKnown((a OR TRUE))", true)]
     [InlineData("ExactlyOne((a AND FALSE), (b AND FALSE))", false)]
     [InlineData("ExactlyOne((a OR TRUE), (b AND FALSE))", true)]
     [InlineData("AtLeast(1, (a AND FALSE), (b AND FALSE))", false)]
@@ -193,6 +209,11 @@ public sealed class AnalyzerTests
     [InlineData("If(a, a, NOT a)")]
     [InlineData("If(a, NOT a, a)")]
     [InlineData("a ? b : NOT b")]
+    [InlineData("IsTrue(a)")]
+    [InlineData("IsFalse(NOT a)")]
+    [InlineData("IsUnknown(a)")]
+    [InlineData("IsKnown(a)")]
+    [InlineData("IsUnknown(a AND NOT a)")]
     [InlineData("ExactlyOne(a, NOT a)")]
     [InlineData("AtLeast(1, a, NOT a)")]
     [InlineData("AtMost(1, a, NOT a)")]
@@ -365,7 +386,7 @@ public sealed class AnalyzerTests
             return GenerateRule(random, depth - 1);
         }
 
-        switch (random.Next(18))
+        switch (random.Next(19))
         {
             case 0:
                 GeneratedRule operand = Child();
@@ -461,6 +482,10 @@ public sealed class AnalyzerTests
                     v => K3Oracle.Coalesce([.. coalesced.Select(o => o.Eval(v))]),
                     coalesced
                 );
+            case 18:
+                GeneratedRule inspected = Child();
+                (string inspection, Func<TruthValue, TruthValue> inspect) = Inspections[random.Next(Inspections.Length)];
+                return new GeneratedRule($"{inspection}({inspected.Text})", v => inspect(inspected.Eval(v)), [inspected]);
             case 17:
                 GeneratedRule condition = Child();
                 GeneratedRule whenTrue = Child();

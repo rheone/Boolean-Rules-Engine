@@ -106,6 +106,8 @@ public sealed class DslRoundTripPropertyTests
             Gen<Expression> genCoalesce = self.Array[2, 4]
                 .Select(operands => (Expression)new CoalesceExpression(new EquatableArray<Expression>(operands)));
 
+            Gen<Expression> genInspection = Gen.Enum<InspectionKind>()
+                .Select(self, (kind, operand) => (Expression)new InspectionExpression(kind, operand));
             Gen<Expression> genIf = self.Array[3]
                 .Select(operands => (Expression)new IfExpression(operands[0], operands[1], operands[2]));
 
@@ -127,7 +129,8 @@ public sealed class DslRoundTripPropertyTests
                 (1, genThreshold),
                 (1, genBetween),
                 (1, genCoalesce),
-                (1, genIf)
+                (1, genIf),
+                (1, genInspection)
             );
         }
     );

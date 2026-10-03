@@ -239,6 +239,14 @@ internal static class YamlTreeParser
                 return new CoalesceNode(operands, SourceSpan.None);
             case "If":
                 return new IfNode(operands, SourceSpan.None);
+            case "IsTrue":
+                return new InspectionNode(InspectionKind.IsTrue, operands, SourceSpan.None);
+            case "IsFalse":
+                return new InspectionNode(InspectionKind.IsFalse, operands, SourceSpan.None);
+            case "IsUnknown":
+                return new InspectionNode(InspectionKind.IsUnknown, operands, SourceSpan.None);
+            case "IsKnown":
+                return new InspectionNode(InspectionKind.IsKnown, operands, SourceSpan.None);
             case "ExactlyOne":
                 return new ExactlyOneNode(operands, SourceSpan.None);
             case "AtLeast":

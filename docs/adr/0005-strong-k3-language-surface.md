@@ -235,6 +235,26 @@ the aliases are cheap once the canonical form stays single.
     case-insensitive on read; `rule-tree.schema.json` lists `if`).
     `RuleBuilder.If` is new.
 
+    Implemented in k3-conformance 17: `IsTrue(x)`, `IsFalse(x)`, `IsUnknown(x)`
+    and `IsKnown(x)` are **one** `InspectionExpression(Kind, Operand)` node with
+    an `InspectionKind` (the smallest design consistent with the `NodeShape`
+    seam: like the threshold family they differ only in what they test, and
+    `NodeShape.OpName` is the kind's name). They are function calls (reserved
+    words, any case) taking exactly one operand (`MalformedTree` otherwise) and
+    always yield a definite `True` or `False`: `IsTrue` is "is `True`",
+    `IsFalse` is "is `False`", `IsUnknown` is "is `Unknown`", `IsKnown` is "is
+    not `Unknown`". The operand's own faults are recorded as usual but the
+    inspection adds none, and a definite result never collapses the rest of
+    the enclosing rule. The operand is always evaluated. The analyzer rail has
+    equal definite and possible rails: with `(D, P)` the rails of `x`, `IsTrue`
+    is `D`, `IsFalse` is `NOT P`, `IsUnknown` is `P AND NOT D`, `IsKnown` is `D
+    OR NOT P`, so `IsUnknown(a) OR IsKnown(a)` is a genuine tautology. The
+    canonical printer writes `IsTrue(a)` etc.; the evaluated/description label
+    is the same word in every `OperatorStyle`. JSON/YAML: `{"op": "isTrue" |
+    "isFalse" | "isUnknown" | "isKnown", "operands": [x]}` (case-insensitive on
+    read, one operand checked by the compiler; the schema lists them in the
+    unary node). `RuleBuilder.IsTrue`/`IsFalse`/`IsUnknown`/`IsKnown` are new.
+
 14. **`Collapse(expr, policy)`** is the final boundary that produces a
     two-valued application result. Policies: `UnknownAsFalse`,
     `UnknownAsTrue`, `UnknownIsError`. `Unknown` is a normal K3 value, not a

@@ -56,7 +56,7 @@
       "additionalProperties": false
     },
     "operatorNode": {
-      "description": "An operator node: unary NOT, an n-ary boolean operator, or an n-ary threshold operator.",
+      "description": "An operator node: a unary operator (NOT or an inspection), an n-ary boolean operator, or an n-ary threshold operator.",
       "oneOf": [
         { "$ref": "#/$defs/unaryOperatorNode" },
         { "$ref": "#/$defs/naryOperatorNode" },
@@ -65,10 +65,10 @@
       ]
     },
     "unaryOperatorNode": {
-      "description": "NOT: exactly one operand.",
+      "description": "NOT, or an inspection (IsTrue, IsFalse, IsUnknown, IsKnown; case-insensitive on read): exactly one operand. An inspection always yields a definite true or false.",
       "type": "object",
       "properties": {
-        "op": { "const": "not" },
+        "op": { "enum": ["not", "isTrue", "isFalse", "isUnknown", "isKnown"] },
         "operands": {
           "type": "array",
           "items": { "$ref": "#/$defs/node" },

@@ -56,6 +56,7 @@ internal static class ExpressionShape
             ExactlyOneExpression e => new NodeShape("ExactlyOne", null, e.Operands),
             ThresholdExpression th => new NodeShape(th.Comparison.ToString(), th.K, th.Operands),
             BetweenExpression bt => new NodeShape("Between", bt.Min, bt.Operands, bt.Max),
+            InspectionExpression ins => new NodeShape(ins.Kind.ToString(), null, [ins.Operand]),
             IfExpression i3 => new NodeShape("If", null, [i3.Condition, i3.WhenTrue, i3.WhenFalse]),
             CoalesceExpression co => new NodeShape("Coalesce", null, co.Operands),
             ConstantExpression or TermExpression => throw new ArgumentException(
