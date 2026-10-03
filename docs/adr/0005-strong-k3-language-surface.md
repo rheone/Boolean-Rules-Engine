@@ -106,7 +106,12 @@ the aliases are cheap once the canonical form stays single.
     becomes `Unknown` plus a `Fault` (ADR-0001).
 16. **`Unknown` is a first-class constant and substitution value.**
     Constants are `TruthValue`s end to end. Lenient-mode and failed-node
-    substitutions use `Unknown`, not `false`.
+    substitutions use `Unknown`, not `false`. `True`, `False`, `Unknown` and
+    every operator name are case-insensitive; the canonical printer writes
+    `True`, `False`, `Unknown` and upper-case operators. Serialized form
+    (implemented in k3-conformance 03): JSON `{"const": true|false}` is kept,
+    and `Unknown` is `{"const": "unknown"}` (a string constant in any letter
+    case is also accepted for all three values); YAML is `const: unknown`.
 17. **The analyzer is K3-aware.** A dual-rail BDD tracking "definitely true"
     and "possibly true" replaces classical two-valued analysis, so
     `A AND NOT A` is a K3 contradiction only when it is, and `A OR NOT A` is

@@ -1,6 +1,8 @@
 namespace TruthWeaver.Building;
 
 using System.Text.Json.Nodes;
+using TruthWeaver.Abstractions;
+using TruthWeaver.Ast;
 using TruthWeaver.Compilation;
 
 /// <summary>
@@ -17,10 +19,18 @@ public abstract class RuleBuilder
 {
     private RuleBuilder() { }
 
-    /// <summary>Creates a builder for the literal <see langword="true"/>/<see langword="false"/> constant.</summary>
+    /// <summary>Creates a builder for the literal <c>True</c>/<c>False</c> constant.</summary>
     /// <param name="value">The constant's value.</param>
     /// <returns>A builder for the constant.</returns>
     public static RuleBuilder Constant(bool value)
+    {
+        return new ConstantBuilder(value ? TruthValue.True : TruthValue.False);
+    }
+
+    /// <summary>Creates a builder for a literal K3 constant, including <see cref="TruthValue.Unknown"/>.</summary>
+    /// <param name="value">The constant's value.</param>
+    /// <returns>A builder for the constant.</returns>
+    public static RuleBuilder Constant(TruthValue value)
     {
         return new ConstantBuilder(value);
     }
@@ -201,13 +211,19 @@ public abstract class RuleBuilder
         return array;
     }
 
-    private sealed class ConstantBuilder(bool value) : RuleBuilder
+    private sealed class ConstantBuilder(TruthValue value) : RuleBuilder
     {
-        private readonly bool value = value;
+        private readonly TruthValue value = value;
 
         private protected override JsonNode ToNode()
         {
-            return new JsonObject { ["const"] = this.value };
+            // Same shape JsonTreePrinter writes: booleans for True/False, the string "unknown" otherwise.
+            return this.value switch
+            {
+                TruthValue.True => new JsonObject { ["const"] = true },
+                TruthValue.False => new JsonObject { ["const"] = false },
+                _ => new JsonObject { ["const"] = TruthValueText.TreeFormat(this.value) },
+            };
         }
     }
 

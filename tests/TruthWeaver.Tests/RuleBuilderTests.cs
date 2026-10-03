@@ -136,7 +136,7 @@ public sealed class RuleBuilderTests
 
         CompiledRule<RuleTestContext> rule = RuleBuilder.Constant(true).Compile(compiler).CompiledRule!;
 
-        Assert.Equal("true", rule.CanonicalText);
+        Assert.Equal("True", rule.CanonicalText);
     }
 
     [Theory]

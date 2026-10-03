@@ -60,7 +60,8 @@ public sealed class DslRoundTripPropertyTests
 
     private static readonly Gen<string> GenString = Gen.String[GenStringChar, 0, 10];
 
-    private static readonly Gen<Expression> GenConstant = Gen.Bool.Select(value => (Expression)new ConstantExpression(value));
+    private static readonly Gen<Expression> GenConstant = Gen.Enum<TruthValue>()
+        .Select(value => (Expression)new ConstantExpression(value));
 
     private static readonly Gen<Expression> GenTerm = Gen.OneOf([.. TermSpecs.Select(BuildTermGen)]);
 

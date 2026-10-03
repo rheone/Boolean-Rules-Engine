@@ -1,5 +1,6 @@
 namespace TruthWeaver.Parsing;
 
+using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
 using TruthWeaver.Diagnostics;
 
@@ -20,8 +21,8 @@ using TruthWeaver.Diagnostics;
 /// <param name="Span">This node's location in the source it was parsed from.</param>
 internal abstract record RuleNode(SourceSpan Span);
 
-/// <summary>The literal <see langword="true"/>/<see langword="false"/> constant.</summary>
-internal sealed record ConstantNode(bool Value, SourceSpan Span) : RuleNode(Span);
+/// <summary>The literal K3 constant: <c>True</c>, <c>False</c> or <c>Unknown</c>.</summary>
+internal sealed record ConstantNode(TruthValue Value, SourceSpan Span) : RuleNode(Span);
 
 /// <summary>A raw predicate reference with its (not yet validated) named arguments.</summary>
 internal sealed record TermNode(string PredicateName, IReadOnlyList<ArgumentNode> Arguments, SourceSpan Span) : RuleNode(Span);

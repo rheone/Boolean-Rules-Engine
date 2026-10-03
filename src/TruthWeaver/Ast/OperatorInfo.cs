@@ -19,10 +19,8 @@ public static class OperatorInfo
     {
         if (node is ConstantExpression c)
         {
-            // TODO? Add "Unknown" to possible values / descriptor
-            return c.Value
-                ? new OperatorDescriptor("True", "A fixed True value.")
-                : new OperatorDescriptor("False", "A fixed False value.");
+            string label = TruthValueText.Canonical(c.Value);
+            return new OperatorDescriptor(label, $"A fixed {label} value.");
         }
 
         if (node is TermExpression)

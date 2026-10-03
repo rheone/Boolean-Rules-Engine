@@ -2,6 +2,7 @@ namespace TruthWeaver.Json;
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
 using TruthWeaver.Diagnostics;
 using TruthWeaver.Parsing;
@@ -79,15 +80,29 @@ internal static class JsonTreeParser
 
         if (element.TryGetProperty("const", out JsonElement constElement))
         {
-            if (constElement.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            // A constant is a JSON boolean (the original True/False form) or a string naming a K3 value, so
+            // Unknown (which JSON has no literal for) can be written as "unknown" in any letter case.
+            if (constElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
             {
-                diagnostics.Add(
-                    Diagnostic.Error(DiagnosticCodes.MalformedTree, "'const' must be a JSON boolean.", SourceSpan.None)
-                );
-                return null;
+                return new ConstantNode(constElement.GetBoolean() ? TruthValue.True : TruthValue.False, SourceSpan.None);
             }
 
-            return new ConstantNode(constElement.GetBoolean(), SourceSpan.None);
+            if (
+                constElement.ValueKind == JsonValueKind.String
+                && TruthValueText.TryParse(constElement.GetString(), out TruthValue constValue)
+            )
+            {
+                return new ConstantNode(constValue, SourceSpan.None);
+            }
+
+            diagnostics.Add(
+                Diagnostic.Error(
+                    DiagnosticCodes.MalformedTree,
+                    "'const' must be a JSON boolean or one of \"true\", \"false\", \"unknown\".",
+                    SourceSpan.None
+                )
+            );
+            return null;
         }
 
         if (element.TryGetProperty("predicate", out JsonElement predicateElement))

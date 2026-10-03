@@ -1,5 +1,6 @@
 namespace TruthWeaver.Parsing;
 
+using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
 using TruthWeaver.Diagnostics;
 
@@ -22,6 +23,7 @@ internal sealed class DslParser
         "XNOR",
         "TRUE",
         "FALSE",
+        "UNKNOWN",
         "EXACTLYONE",
         "ATLEAST",
         "ATMOST",
@@ -194,6 +196,13 @@ internal sealed class DslParser
         return this.ParsePrimary();
     }
 
+    private ConstantNode ConsumeConstant(TruthValue value)
+    {
+        SourceSpan span = this.Current.Span;
+        this.position++;
+        return new ConstantNode(value, span);
+    }
+
     private RuleNode ParsePrimary()
     {
         if (this.Current.Kind == TokenKind.LParen)
@@ -204,18 +213,20 @@ internal sealed class DslParser
             return inner;
         }
 
+        // Keyword matching is case-insensitive (IsKeyword), so True/TRUE/true all yield the same node.
         if (this.IsKeyword("TRUE"))
         {
-            SourceSpan span = this.Current.Span;
-            this.position++;
-            return new ConstantNode(true, span);
+            return this.ConsumeConstant(TruthValue.True);
         }
 
         if (this.IsKeyword("FALSE"))
         {
-            SourceSpan span = this.Current.Span;
-            this.position++;
-            return new ConstantNode(false, span);
+            return this.ConsumeConstant(TruthValue.False);
+        }
+
+        if (this.IsKeyword("UNKNOWN"))
+        {
+            return this.ConsumeConstant(TruthValue.Unknown);
         }
 
         if (this.IsKeyword("EXACTLYONE"))

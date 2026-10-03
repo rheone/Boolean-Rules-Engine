@@ -95,7 +95,7 @@ internal sealed class RuleNodeCompiler<TContext>
                 );
             }
 
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         if (depth > this.options.MaxDepth)
@@ -107,13 +107,13 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span
                 )
             );
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         return node switch
         {
             ConstantNode c => new ConstantExpression(c.Value),
-            ErrorNode => new ConstantExpression(false),
+            ErrorNode => new ConstantExpression(TruthValue.False),
             TermNode t => this.BuildTerm(t),
             NotNode n => new NotExpression(this.Build(n.Operand, depth + 1)),
             AndNode a => this.BuildVariadic(
@@ -161,7 +161,7 @@ internal sealed class RuleNodeCompiler<TContext>
                     span
                 )
             );
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         List<Expression> built = new(operands.Count);
@@ -184,7 +184,7 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span
                 )
             );
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         Expression left = this.Build(node.Operands[0], depth + 1);
@@ -203,7 +203,7 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span
                 )
             );
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         Expression left = this.Build(node.Operands[0], depth + 1);
@@ -218,7 +218,7 @@ internal sealed class RuleNodeCompiler<TContext>
             this.diagnostics.Add(
                 Diagnostic.Error(DiagnosticCodes.MalformedTree, $"{node.Comparison} requires at least one operand.", node.Span)
             );
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         (int minK, int maxK) = ValidThresholdRange(node.Comparison, node.Operands.Count);
@@ -231,7 +231,7 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span
                 )
             );
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         List<Expression> built = new(node.Operands.Count);
@@ -259,7 +259,7 @@ internal sealed class RuleNodeCompiler<TContext>
                     node.Span
                 )
             );
-            return new ConstantExpression(false);
+            return new ConstantExpression(TruthValue.False);
         }
 
         PredicateSchema schema = descriptor.Schema;

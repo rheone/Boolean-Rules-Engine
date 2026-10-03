@@ -131,7 +131,7 @@ public sealed class JsonTreeTests
     [Theory]
     [InlineData("not even json", "Malformed JSON:")]
     [InlineData("""{"nothingRecognized": true}""", "must have a 'const', 'predicate', or 'op' key")]
-    [InlineData("""{"const": "notabool"}""", "'const' must be a JSON boolean.")]
+    [InlineData("""{"const": "notabool"}""", "'const' must be a JSON boolean or one of")]
     [InlineData("""{"predicate": 123}""", "'predicate' must be a JSON string.")]
     [InlineData("""{"predicate": "isManager", "args": [1, 2]}""", "'args' must be a JSON object.")]
     [InlineData("""{"predicate": "isManager", "args": {"x": {"weird": 1}}}""", "Unsupported literal JSON value kind")]

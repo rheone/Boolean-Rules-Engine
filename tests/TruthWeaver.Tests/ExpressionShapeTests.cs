@@ -102,7 +102,7 @@ public sealed class ExpressionShapeTests
     [Fact]
     public void Constant_nodes_have_no_operand_shape()
     {
-        ConstantExpression node = new(true);
+        ConstantExpression node = new(TruthValue.True);
 
         Assert.Throws<ArgumentException>(() => ExpressionShape.Of(node));
     }

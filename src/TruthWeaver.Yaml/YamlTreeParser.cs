@@ -1,6 +1,7 @@
 namespace TruthWeaver.Yaml;
 
 using System.Diagnostics.CodeAnalysis;
+using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
 using TruthWeaver.Diagnostics;
 using TruthWeaver.Parsing;
@@ -79,10 +80,17 @@ internal static class YamlTreeParser
 
         if (TryGetChild(mapping, "const", out YamlNode? constNode))
         {
-            if (constNode is not YamlScalarNode { Value: { } constText } || !TryParseBoolean(constText, out bool constValue))
+            if (
+                constNode is not YamlScalarNode { Value: { } constText }
+                || !TruthValueText.TryParse(constText, out TruthValue constValue)
+            )
             {
                 diagnostics.Add(
-                    Diagnostic.Error(DiagnosticCodes.MalformedTree, "'const' must be a YAML boolean.", SourceSpan.None)
+                    Diagnostic.Error(
+                        DiagnosticCodes.MalformedTree,
+                        "'const' must be a YAML boolean or one of true, false, unknown.",
+                        SourceSpan.None
+                    )
                 );
                 return null;
             }

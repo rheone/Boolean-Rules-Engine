@@ -22,7 +22,14 @@ internal static class JsonTreePrinter
     {
         if (node is ConstantExpression c)
         {
-            return new JsonObject { ["const"] = c.Value };
+            // True/False stay plain JSON booleans (compatible with existing documents); Unknown has no JSON
+            // literal, so it is written as the string "unknown".
+            return c.Value switch
+            {
+                TruthValue.True => new JsonObject { ["const"] = true },
+                TruthValue.False => new JsonObject { ["const"] = false },
+                _ => new JsonObject { ["const"] = TruthValueText.TreeFormat(c.Value) },
+            };
         }
 
         if (node is TermExpression t)

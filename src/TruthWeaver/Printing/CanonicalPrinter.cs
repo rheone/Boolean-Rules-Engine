@@ -58,7 +58,7 @@ internal static class CanonicalPrinter
     {
         string inner = node switch
         {
-            ConstantExpression c => c.Value ? "true" : "false",
+            ConstantExpression c => TruthValueText.Canonical(c.Value),
             TermExpression t => t.Identity.ToString(),
             NotExpression n => "NOT " + PrintNode(n.Operand, PrintContext.NotOperand),
             AndExpression => JoinOperands(node, " AND ", PrintContext.AndOperand),

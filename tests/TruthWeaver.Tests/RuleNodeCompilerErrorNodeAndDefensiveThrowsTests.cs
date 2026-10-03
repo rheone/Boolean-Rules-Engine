@@ -1,5 +1,6 @@
 namespace TruthWeaver.Tests;
 
+using TruthWeaver.Abstractions;
 using TruthWeaver.Ast;
 using TruthWeaver.Compilation;
 using TruthWeaver.Diagnostics;
@@ -29,7 +30,7 @@ public sealed class RuleNodeCompilerErrorNodeAndDefensiveThrowsTests
     public void An_error_node_compiles_to_a_false_constant_without_throwing_and_the_surrounding_tree_still_compiles()
     {
         SourceSpan span = new(0, 1);
-        AndNode tree = new([new ConstantNode(true, span), new ErrorNode(span)], span);
+        AndNode tree = new([new ConstantNode(TruthValue.True, span), new ErrorNode(span)], span);
 
         (Expression? compiled, IReadOnlyList<Diagnostic> diagnostics) = RuleNodeCompiler<RuleTestContext>.Compile(
             tree,
@@ -40,7 +41,7 @@ public sealed class RuleNodeCompilerErrorNodeAndDefensiveThrowsTests
         Assert.NotNull(compiled);
         Assert.Empty(diagnostics);
         AndExpression and = Assert.IsType<AndExpression>(compiled);
-        Assert.Equal([new ConstantExpression(true), new ConstantExpression(false)], and.Operands);
+        Assert.Equal([new ConstantExpression(TruthValue.True), new ConstantExpression(TruthValue.False)], and.Operands);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public sealed class RuleNodeCompilerErrorNodeAndDefensiveThrowsTests
         // switch's discriminant is the Comparison carried directly on a hand-built ThresholdNode, so a
         // bogus value reaches it without needing reflection into a private member.
         SourceSpan span = new(0, 1);
-        ThresholdNode bogus = new((ThresholdComparison)999, K: 0, Operands: [new ConstantNode(true, span)], span);
+        ThresholdNode bogus = new((ThresholdComparison)999, K: 0, Operands: [new ConstantNode(TruthValue.True, span)], span);
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
             RuleNodeCompiler<RuleTestContext>.Compile(bogus, EmptyRegistry, CompilerOptions.Default)

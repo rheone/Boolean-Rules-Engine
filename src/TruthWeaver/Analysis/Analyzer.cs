@@ -145,7 +145,17 @@ internal static class Analyzer
         switch (node)
         {
             case ConstantExpression c:
-                return c.Value ? BddManager.True : BddManager.False;
+                if (c.Value == TruthValue.Unknown)
+                {
+                    // Interim (the dual-rail K3 analyzer is a later slice): an Unknown literal is neither
+                    // structurally true nor false, so it becomes its own fresh variable. That keeps
+                    // `Unknown AND NOT Unknown` from being reported as a classical contradiction.
+                    int fresh = variableIndex.Count;
+                    variableIndex[new TermIdentity($"<unknown#{fresh}>", [])] = fresh;
+                    return bdd.Variable(fresh);
+                }
+
+                return c.Value == TruthValue.True ? BddManager.True : BddManager.False;
             case TermExpression t:
                 if (!variableIndex.TryGetValue(t.Identity, out int index))
                 {

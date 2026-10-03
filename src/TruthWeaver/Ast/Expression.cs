@@ -36,9 +36,12 @@ public abstract record Expression
     private protected Expression() { }
 }
 
-/// <summary>The literal <see langword="true"/>/<see langword="false"/> constant.</summary>
+/// <summary>
+/// A literal K3 constant: <see cref="TruthValue.True"/>, <see cref="TruthValue.False"/> or
+/// <see cref="TruthValue.Unknown"/> (ADR-0005). Written <c>True</c>/<c>False</c>/<c>Unknown</c> in any letter case.
+/// </summary>
 /// <param name="Value">The constant's value.</param>
-public sealed record ConstantExpression(bool Value) : Expression;
+public sealed record ConstantExpression(TruthValue Value) : Expression;
 
 /// <summary>A leaf node: a predicate bound to concrete, validated arguments.</summary>
 /// <param name="Identity">This term's identity — the unit of memoization and structural equality.</param>

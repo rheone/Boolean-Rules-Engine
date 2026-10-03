@@ -30,7 +30,7 @@ internal static class YamlTreePrinter
     {
         if (node is ConstantExpression c)
         {
-            return Mapping(("const", Scalar(c.Value ? "true" : "false", ScalarStyle.Plain)));
+            return Mapping(("const", Scalar(TruthValueText.TreeFormat(c.Value), ScalarStyle.Plain)));
         }
 
         if (node is TermExpression t)

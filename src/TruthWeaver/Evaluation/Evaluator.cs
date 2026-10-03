@@ -47,7 +47,7 @@ internal sealed class Evaluator<TContext>(
     {
         if (node is ConstantExpression c)
         {
-            return c.Value ? "true" : "false";
+            return TruthValueText.Canonical(c.Value);
         }
 
         if (node is TermExpression t)
@@ -191,7 +191,7 @@ internal sealed class Evaluator<TContext>(
         switch (node)
         {
             case ConstantExpression c:
-                TruthValue constantValue = c.Value ? TruthValue.True : TruthValue.False;
+                TruthValue constantValue = c.Value;
                 string constantDescription = Describe(node);
                 this.trace.Add(new TraceEntry(constantDescription, constantValue, false));
                 return new EvalResult(constantValue, new EvaluatedNode(constantDescription, constantValue, false, []));
