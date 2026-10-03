@@ -11,7 +11,7 @@ using TruthWeaver.Abstractions;
 /// </summary>
 public static class OperatorInfo
 {
-    // TODO operator descriptions should be enriched with context, not be a static value unless a static value is actually called for
+    // Note: descriptors are static text today; enrich them with context only where a static value is not enough.
 
     /// <summary>Gets the label and description for an operator node.</summary>
     /// <param name="node">The expression node.</param>
@@ -37,8 +37,6 @@ public static class OperatorInfo
         NodeShape shape = ExpressionShape.Of(node);
         return shape.OpName switch
         {
-            // TODO add all operators
-
             "Not" => new OperatorDescriptor("NOT", "Logical negation. Unknown stays Unknown."),
             "And" => new OperatorDescriptor("AND", "True iff every operand is true. Short-circuits at the first False."),
             "Or" => new OperatorDescriptor("OR", "True iff at least one operand is true. Short-circuits at the first True."),

@@ -9,4 +9,4 @@ using BenchmarkDotNet.Running;
 // generated-project/SDK-resolution step entirely. The tradeoff (no process isolation between cases) is
 // acceptable here: every benchmark in this suite is a short, allocation-light, single-threaded call with
 // no static state that would leak between cases.
-BenchmarkSwitcher.FromAssembly(Assembly.GetExecutingAssembly()).Run(args);
+_ = await BenchmarkSwitcher.FromAssembly(Assembly.GetExecutingAssembly()).RunAsync(args);
